@@ -9,7 +9,7 @@ import dev.arcaneclient.command.ArcaneCommands;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.render.EspRenderer;
 import dev.arcaneclient.render.ItemEspRenderer;
-import dev.arcaneclient.render.StashLabelRenderer;
+import dev.arcaneclient.render.GrowthLabelRenderer;
 import dev.arcaneclient.render.ArcaneHud;
 import dev.arcaneclient.render.TraceRenderer;
 import dev.arcaneclient.render.TunnelEspRenderer;
@@ -96,7 +96,7 @@ implements ClientModInitializer {
             ItemEspRenderer.tick(client);
             engine.tick(client);
             TunnelEspRenderer.tick();
-            StashLabelRenderer.tick(client);
+            GrowthLabelRenderer.tick(client);
         });
         ArcaneCommands.register();
         FreecamController.register();
@@ -104,7 +104,7 @@ implements ClientModInitializer {
         EspRenderer.register();
         ItemEspRenderer.register();
         TunnelEspRenderer.register();
-        StashLabelRenderer.register();
+        GrowthLabelRenderer.register();
         ArcaneHud.register();
         LOGGER.info("Arcane Client initialized for Minecraft 1.21.11");
     }

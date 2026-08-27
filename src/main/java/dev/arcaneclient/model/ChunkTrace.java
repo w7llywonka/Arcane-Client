@@ -1,10 +1,5 @@
 package dev.arcaneclient.model;
 
-import dev.arcaneclient.model.DepthProfile;
-import dev.arcaneclient.model.ScanEvidence;
-import dev.arcaneclient.model.ScanResult;
-import dev.arcaneclient.model.ScoreSummary;
-import dev.arcaneclient.model.SignalCategory;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -16,32 +11,41 @@ import java.util.function.Predicate;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
-@Environment(value=EnvType.CLIENT)
+@Environment(EnvType.CLIENT)
 public final class ChunkTrace {
     private final EnumMap<SignalCategory, StaticHistory> staticHistory = new EnumMap<>(SignalCategory.class);
-    private final Map<ScanEvidence.EvidenceKey, ScanEvidence> liveSignals = new HashMap<ScanEvidence.EvidenceKey, ScanEvidence>();
+    private final Map<ScanEvidence.EvidenceKey, ScanEvidence> liveSignals = new HashMap<>();
+
+    public void mergeSnapshot(ScanResult scan) {
+        this.staticHistory.clear();
+        this.merge(scan);
+    }
 
     public void merge(ScanResult scan) {
         EnumMap<SignalCategory, List<ScanEvidence>> staticByCategory = new EnumMap<>(SignalCategory.class);
-        ArrayList<ScanEvidence> incomingLive = new ArrayList<ScanEvidence>();
-        for (ScanEvidence scanEvidence : scan.evidence()) {
-            if (scanEvidence.isLive()) {
-                incomingLive.add(scanEvidence);
-                continue;
+        ArrayList<ScanEvidence> incomingLive = new ArrayList<>();
+        for (ScanEvidence evidence : scan.evidence()) {
+            if (evidence.isLive()) {
+                incomingLive.add(evidence);
+            } else {
+                staticByCategory.computeIfAbsent(evidence.category(), ignored -> new ArrayList<>()).add(evidence);
             }
-            staticByCategory.computeIfAbsent(scanEvidence.category(), ignored -> new ArrayList<>()).add(scanEvidence);
         }
+
         for (Map.Entry<SignalCategory, List<ScanEvidence>> entry : staticByCategory.entrySet()) {
             StaticHistory candidate = StaticHistory.from(entry.getValue());
             StaticHistory existing = this.staticHistory.get(entry.getKey());
-            if (existing != null && !candidate.isPreferredTo(existing)) continue;
-            this.staticHistory.put(entry.getKey(), candidate);
+            if (existing == null || candidate.isPreferredTo(existing)) {
+                this.staticHistory.put(entry.getKey(), candidate);
+            }
         }
+
         Set<ScanEvidence.EvidenceKey> staticKeys = this.allStaticKeys();
         this.liveSignals.keySet().removeAll(staticKeys);
         for (ScanEvidence evidence : incomingLive) {
-            if (staticKeys.contains(evidence.key())) continue;
-            this.liveSignals.merge(evidence.key(), evidence, ScanEvidence::mergeDuplicate);
+            if (!staticKeys.contains(evidence.key())) {
+                this.liveSignals.merge(evidence.key(), evidence, ScanEvidence::mergeDuplicate);
+            }
         }
     }
 
@@ -50,40 +54,42 @@ public final class ChunkTrace {
     }
 
     public ScoreSummary summarizeAt(long tick) {
-        return this.summarizeAt(tick, ignored -> true, true, false);
+        return this.summarizeAt(tick, ignored -> true, true);
     }
 
-    public ScoreSummary summarizeAt(long tick, Predicate<SignalCategory> categoryEnabled, boolean includeLiveSignals) {
-        return this.summarizeAt(tick, categoryEnabled, includeLiveSignals, false);
-    }
+    public ScoreSummary summarizeAt(
+        long tick,
+        Predicate<SignalCategory> categoryEnabled,
+        boolean includeLiveSignals
+    ) {
+        EnumMap<SignalCategory, Integer> rawStrengths = new EnumMap<>(SignalCategory.class);
+        ArrayList<String> reasons = new ArrayList<>();
 
-    public ScoreSummary summarizeAt(long tick, Predicate<SignalCategory> categoryEnabled, boolean includeLiveSignals, boolean deepFocus) {
-        EnumMap<SignalCategory, Integer> rawStrengths = new EnumMap<SignalCategory, Integer>(SignalCategory.class);
-        ArrayList<String> reasons = new ArrayList<String>();
-        boolean hasDeepAnchor = false;
         for (Map.Entry<SignalCategory, StaticHistory> entry : this.staticHistory.entrySet()) {
-            if (!categoryEnabled.test(entry.getKey())) continue;
+            if (!categoryEnabled.test(entry.getKey())) {
+                continue;
+            }
             for (ScanEvidence evidence : entry.getValue().evidence()) {
-                ChunkTrace.addSaturated(rawStrengths, evidence.category(), ChunkTrace.adjustedStrength(evidence, evidence.strength(), deepFocus));
+                addSaturated(rawStrengths, evidence.category(), evidence.strength());
                 reasons.add(evidence.reason());
-                hasDeepAnchor |= evidence.position().y() <= 48;
             }
         }
-        for (ScanEvidence evidence : this.liveSignals.values()) {
-            int decayedStrength;
-            if (!includeLiveSignals || !categoryEnabled.test(evidence.category()) || (decayedStrength = evidence.strengthAt(tick)) <= 0) continue;
-            ChunkTrace.addSaturated(rawStrengths, evidence.category(), ChunkTrace.adjustedStrength(evidence, decayedStrength, deepFocus));
-            reasons.add(evidence.reason());
-            hasDeepAnchor |= evidence.position().y() <= 48;
-        }
-        if (deepFocus && !hasDeepAnchor) {
-            return ScoreSummary.fromRawStrengths(Map.of(), List.of());
-        }
-        return ScoreSummary.fromRawStrengths(rawStrengths, reasons);
-    }
 
-    private static int adjustedStrength(ScanEvidence evidence, int strength, boolean deepFocus) {
-        return deepFocus ? DepthProfile.adjust(strength, evidence.position().y()) : strength;
+        if (includeLiveSignals) {
+            for (ScanEvidence evidence : this.liveSignals.values()) {
+                if (!categoryEnabled.test(evidence.category())) {
+                    continue;
+                }
+                int decayedStrength = evidence.strengthAt(tick);
+                if (decayedStrength <= 0) {
+                    continue;
+                }
+                addSaturated(rawStrengths, evidence.category(), decayedStrength);
+                reasons.add(evidence.reason());
+            }
+        }
+
+        return ScoreSummary.fromRawStrengths(rawStrengths, reasons);
     }
 
     public int historicalRawMaximum(SignalCategory category) {
@@ -95,19 +101,8 @@ public final class ChunkTrace {
         return this.liveSignals.size();
     }
 
-    public boolean hasActiveEvidenceAtOrBelow(long tick, Predicate<SignalCategory> categoryEnabled, boolean includeLiveSignals, int maximumY) {
-        for (Map.Entry<SignalCategory, StaticHistory> entry : this.staticHistory.entrySet()) {
-            if (!categoryEnabled.test(entry.getKey()) || !entry.getValue().evidence().stream().anyMatch(evidence -> evidence.position().y() <= maximumY)) continue;
-            return true;
-        }
-        if (!includeLiveSignals) {
-            return false;
-        }
-        return this.liveSignals.values().stream().anyMatch(evidence -> categoryEnabled.test(evidence.category()) && evidence.position().y() <= maximumY && evidence.strengthAt(tick) > 0);
-    }
-
     private Set<ScanEvidence.EvidenceKey> allStaticKeys() {
-        HashSet<ScanEvidence.EvidenceKey> keys = new HashSet<ScanEvidence.EvidenceKey>();
+        HashSet<ScanEvidence.EvidenceKey> keys = new HashSet<>();
         for (StaticHistory history : this.staticHistory.values()) {
             for (ScanEvidence evidence : history.evidence()) {
                 keys.add(evidence.key());
@@ -116,36 +111,41 @@ public final class ChunkTrace {
         return keys;
     }
 
-    private static void addSaturated(EnumMap<SignalCategory, Integer> totals, SignalCategory category, int amount) {
-        long sum = (long)totals.getOrDefault(category, 0).intValue() + (long)amount;
-        totals.put(category, (int)Math.min(Integer.MAX_VALUE, sum));
+    private static void addSaturated(
+        EnumMap<SignalCategory, Integer> totals,
+        SignalCategory category,
+        int amount
+    ) {
+        long sum = (long) totals.getOrDefault(category, 0) + amount;
+        totals.put(category, (int) Math.min(Integer.MAX_VALUE, sum));
     }
 
-    @Environment(value=EnvType.CLIENT)
+    @Environment(EnvType.CLIENT)
     private record StaticHistory(int rawStrength, List<ScanEvidence> evidence) {
-        static StaticHistory from(List<ScanEvidence> evidence) {
-            ArrayList<ScanEvidence> sorted = new ArrayList<ScanEvidence>(evidence);
+        private static StaticHistory from(List<ScanEvidence> evidence) {
+            ArrayList<ScanEvidence> sorted = new ArrayList<>(evidence);
             sorted.sort(ScanEvidence.ORDER);
             long raw = 0L;
             for (ScanEvidence item : sorted) {
-                raw = Math.min(Integer.MAX_VALUE, raw + (long)item.strength());
+                raw = Math.min(Integer.MAX_VALUE, raw + item.strength());
             }
-            return new StaticHistory((int)raw, List.copyOf(sorted));
+            return new StaticHistory((int) raw, List.copyOf(sorted));
         }
 
-        boolean isPreferredTo(StaticHistory other) {
+        private boolean isPreferredTo(StaticHistory other) {
             if (this.rawStrength != other.rawStrength) {
                 return this.rawStrength > other.rawStrength;
             }
-            return StaticHistory.compareEvidence(this.evidence, other.evidence) < 0;
+            return compareEvidence(this.evidence, other.evidence) < 0;
         }
 
         private static int compareEvidence(List<ScanEvidence> left, List<ScanEvidence> right) {
             int sharedLength = Math.min(left.size(), right.size());
-            for (int index = 0; index < sharedLength; ++index) {
+            for (int index = 0; index < sharedLength; index++) {
                 int compared = ScanEvidence.ORDER.compare(left.get(index), right.get(index));
-                if (compared == 0) continue;
-                return compared;
+                if (compared != 0) {
+                    return compared;
+                }
             }
             return Integer.compare(left.size(), right.size());
         }

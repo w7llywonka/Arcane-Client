@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.0+mc1.21.11
+
+- Replaced broad base suspicion with a growth-only discovery model.
+- Set storage, block-entity, machine, placed-block, entity, interaction, and light category caps to zero.
+- Added palette-level section skipping so normal scans avoid sections with no growth-relevant block states.
+- Added organized crop, farmland support, synchronized stage, mature crop, sapling, vertical growth, imported biome, and temporal harvest heuristics.
+- Reduced the packet mixin from fifteen broad hooks to two growth-transition hooks.
+- Renamed stash-facing alerts and labels to growth-site alerts while retaining `/arcane stashalerts` as a command alias.
+- Removed obsolete depth weighting, generic temporal layout scans, block-entity scans, light sampling, and entity scans.
+- Added automated guarantees that storage, light, machines, block entities, and entities cannot produce suspicion.
+
 ## 2.1.0+mc1.21.11
 
 - Added a professional smooth Inter UI font under the SIL Open Font License.

@@ -80,13 +80,8 @@ public final class ArcaneSettingsScreen extends Screen {
         this.config = ArcaneClient.config();
         this.scannerWasEnabled = this.config.enabled;
         this.finderSettings = List.of(
-            new ToggleRow("Deep focus", () -> this.config.deepFocus, value -> this.config.deepFocus = value),
-            new ToggleRow("Farms", () -> this.config.farmSignals, value -> this.config.farmSignals = value),
-            new ToggleRow("Machines", () -> this.config.machineSignals, value -> this.config.machineSignals = value),
-            new ToggleRow("Player blocks", () -> this.config.playerBlockSignals, value -> this.config.playerBlockSignals = value),
-            new ToggleRow("Live activity", () -> this.config.packetSignals, value -> this.config.packetSignals = value),
-            new ToggleRow("Light leaks", () -> this.config.lightSignals, value -> this.config.lightSignals = value),
-            new ToggleRow("Entities", () -> this.config.entitySignals, value -> this.config.entitySignals = value)
+            new ToggleRow("Growth patterns", () -> this.config.farmSignals, value -> this.config.farmSignals = value),
+            new ToggleRow("Live growth", () -> this.config.packetSignals, value -> this.config.packetSignals = value)
         );
         this.visualRows = List.of(
             new VisualRow(VisualModule.CHUNK_TILES, "Chunk tiles", () -> this.config.overlay, value -> this.config.overlay = value),
@@ -98,7 +93,7 @@ public final class ArcaneSettingsScreen extends Screen {
                 this.config.tunnelEsp = value;
                 ArcaneClient.engine().tunnelSettingsChanged(this.client);
             }),
-            new VisualRow(VisualModule.STASH_ALERTS, "Stash alerts", () -> this.config.stashAlerts, value -> this.config.stashAlerts = value),
+            new VisualRow(VisualModule.GROWTH_ALERTS, "Growth alerts", () -> this.config.growthAlerts, value -> this.config.growthAlerts = value),
             new VisualRow(VisualModule.BLOCK_ENTITY_DEBUG, "ESP diagnostics", () -> this.config.blockEntityDebug, value -> this.config.blockEntityDebug = value)
         );
         this.playerRows = List.of(
@@ -200,14 +195,14 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private void drawFinder(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
-        boolean visible = matches("Base scanner");
+        boolean visible = matches("Growth scanner");
         int settingsHeight = this.finderExpanded ? SLIDER_HEIGHT + finderSettings().size() * SETTING_HEIGHT : 0;
         int height = HEADER_HEIGHT + (this.finderPanel.open && visible ? ROW_HEIGHT + settingsHeight : 0);
         drawPanel(graphics, this.finderPanel, height, "DISCOVERY", visible ? (this.config.enabled ? "1/1" : "0/1") : "0/0", mouseX, mouseY, theme);
         if (!this.finderPanel.open || !visible) return;
 
         int rowY = this.finderPanel.y + HEADER_HEIGHT;
-        drawModuleRow(graphics, this.finderPanel.x, rowY, "Base scanner", this.config.enabled, true, this.finderExpanded, mouseX, mouseY, theme);
+        drawModuleRow(graphics, this.finderPanel.x, rowY, "Growth scanner", this.config.enabled, true, this.finderExpanded, mouseX, mouseY, theme);
         if (!this.finderExpanded) return;
         int sliderY = rowY + ROW_HEIGHT;
         drawSensitivity(graphics, this.finderPanel.x, sliderY, mouseX, mouseY, theme);
@@ -479,7 +474,7 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private boolean handleFinderClick(int mouseX, int mouseY, int button) {
-        if (!this.finderPanel.open || !matches("Base scanner")) return false;
+        if (!this.finderPanel.open || !matches("Growth scanner")) return false;
         int moduleY = this.finderPanel.y + HEADER_HEIGHT;
         if (inside(mouseX, mouseY, this.finderPanel.x, moduleY, PANEL_WIDTH, ROW_HEIGHT)) {
             if (button == 1) this.finderExpanded = !this.finderExpanded;
@@ -739,7 +734,7 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private int visibleModuleCount() {
-        return (matches("Base scanner") ? 1 : 0)
+        return (matches("Growth scanner") ? 1 : 0)
             + visibleVisualRows().size()
             + visiblePlayerRows().size()
             + (matches("Chat macros") ? 1 : 0)
@@ -767,7 +762,7 @@ public final class ArcaneSettingsScreen extends Screen {
         if (this.config.esp) active++;
         if (this.config.itemEsp) active++;
         if (this.config.tunnelEsp) active++;
-        if (this.config.stashAlerts) active++;
+        if (this.config.growthAlerts) active++;
         if (this.config.blockEntityDebug) active++;
         if (this.config.autoTotem) active++;
         if (FreecamController.isActive()) active++;
@@ -954,7 +949,7 @@ public final class ArcaneSettingsScreen extends Screen {
         STORAGE_ESP(true),
         ITEM_ESP(true),
         TUNNEL_ESP(true),
-        STASH_ALERTS(false),
+        GROWTH_ALERTS(false),
         BLOCK_ENTITY_DEBUG(true);
 
         private final boolean hasSettings;

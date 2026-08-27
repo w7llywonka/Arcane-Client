@@ -129,10 +129,10 @@ public final class ArcaneHud {
             return;
         }
 
-        boolean stash = isStashChunk(engine, chunk);
-        String score = stash ? "POSSIBLE STASH  " + marker.score() : "SCORE  " + marker.score();
+        boolean growthSite = isGrowthSite(engine, chunk);
+        String score = growthSite ? "GROWTH SITE  " + marker.score() : "SCORE  " + marker.score();
         int scoreX = x + panelWidth - 9 - font.getWidth(score);
-        graphics.drawText(font, score, scoreX, y + 7, stash ? 0xFFFB7185 : accent, true);
+        graphics.drawText(font, score, scoreX, y + 7, growthSite ? 0xFFFB7185 : accent, true);
 
         int lineY = y + 34;
         for (int index = 0; index < reasonCount; index++) {
@@ -142,8 +142,8 @@ public final class ArcaneHud {
         }
     }
 
-    private static boolean isStashChunk(TraceEngine engine, ChunkPos chunk) {
-        for (TraceEngine.StashCandidate candidate : engine.stashCandidates()) {
+    private static boolean isGrowthSite(TraceEngine engine, ChunkPos chunk) {
+        for (TraceEngine.GrowthCandidate candidate : engine.growthCandidates()) {
             if (candidate.chunkX() == chunk.x && candidate.chunkZ() == chunk.z) return true;
         }
         return false;
