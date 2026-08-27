@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090a0f">
-  <meta name="description" content="Arcane Client reads deliberate growth patterns in loaded Minecraft chunks without using storage or light to score them.">
-  <meta property="og:title" content="Arcane Client">
-  <meta property="og:description" content="Growth leaves a pattern. Arcane reads it.">
-  <meta property="og:type" content="website">
-  <title>Arcane Client</title>
+  <meta name="description" content="Arcane Client is a Fabric 1.21.11 growth scanner built around deliberate crop and plant patterns.">
+  <meta name="theme-color" content="#0a0e14">
+  <title>Arcane Client — Growth Scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" href="assets/arcane-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script>
+    document.documentElement.classList.add("js");
     try {
       if (sessionStorage.getItem("arcane-hiss-seen")) {
         document.documentElement.classList.add("hiss-seen");
@@ -25,213 +26,424 @@
 </head>
 <body>
   <div class="hiss-startup" aria-hidden="true">
-    <div class="hiss-lockup">
-      <span>WEB ADDON / 01</span>
-      <strong>HISS <b>ADDON</b></strong>
+    <div class="hiss-startup-copy">
+      <span>HISS ADDON</span>
+      <strong>ARCANE</strong>
     </div>
-    <svg class="hiss-snake" viewBox="0 0 300 90" aria-hidden="true" focusable="false">
-      <path class="hiss-body" d="M8 47 C35 8 62 84 91 47 S147 8 176 47 S232 82 260 47"/>
-      <ellipse class="hiss-head" cx="269" cy="47" rx="14" ry="10"/>
-      <circle class="hiss-eye" cx="274" cy="44" r="2"/>
-      <path class="hiss-tongue" d="M281 49 290 53 298 49 M290 53 298 58"/>
+    <svg class="hiss-startup-snake" viewBox="0 0 520 130" focusable="false">
+      <path d="M16 68 C62 8 106 126 154 68 S248 8 296 68 S390 126 438 68"/>
+      <ellipse cx="465" cy="68" rx="27" ry="19"/>
+      <circle cx="473" cy="62" r="3"/>
+      <path class="hiss-tongue" d="M490 69 H510 M510 69 L518 61 M510 69 L518 77"/>
     </svg>
-    <span class="hiss-rule"></span>
+    <span class="hiss-startup-rule"></span>
   </div>
 
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main-content">Skip to content</a>
 
-  <header class="site-header">
-    <a class="brand" href="#top" aria-label="Arcane Client home">
-      <img src="assets/arcane-mark.svg" width="32" height="32" alt="">
-      <span>Arcane Client</span>
-    </a>
-    <nav class="main-nav" aria-label="Primary navigation">
-      <a href="#tools">Tools</a>
-      <a href="#plans">Plans</a>
-      <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
-    </nav>
-    <a class="header-cta" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
-  </header>
+  <nav class="site-nav" aria-label="Primary navigation">
+    <div class="nav-shell">
+      <a class="brand" href="#home" aria-label="Arcane Client home">
+        <img src="assets/arcane-mark.svg" width="46" height="32" alt="">
+        <span>Arcane Client</span>
+      </a>
 
-  <main id="main">
-    <section class="hero" id="top">
+      <div class="desktop-nav">
+        <a href="#home">Home</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </div>
+
+      <a class="nav-action" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
+
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+
+    <div class="mobile-menu" id="mobile-menu" hidden>
+      <a href="#home">Home</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a class="mobile-menu-action" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
+    </div>
+  </nav>
+
+  <main id="main-content">
+    <section class="hero" id="home" aria-labelledby="hero-title">
+      <div class="hero-beams" aria-hidden="true">
+        <span class="beam beam-left beam-wide"></span>
+        <span class="beam beam-left beam-thin"></span>
+        <span class="beam beam-right beam-wide"></span>
+        <span class="beam beam-right beam-thin"></span>
+      </div>
+
       <div class="hero-copy">
-        <p class="eyebrow">Fabric · 1.21.11 · Client-side</p>
-        <h1>Growth leaves<br>a pattern.</h1>
-        <p class="hero-text">Arcane reads deliberate crop and plant layouts in loaded chunks—without using storage or light to score them.</p>
+        <h1 id="hero-title">
+          <span class="hero-word" style="--word-delay: 120ms">The</span>
+          <span class="hero-word" style="--word-delay: 190ms">smarter</span><br>
+          <span class="hero-word hero-accent" style="--word-delay: 260ms">growth</span>
+          <span class="hero-word" style="--word-delay: 330ms">scanner.</span>
+        </h1>
+        <p>Reads deliberate crop and plant layouts in loaded chunks. Storage and light never affect the score.</p>
         <div class="hero-actions">
-          <a class="button button-solid" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
-          <a class="button button-outline" href="#plans">Explore options</a>
+          <a class="pill pill-primary pill-glint" href="#pricing">View plans</a>
+          <a class="pill pill-secondary" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
         </div>
-        <div class="hero-meta" role="group" aria-label="Arcane Client facts">
-          <span>Arcane 2.2</span>
-          <span>High FPS default</span>
+        <div class="hero-meta" role="group" aria-label="Client compatibility">
+          <span>Fabric 1.21.11</span>
+          <i></i>
+          <span>Client-side</span>
+          <i></i>
           <span>Right Shift GUI</span>
         </div>
       </div>
+    </section>
 
-      <div class="client-window" role="group" aria-label="Arcane growth scanner interface preview">
-        <header class="window-bar">
-          <span><i></i> ARCANE / GROWTH SCANNER</span>
-          <span>SAMPLE</span>
+    <section class="section section-large" id="features" aria-labelledby="features-title">
+      <div class="container container-medium">
+        <header class="section-heading reveal">
+          <span class="section-kicker">Built with a clear signal</span>
+          <h2 id="features-title">Why choose <em>Arcane?</em></h2>
         </header>
-        <div class="window-body">
-          <div class="map-panel">
-            <div class="map-label">
-              <span>LOADED CHUNKS</span>
-              <span>X +124 / Z −038</span>
+
+        <div class="feature-grid">
+          <article class="feature-card reveal" style="--reveal-delay: 0ms">
+            <span class="card-orbit" aria-hidden="true"></span>
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 21v-9m0 1C8 13 5 10 5 6c4 0 7 2 7 7Zm0 3c3 0 6-2 7-6-4 0-7 2-7 6Z"/>
+              </svg>
             </div>
-            <div class="chunk-grid" aria-hidden="true">
-              <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-              <span></span><span></span><span class="trace-low">12</span><span></span><span></span><span></span><span></span>
-              <span></span><span class="trace-low">08</span><span class="trace-mid">36</span><span class="trace-mid">44</span><span></span><span></span><span></span>
-              <span></span><span></span><span class="trace-mid">31</span><span class="trace-hot">78</span><span class="trace-mid">40</span><span></span><span></span>
-              <span></span><span></span><span></span><span class="trace-low">16</span><span></span><span></span><span></span>
-              <i class="scan-line"></i>
+            <h3>Growth-only scoring</h3>
+            <p>Organized crop plots, synchronized stages, farmland support, vertical farms, and repeated harvest activity.</p>
+            <span class="card-note">Storage and light ignored</span>
+          </article>
+
+          <article class="feature-card reveal" style="--reveal-delay: 80ms">
+            <span class="card-orbit card-orbit-purple" aria-hidden="true"></span>
+            <div class="feature-icon feature-icon-purple" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 13a8 8 0 1 1 16 0"/>
+                <path d="m12 13 4-4"/>
+                <path d="M5 18h14"/>
+              </svg>
             </div>
+            <h3>Built to stay light</h3>
+            <p>High FPS is the default profile, with a focused scan pipeline and a 1.0 ms-per-tick default budget.</p>
+            <span class="card-note">Three performance profiles</span>
+          </article>
+
+          <article class="feature-card reveal" style="--reveal-delay: 160ms">
+            <span class="card-orbit" aria-hidden="true"></span>
+            <div class="feature-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="4" y="4" width="6" height="6" rx="1"/>
+                <rect x="14" y="4" width="6" height="6" rx="1"/>
+                <rect x="4" y="14" width="6" height="6" rx="1"/>
+                <path d="M14 17h6m-3-3v6"/>
+              </svg>
+            </div>
+            <h3>Clear evidence</h3>
+            <p>Chunk tiles, radar, labels, alerts, and a current-chunk readout keep the reason behind every score visible.</p>
+            <span class="card-note">No mystery score</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-medium" id="install" aria-label="Installation and compatibility">
+      <div class="container container-medium">
+        <div class="setup-grid">
+          <article class="setup-main surface-card reveal">
+            <span class="section-kicker">Easy to set up</span>
+            <h2>Drop it in.<br>Start scanning.</h2>
+            <p class="setup-intro">Arcane is a client-side Fabric mod. No installer maze and no extra storage service.</p>
+
+            <ol class="setup-steps">
+              <li>
+                <span class="step-number">01</span>
+                <div>
+                  <h3>Install Fabric</h3>
+                  <p>Use a Fabric 1.21.11 profile.</p>
+                </div>
+              </li>
+              <li>
+                <span class="step-number">02</span>
+                <div>
+                  <h3>Drop in the JAR</h3>
+                  <p>Place Arcane in your mods folder.</p>
+                </div>
+              </li>
+              <li>
+                <span class="step-number">03</span>
+                <div>
+                  <h3>Launch</h3>
+                  <p>Join a world and press Right Shift.</p>
+                </div>
+              </li>
+            </ol>
+          </article>
+
+          <article class="stat-card surface-card reveal" style="--reveal-delay: 80ms">
+            <span class="stat-label">Default scan budget</span>
+            <strong>1.0 <small>ms</small></strong>
+            <p>Per tick in the High FPS profile.</p>
+          </article>
+
+          <article class="compat-card surface-card reveal" style="--reveal-delay: 160ms">
+            <span class="stat-label">Compatible setup</span>
+            <p>Fabric 1.21.11, client-side.</p>
+            <div class="launcher-grid">
+              <span><i class="launcher-dot launcher-blue"></i>Minecraft</span>
+              <span><i class="launcher-dot launcher-green"></i>Modrinth</span>
+              <span><i class="launcher-dot launcher-purple"></i>Prism</span>
+              <span><i class="launcher-dot launcher-white"></i>Fabric</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-medium" id="preview" aria-labelledby="preview-title">
+      <div class="container container-wide">
+        <header class="section-heading reveal">
+          <span class="section-kicker">Interface samples</span>
+          <h2 id="preview-title">See <em>Arcane</em> in action.</h2>
+          <p>Three clear views, each built around a specific job.</p>
+        </header>
+
+        <div class="demo-grid">
+          <article class="demo-card reveal" style="--reveal-delay: 0ms">
+            <div class="demo-window">
+              <header>
+                <span><i></i> Growth Scanner</span>
+                <small>Sample</small>
+              </header>
+              <div class="mini-map" aria-hidden="true">
+                <span></span><span>08</span><span></span><span></span><span></span><span></span>
+                <span></span><span>24</span><span>36</span><span>41</span><span></span><span></span>
+                <span></span><span></span><span>31</span><span class="hot">78</span><span>40</span><span></span>
+                <span></span><span></span><span></span><span>16</span><span></span><span></span>
+                <i></i>
+              </div>
+            </div>
+            <footer>
+              <div>
+                <h3>Growth Scanner</h3>
+                <p>Loaded-chunk growth map</p>
+              </div>
+              <span>01</span>
+            </footer>
+          </article>
+
+          <article class="demo-card reveal" style="--reveal-delay: 80ms">
+            <div class="demo-window">
+              <header>
+                <span><i class="purple-dot"></i> Chunk Intel</span>
+                <small>Sample</small>
+              </header>
+              <div class="intel-panel">
+                <div class="intel-score"><span>Current chunk</span><strong>78</strong></div>
+                <dl>
+                  <div><dt>Crop blocks</dt><dd>24</dd></div>
+                  <div><dt>Dominant stage</dt><dd>18</dd></div>
+                  <div><dt>Farmland support</dt><dd>15</dd></div>
+                </dl>
+              </div>
+            </div>
+            <footer>
+              <div>
+                <h3>Chunk Intel</h3>
+                <p>The evidence behind the score</p>
+              </div>
+              <span>02</span>
+            </footer>
+          </article>
+
+          <article class="demo-card reveal" style="--reveal-delay: 160ms">
+            <div class="demo-window">
+              <header>
+                <span><i></i> Independent ESP</span>
+                <small>Visual only</small>
+              </header>
+              <div class="esp-panel">
+                <div><span>Storage ESP</span><i class="toggle on"></i></div>
+                <div><span>Item ESP</span><i class="toggle on"></i></div>
+                <div><span>Tunnel ESP</span><i class="toggle"></i></div>
+                <p>Never changes suspicion score.</p>
+              </div>
+            </div>
+            <footer>
+              <div>
+                <h3>Independent ESP</h3>
+                <p>Useful visuals, separate logic</p>
+              </div>
+              <span>03</span>
+            </footer>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-large" id="pricing" aria-labelledby="pricing-title">
+      <div class="container container-medium">
+        <header class="section-heading reveal">
+          <span class="section-kicker">Simple access</span>
+          <h2 id="pricing-title">Choose your <em>plan.</em></h2>
+          <p>Every included tool is listed. Premium scanning is still in development.</p>
+        </header>
+
+        <div class="plan-grid">
+          <article class="plan-card reveal" style="--reveal-delay: 0ms">
+            <header>
+              <span>Base</span>
+              <small>Current release</small>
+            </header>
+            <div class="plan-price"><sup>$</sup>5</div>
+            <p>The complete Arcane 2.2 client available today.</p>
+            <ul>
+              <li><span class="check" aria-hidden="true"></span>Growth scanner</li>
+              <li><span class="check" aria-hidden="true"></span>Chunk map, radar, and intel</li>
+              <li><span class="check" aria-hidden="true"></span>Growth labels and alerts</li>
+              <li><span class="check" aria-hidden="true"></span>Storage, Item, and Tunnel ESP</li>
+              <li><span class="check" aria-hidden="true"></span>Freecam and Auto Totem</li>
+              <li><span class="check" aria-hidden="true"></span>Chat macros and performance profiles</li>
+              <li><span class="check" aria-hidden="true"></span>All client updates</li>
+            </ul>
+            <a class="plan-action plan-action-secondary" href="https://discord.com/" target="_blank" rel="noreferrer">Ask about Base</a>
+          </article>
+
+          <article class="plan-card plan-card-featured reveal" style="--reveal-delay: 80ms">
+            <span class="plan-badge">In development</span>
+            <header>
+              <span>Premium</span>
+              <small>Preview tier</small>
+            </header>
+            <div class="plan-price"><sup>$</sup>10</div>
+            <p>The Arcane toolset plus access to the future Premium scanner.</p>
+            <ul>
+              <li><span class="check" aria-hidden="true"></span>Growth scanner</li>
+              <li><span class="check" aria-hidden="true"></span>Chunk map, radar, and intel</li>
+              <li><span class="check" aria-hidden="true"></span>Growth labels and alerts</li>
+              <li><span class="check" aria-hidden="true"></span>Storage, Item, and Tunnel ESP</li>
+              <li><span class="check" aria-hidden="true"></span>Freecam and Auto Totem</li>
+              <li><span class="check" aria-hidden="true"></span>Chat macros and performance profiles</li>
+              <li><span class="check" aria-hidden="true"></span>Premium scanner when released</li>
+              <li><span class="check" aria-hidden="true"></span>All client updates</li>
+            </ul>
+            <a class="plan-action plan-action-primary" href="https://discord.com/" target="_blank" rel="noreferrer">Join Premium waitlist</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-large" id="hiss" aria-labelledby="hiss-title">
+      <div class="container container-wide">
+        <header class="section-heading reveal">
+          <span class="section-kicker">Hiss Addon</span>
+          <h2 id="hiss-title">A quick <em>hello.</em><br>Then out of the way.</h2>
+        </header>
+
+        <div class="hiss-card reveal">
+          <div class="hiss-art" aria-hidden="true">
+            <span class="hiss-orbit hiss-orbit-one"></span>
+            <span class="hiss-orbit hiss-orbit-two"></span>
+            <svg viewBox="0 0 420 140" focusable="false">
+              <path d="M12 74 C52 14 94 130 136 74 S220 14 262 74 S346 126 386 74"/>
+              <ellipse cx="398" cy="74" rx="18" ry="14"/>
+              <circle cx="403" cy="70" r="2.5"/>
+            </svg>
           </div>
-          <aside class="scan-readout">
-            <p>CURRENT CHUNK</p>
-            <strong>78</strong>
-            <span>GROWTH SITE</span>
-            <dl>
-              <div><dt>Crop blocks</dt><dd>24</dd></div>
-              <div><dt>Dominant stage</dt><dd>18</dd></div>
-              <div><dt>Farmland support</dt><dd>15</dd></div>
-            </dl>
-          </aside>
+          <div class="hiss-copy">
+            <span class="section-kicker">Website startup</span>
+            <h3>Character without the wait.</h3>
+            <p>Hiss appears once per browsing session, slithers across the screen, and clears in about a second and a half.</p>
+            <button class="replay-hiss" type="button">Replay Hiss</button>
+          </div>
         </div>
-        <footer class="window-footer">
-          <span><i></i> SCANNER READY</span>
-          <span>STORAGE IGNORED · LIGHT IGNORED</span>
-        </footer>
+
+        <a class="discord-callout reveal" href="https://discord.com/" target="_blank" rel="noreferrer">
+          <span class="discord-mark" aria-hidden="true">A</span>
+          <span>
+            <strong>Arcane updates, support, and the Premium waitlist.</strong>
+            <small>Open Discord to stay close to the project.</small>
+          </span>
+          <b>Join Discord <i>→</i></b>
+        </a>
       </div>
     </section>
 
-    <section class="proof-strip" aria-label="Compatibility and performance">
-      <div><strong>1.0 ms</strong><span>Default scan budget</span></div>
-      <div><strong>Growth only</strong><span>Scoring input</span></div>
-      <div><strong>1.21.11</strong><span>Minecraft + Fabric</span></div>
-      <div><strong>Local</strong><span>Client-side configuration</span></div>
-    </section>
+    <section class="section section-large" id="faq" aria-labelledby="faq-title">
+      <div class="container container-faq">
+        <header class="section-heading reveal">
+          <span class="section-kicker">Clear answers</span>
+          <h2 id="faq-title">Frequently asked <em>questions.</em></h2>
+        </header>
 
-    <section class="tools-section" id="tools">
-      <header class="section-intro">
-        <p class="eyebrow">What it does</p>
-        <h2>One signal.<br>Four clear views.</h2>
-      </header>
-      <div class="feature-list">
-        <article class="feature-row">
-          <span class="feature-number">01</span>
-          <h3>Growth Scanner</h3>
-          <p>Finds organized crop rows, synchronized growth stages, mature plots, sapling layouts, vertical farms, and harvest cycles.</p>
-          <span class="feature-state">Core</span>
-        </article>
-        <article class="feature-row">
-          <span class="feature-number">02</span>
-          <h3>Chunk Intel</h3>
-          <p>Shows chunk tiles, radar, current-chunk evidence, growth labels, and alerts without burying the reason behind a score.</p>
-          <span class="feature-state">Live</span>
-        </article>
-        <article class="feature-row">
-          <span class="feature-number">03</span>
-          <h3>Independent ESP</h3>
-          <p>Storage, item, and tunnel ESP stay separate. They help you look, but they never make a chunk suspicious.</p>
-          <span class="feature-state">Visual</span>
-        </article>
-        <article class="feature-row">
-          <span class="feature-number">04</span>
-          <h3>Player Tools</h3>
-          <p>Freecam, Auto Totem, chat macros, configurable keybinds, and three performance profiles remain close at hand.</p>
-          <span class="feature-state">Utility</span>
-        </article>
-      </div>
-    </section>
-
-    <section class="hiss-feature" id="hiss">
-      <div class="hiss-feature-art" aria-hidden="true">
-        <svg viewBox="0 0 300 90" focusable="false">
-          <path d="M8 47 C35 8 62 84 91 47 S147 8 176 47 S232 82 260 47"/>
-          <ellipse cx="269" cy="47" rx="14" ry="10"/>
-          <circle cx="274" cy="44" r="2"/>
-        </svg>
-      </div>
-      <div>
-        <p class="eyebrow">Hiss Addon</p>
-        <h2>Fast in. Gone in a second.</h2>
-        <p>A small session intro with one job: open Arcane with a little character, then get out of the way.</p>
-      </div>
-      <button class="replay-hiss" type="button">Replay Hiss</button>
-    </section>
-
-    <section class="plans-section" id="plans">
-      <header class="section-intro plans-intro">
-        <div>
-          <p class="eyebrow">Options</p>
-          <h2>Pick your access.</h2>
+        <div class="faq-list">
+          <details class="faq-item reveal" open>
+            <summary>What makes a chunk score higher?<span class="faq-plus" aria-hidden="true"></span></summary>
+            <p>Deliberate growth patterns: organized crop rows, synchronized stages, mature concentrations, sapling layouts, vertical farms, imported growth clusters, and repeated harvest activity.</p>
+          </details>
+          <details class="faq-item reveal">
+            <summary>Do storage blocks or light affect the score?<span class="faq-plus" aria-hidden="true"></span></summary>
+            <p>No. Storage, block entities, machines, placed-block density, interactions, and light have zero suspicion weight. The core discovery model is growth-only.</p>
+          </details>
+          <details class="faq-item reveal">
+            <summary>What do the ESP tools do?<span class="faq-plus" aria-hidden="true"></span></summary>
+            <p>Storage, Item, and Tunnel ESP are independent visual tools. They can help you inspect an area, but they never make a chunk suspicious.</p>
+          </details>
+          <details class="faq-item reveal">
+            <summary>Which Minecraft version is supported?<span class="faq-plus" aria-hidden="true"></span></summary>
+            <p>Arcane 2.2 targets Minecraft 1.21.11 with Fabric and runs entirely on the client.</p>
+          </details>
+          <details class="faq-item reveal">
+            <summary>How do I open Arcane?<span class="faq-plus" aria-hidden="true"></span></summary>
+            <p>Press Right Shift after launching the game. Keybinds can be changed from the client interface.</p>
+          </details>
+          <details class="faq-item reveal">
+            <summary>What is different about Premium?<span class="faq-plus" aria-hidden="true"></span></summary>
+            <p>Premium is the future scanner tier and is still in development. The current Base client already includes the scanner, intel views, visual ESP tools, and player utilities listed above.</p>
+          </details>
         </div>
-        <p>No vague bundles. Every included tool is listed below.</p>
-      </header>
-
-      <div class="price-board">
-        <table class="price-table">
-          <caption class="sr-only">Arcane Client Base and Premium plan comparison</caption>
-          <colgroup>
-            <col class="feature-column">
-            <col>
-            <col>
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="price-head feature-head" scope="col"><span>Feature</span></th>
-              <th class="price-head base-head" scope="col">
-                <span>Base</span>
-                <strong><sup>$</sup>5</strong>
-              </th>
-              <th class="price-head premium-head" scope="col">
-                <span>Premium</span>
-                <strong><sup>$</sup>10</strong>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><th scope="row">Growth scanner</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
-            <tr><th scope="row">Chunk tiles, radar, and intel</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
-            <tr><th scope="row">Growth labels and alerts</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
-            <tr><th scope="row">Storage, Item, and Tunnel ESP</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
-            <tr><th scope="row">Freecam and Auto Totem</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
-            <tr><th scope="row">Chat macros and performance profiles</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
-            <tr><th scope="row">All client updates</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
-            <tr class="premium-row"><th scope="row">Premium scanner</th><td><span class="plan-status unavailable-status">—</span></td><td><span class="plan-status premium-status">In development</span></td></tr>
-          </tbody>
-          <tfoot>
-            <tr>
-              <th scope="row"><span class="sr-only">Choose a plan</span></th>
-              <td><a href="https://discord.com/" target="_blank" rel="noreferrer">Get Base</a></td>
-              <td><a class="premium-action" href="https://discord.com/" target="_blank" rel="noreferrer">Join waitlist</a></td>
-            </tr>
-          </tfoot>
-        </table>
       </div>
-    </section>
-
-    <section class="closing">
-      <p class="eyebrow">Arcane Client / 2.2</p>
-      <h2>Read the pattern.</h2>
-      <a class="button button-solid" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
     </section>
   </main>
 
   <footer class="site-footer">
-    <div>
-      <img src="assets/arcane-mark.svg" width="26" height="26" alt="">
-      <span>Arcane Client</span>
+    <div class="container container-wide">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a class="brand" href="#home">
+            <img src="assets/arcane-mark.svg" width="46" height="32" alt="">
+            <span>Arcane Client</span>
+          </a>
+          <p>Growth evidence, clearly presented.</p>
+        </div>
+        <div>
+          <h2>Navigation</h2>
+          <a href="#features">Features</a>
+          <a href="#install">Install</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
+        </div>
+        <div>
+          <h2>Project</h2>
+          <a href="https://discord.com/" target="_blank" rel="noreferrer">Discord</a>
+          <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="#hiss">Hiss Addon</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 Arcane Client</span>
+        <p>Use only where server rules permit. Not affiliated with Mojang or Microsoft.</p>
+      </div>
     </div>
-    <p>Use only where server rules permit. Not affiliated with Mojang or Microsoft.</p>
-    <nav aria-label="Footer navigation">
-      <a href="https://discord.com/" target="_blank" rel="noreferrer">Discord</a>
-      <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
-    </nav>
   </footer>
 
   <script src="script.js"></script>
