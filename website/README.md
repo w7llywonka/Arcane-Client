@@ -15,8 +15,8 @@ Then open `http://127.0.0.1:4173`.
 ## Structure
 
 - `index.html` — semantic content and product feature inventory.
-- `styles.css` — responsive visual system, motion, and interface mockups.
-- `script.js` — scanner demo, GUI theme preview, navigation, and copy interaction.
+- `styles.css` — clean responsive layout, typography, and compact interface preview.
+- `script.js` — mobile navigation and build-command copy control.
 - `assets/` — the optimized Arcane emblem, locally bundled interface font, and its OFL license.
 
 The site intentionally has no build step and can be hosted on any static provider.
