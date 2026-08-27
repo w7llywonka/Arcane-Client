@@ -14,9 +14,8 @@ Then open `http://127.0.0.1:4173`.
 
 ## Structure
 
-- `index.html` — minimal landing page and $5/$10 access options.
-- `styles.css` — responsive purple-and-blue layout and motion.
-- `script.js` — lightweight scroll reveals.
-- `assets/` — the Arcane mark, locally bundled interface font, and its OFL license.
+- `index.html` — minimal landing page and explicit $5/$10 feature lists.
+- `styles.css` — flat responsive layout and lightweight CSS motion.
+- `assets/arcane-mark.svg` — the flat Arcane mark.
 
-The site intentionally has no build step and can be hosted on any static provider.
+The site has no build step, JavaScript, external requests, or web-font payload.

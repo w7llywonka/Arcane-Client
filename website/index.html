@@ -3,109 +3,91 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090914">
-  <meta name="description" content="Arcane Client — a focused Minecraft utility client for Fabric 1.21.11.">
+  <meta name="theme-color" content="#0b0b10">
+  <meta name="description" content="Arcane Client for Fabric 1.21.11.">
   <meta property="og:title" content="Arcane Client">
-  <meta property="og:description" content="Simple. Fast. Arcane.">
+  <meta property="og:description" content="Arcane Client for Fabric 1.21.11.">
   <meta property="og:type" content="website">
   <title>Arcane Client</title>
   <link rel="icon" href="assets/arcane-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
-  <script>
-    window.__consoleErrors = [];
-    window.addEventListener("error", function (event) {
-      window.__consoleErrors.push(event.message || "Unknown browser error");
-    });
-  </script>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
-  <div class="glow glow-one" aria-hidden="true"></div>
-  <div class="glow glow-two" aria-hidden="true"></div>
 
   <header class="site-header">
     <a class="brand" href="#top" aria-label="Arcane Client home">
-      <img src="assets/arcane-mark.svg" width="34" height="34" alt="">
-      <span>Arcane</span>
+      <img src="assets/arcane-mark.svg" width="32" height="32" alt="">
+      <span>Arcane Client</span>
     </a>
-    <a class="small-link" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Join Discord</a>
+    <a class="header-link" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Join Discord ↗</a>
   </header>
 
   <main id="main">
     <section class="hero" id="top">
-      <div class="hero-inner">
-        <img class="hero-mark" src="assets/arcane-mark.svg" width="104" height="104" alt="">
-        <p class="release">Fabric · Minecraft 1.21.11</p>
-        <h1>Arcane Client</h1>
-        <p class="tagline">Simple. Fast. Arcane.</p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Join Discord</a>
-          <a class="button button-secondary" href="#options">Explore options</a>
-        </div>
+      <p class="kicker">Fabric / Minecraft 1.21.11</p>
+      <h1>Arcane<br><span>Client</span></h1>
+      <div class="hero-actions">
+        <a class="button button-primary" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Join Discord</a>
+        <a class="button button-secondary" href="#options">Explore options</a>
       </div>
-      <a class="scroll-cue" href="#options" aria-label="Scroll to plans"><span></span></a>
+      <p class="addon-note"><strong>Hiss Addon</strong> / snake startup animation included</p>
     </section>
 
     <section class="options" id="options">
-      <div class="options-inner">
-        <div class="options-heading reveal">
-          <p>Explore options</p>
-          <h2>Choose your access.</h2>
-        </div>
+      <header class="section-heading">
+        <p>Options</p>
+        <h2>Pick your version.</h2>
+      </header>
 
-        <div class="plans">
-          <article class="plan reveal">
-            <div class="plan-top">
-              <div>
-                <span class="plan-name">Base</span>
-                <h3><sup>$</sup>5</h3>
-              </div>
-              <span class="plan-type">Arcane</span>
+      <div class="plans">
+        <article class="plan plan-base">
+          <header class="plan-header">
+            <div>
+              <span class="plan-number">01</span>
+              <h3>Base</h3>
             </div>
-            <ul>
-              <li>Growth scanner</li>
-              <li>Chunk radar &amp; alerts</li>
-              <li>Storage, item &amp; tunnel ESP</li>
-              <li>Freecam &amp; Auto Totem</li>
-              <li>All client updates</li>
-            </ul>
-            <a class="plan-button" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Get Base</a>
-          </article>
+            <p class="price"><sup>$</sup>5</p>
+          </header>
+          <ul>
+            <li>Growth scanner</li>
+            <li>Chunk radar and growth alerts</li>
+            <li>Storage ESP</li>
+            <li>Item ESP and Tunnel ESP</li>
+            <li>Freecam and Auto Totem</li>
+            <li>Hiss Addon startup animation</li>
+          </ul>
+          <a class="plan-button base-button" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Get Base</a>
+        </article>
 
-          <article class="plan plan-premium reveal">
-            <div class="popular">Premium</div>
-            <div class="plan-top">
-              <div>
-                <span class="plan-name">Premium</span>
-                <h3><sup>$</sup>10</h3>
-              </div>
-              <span class="plan-type">Arcane+</span>
+        <article class="plan plan-premium">
+          <header class="plan-header">
+            <div>
+              <span class="plan-number">02</span>
+              <h3>Premium</h3>
             </div>
-            <ul>
-              <li>Everything in Base</li>
-              <li>Premium scanner <small>Coming soon</small></li>
-              <li>Early feature builds</li>
-              <li>Premium Discord role</li>
-              <li>Priority support</li>
-            </ul>
-            <a class="plan-button plan-button-premium" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Get Premium</a>
-          </article>
-        </div>
+            <p class="price"><sup>$</sup>10</p>
+          </header>
+          <ul>
+            <li>Growth scanner</li>
+            <li>Chunk radar and growth alerts</li>
+            <li>Storage, Item, and Tunnel ESP</li>
+            <li>Freecam and Auto Totem</li>
+            <li>Hiss Addon startup animation</li>
+            <li>Premium scanner <small>in development</small></li>
+          </ul>
+          <a class="plan-button premium-button" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Get Premium</a>
+        </article>
       </div>
     </section>
   </main>
 
   <footer>
-    <div class="footer-brand">
-      <img src="assets/arcane-mark.svg" width="26" height="26" alt="">
-      <span>Arcane Client</span>
-    </div>
-    <div class="footer-links">
+    <span>Arcane Client</span>
+    <nav aria-label="Footer">
       <a href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Discord</a>
       <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
-    </div>
+    </nav>
   </footer>
-
-  <script src="script.js"></script>
 </body>
 </html>

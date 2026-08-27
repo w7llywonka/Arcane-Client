@@ -10,6 +10,7 @@ Arcane Client is a client-side Fabric utility suite for Minecraft 1.21.11. This 
 - **Visual intelligence:** chunk tiles, radar HUD, current-chunk growth intel, independent storage ESP, item ESP with category colors, tunnel ESP, tracers, growth-site labels/alerts, and diagnostics.
 - **Player tools:** freecam and Auto Totem.
 - **Social tools:** four editable, rebindable chat macros.
+- **Hiss Addon:** a short, non-blocking snake slither animation when the title screen first opens.
 - **Arcane Click GUI:** smooth Inter typography, soft outlined module cards, searchable modules, draggable/collapsible panels, nested settings, live FPS/profile status, in-GUI key rebinding, and three persistent themes.
 - **Clean source:** readable Yarn-named Java, typed collections, warning-free compilation, client-only mixins, Gradle wrapper, sources JAR, and GitHub Actions CI.
 
@@ -83,7 +84,7 @@ The primary command is `/arcane`; `/dtrace` remains as a compatibility alias for
 
 ## Product website
 
-The responsive Arcane Client product site lives in [website/](website/). It is a dependency-free static build with an interactive scanner demonstration, complete feature inventory, performance profiles, controls, and installation guide. See [website/README.md](website/README.md) for local preview instructions.
+The responsive Arcane Client product site lives in [website/](website/). It is a dependency-free static pricing page with explicit Base and Premium feature lists, flat styling, and no JavaScript or web-font payload. See [website/README.md](website/README.md) for local preview instructions.
 
 ## Build from source
 
@@ -104,6 +105,7 @@ The remapped mod and sources JARs are written to `build/libs/`.
 ## Project layout
 
 - `src/main/java/dev/arcaneclient/` — client logic, UI, rendering, scanners, commands, and mixins.
+- `src/main/java/dev/arcaneclient/addon/` — lightweight client add-ons, including the Hiss startup animation.
 - `src/main/resources/` — Fabric metadata, mixin config, language strings, Inter font, and packaged icon.
 - `website/` — responsive product website and local assets.
 - `artwork/` — full-resolution Arcane Client emblem source asset.
