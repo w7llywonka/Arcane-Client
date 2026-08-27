@@ -14,8 +14,8 @@ Then open `http://127.0.0.1:4173`.
 
 ## Structure
 
-- `index.html` — minimal landing page and explicit $5/$10 feature lists.
-- `styles.css` — flat responsive layout and lightweight CSS motion.
+- `index.html` — minimal landing page, Hiss Addon startup intro, and explicit $5/$10 feature lists.
+- `styles.css` — flat responsive layout, CSS-only snake animation, and lightweight page motion.
 - `assets/arcane-mark.svg` — the flat Arcane mark.
 
 The site has no build step, JavaScript, external requests, or web-font payload.

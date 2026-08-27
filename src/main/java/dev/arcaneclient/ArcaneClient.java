@@ -3,7 +3,6 @@ package dev.arcaneclient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.TraceEngine;
 import dev.arcaneclient.ArcaneKeybinds;
-import dev.arcaneclient.addon.HissAddon;
 import dev.arcaneclient.chat.ChatMacroController;
 import dev.arcaneclient.combat.AutoTotemController;
 import dev.arcaneclient.command.ArcaneCommands;
@@ -107,7 +106,6 @@ implements ClientModInitializer {
         TunnelEspRenderer.register();
         GrowthLabelRenderer.register();
         ArcaneHud.register();
-        HissAddon.register();
         LOGGER.info("Arcane Client initialized for Minecraft 1.21.11");
     }
 

@@ -2,7 +2,7 @@
 
 ## 2.2.0+mc1.21.11
 
-- Added Hiss Addon, a lightweight snake slither animation shown once on the title screen at startup.
+- Added the Hiss Addon website intro: a lightweight CSS-only snake slither shown once on page load.
 - Reworked the product site with flat colors, explicit plan features, no JavaScript, and no bundled web font.
 
 - Replaced broad base suspicion with a growth-only discovery model.
