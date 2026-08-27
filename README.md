@@ -81,6 +81,10 @@ The primary command is `/arcane`; `/dtrace` remains as a compatibility alias for
 - `/arcane rescan|clear` — refresh or clear the current server/dimension evidence.
 - `/arcane overlay|hud|freecam|esp|itemesp|tunnelesp|autototem|macros|tracers|growthalerts|analysis` — toggle individual tools.
 
+## Product website
+
+The responsive Arcane Client product site lives in [website/](website/). It is a dependency-free static build with an interactive scanner demonstration, complete feature inventory, performance profiles, controls, and installation guide. See [website/README.md](website/README.md) for local preview instructions.
+
 ## Build from source
 
 Windows:
@@ -101,6 +105,7 @@ The remapped mod and sources JARs are written to `build/libs/`.
 
 - `src/main/java/dev/arcaneclient/` — client logic, UI, rendering, scanners, commands, and mixins.
 - `src/main/resources/` — Fabric metadata, mixin config, language strings, Inter font, and packaged icon.
+- `website/` — responsive product website and local assets.
 - `artwork/` — full-resolution Arcane Client emblem source asset.
 - `third-party/` — Inter's SIL Open Font License.
 - `legacy/artifacts/` — untouched 1.6 and 1.8 input binaries retained for provenance.

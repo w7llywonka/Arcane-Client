@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d0c">
+  <meta name="description" content="Arcane Client is a focused growth-discovery utility suite for Minecraft 1.21.11 with independent ESP, player tools, and a polished Click GUI.">
+  <meta property="og:title" content="Arcane Client — Find the pattern. Ignore the noise.">
+  <meta property="og:description" content="Growth-only chunk discovery, independent visual tools, and practical player utilities for Fabric 1.21.11.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/arcane-client-icon.png">
+  <title>Arcane Client — Growth Discovery for Minecraft</title>
+  <link rel="icon" href="assets/arcane-client-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    window.__consoleErrors = [];
+    window.addEventListener("error", function (event) {
+      window.__consoleErrors.push(event.message || "Unknown browser error");
+    });
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="site-header" data-header>
+    <a class="brand" href="#top" aria-label="Arcane Client home">
+      <img src="assets/arcane-client-icon.png" width="38" height="38" alt="">
+      <span>
+        <strong>ARCANE</strong>
+        <small>CLIENT / 2.2</small>
+      </span>
+    </a>
+
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+      <span></span><span></span>
+      <span class="sr-only">Toggle navigation</span>
+    </button>
+
+    <nav id="primary-nav" class="primary-nav" aria-label="Primary navigation" data-nav>
+      <a href="#scanner">Scanner</a>
+      <a href="#features">Features</a>
+      <a href="#performance">Performance</a>
+      <a href="#install">Install</a>
+    </nav>
+
+    <a class="header-link" href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">
+      GitHub <span aria-hidden="true">↗</span>
+    </a>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="hero-copy reveal">
+        <div class="eyebrow">
+          <span class="status-dot"></span>
+          Client-side Fabric utility / Minecraft 1.21.11
+        </div>
+        <h1>Find the pattern.<br><em>Ignore the noise.</em></h1>
+        <p class="hero-lede">
+          Arcane Client reads deliberate cultivation—not storage, not light, not random world clutter.
+          It pairs focused growth discovery with clean visual intelligence and practical player tools.
+        </p>
+
+        <div class="hero-actions">
+          <a class="button button-primary" href="#install">
+            <span>Install Arcane 2.2</span>
+            <span aria-hidden="true">↓</span>
+          </a>
+          <a class="button button-quiet" href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">
+            Explore the source
+          </a>
+        </div>
+
+        <dl class="hero-stats">
+          <div><dt>02</dt><dd>scoring signals</dd></div>
+          <div><dt>09</dt><dd>scanner tests</dd></div>
+          <div><dt>03</dt><dd>performance modes</dd></div>
+        </dl>
+      </div>
+
+      <div class="scanner-shell reveal" data-delay="1" role="group" aria-label="Interactive growth scanner demonstration">
+        <div class="scanner-rivet scanner-rivet-a"></div>
+        <div class="scanner-rivet scanner-rivet-b"></div>
+        <div class="scanner-topline">
+          <div>
+            <span class="scanner-mark">A</span>
+            <span>GROWTH / LIVE MAP</span>
+          </div>
+          <span class="live-chip"><i></i> LIVE</span>
+        </div>
+
+        <div class="scanner-coordinates">
+          <span>X +184</span>
+          <span>Z −032</span>
+          <span>R 12</span>
+        </div>
+
+        <div class="chunk-grid-wrap">
+          <div class="axis axis-y"><span>−2</span><span>0</span><span>+2</span></div>
+          <div class="chunk-grid" data-chunk-grid aria-hidden="true"></div>
+          <div class="scan-beam" aria-hidden="true"></div>
+        </div>
+
+        <div class="scanner-readout">
+          <div>
+            <span class="readout-kicker">PATTERN LOCK</span>
+            <strong data-pattern-name>Organized field</strong>
+            <span data-pattern-reason>Rows + synchronized crop stages</span>
+          </div>
+          <div class="score-orbit" style="--score: 68">
+            <span data-score>68</span>
+            <small>SCORE</small>
+          </div>
+        </div>
+
+        <div class="scanner-modes" role="group" aria-label="Scanner examples">
+          <button class="mode-button is-active" type="button" data-pattern="field">FIELD</button>
+          <button class="mode-button" type="button" data-pattern="harvest">HARVEST</button>
+          <button class="mode-button" type="button" data-pattern="saplings">SAPLINGS</button>
+        </div>
+      </div>
+
+      <div class="hero-note reveal" data-delay="2">
+        <span>01 / CORE RULE</span>
+        <p>Natural growth alone is mathematically capped below the suspicious threshold.</p>
+      </div>
+    </section>
+
+    <section class="signal-boundary section" id="scanner">
+      <div class="section-heading reveal">
+        <p class="section-index">01 / SIGNAL BOUNDARY</p>
+        <h2>Suspicion has a<br><em>hard perimeter.</em></h2>
+        <p>
+          Arcane 2.2 deliberately narrowed the model. Only evidence tied to growth can move a chunk’s score.
+          Every broad signal is capped at zero.
+        </p>
+      </div>
+
+      <div class="boundary-board reveal" data-delay="1">
+        <div class="boundary-column boundary-accepted">
+          <div class="boundary-title">
+            <span class="mini-light"></span>
+            CAN AFFECT SCORE
+          </div>
+          <div class="signal-card">
+            <div><span>01</span><strong>Cultivation</strong></div>
+            <b>CAP 65</b>
+            <p>Organized plots, synchronized stages, mature concentrations, repeated harvest behavior.</p>
+          </div>
+          <div class="signal-card">
+            <div><span>02</span><strong>Natural growth</strong></div>
+            <b>CAP 35</b>
+            <p>Useful context, but capped one point below the default alert threshold when acting alone.</p>
+          </div>
+        </div>
+
+        <div class="boundary-divider" aria-hidden="true">
+          <span>HARD<br>ZERO</span>
+        </div>
+
+        <div class="boundary-column boundary-rejected">
+          <div class="boundary-title">IGNORED BY DISCOVERY</div>
+          <ul class="ignored-list">
+            <li><span>Storage &amp; block entities</span><b>00</b></li>
+            <li><span>Light data</span><b>00</b></li>
+            <li><span>Machines &amp; infrastructure</span><b>00</b></li>
+            <li><span>Generic placed blocks</span><b>00</b></li>
+            <li><span>Players &amp; entities</span><b>00</b></li>
+            <li><span>Sounds &amp; particles</span><b>00</b></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="algorithm section">
+      <div class="algorithm-intro reveal">
+        <p class="section-index">02 / THE PIPELINE</p>
+        <h2>A smaller search.<br>A stronger answer.</h2>
+        <p>
+          The scanner spends time where growth actually exists, then combines shape, stage, and change over time.
+          The result is cleaner evidence with less work per loaded chunk.
+        </p>
+      </div>
+
+      <ol class="pipeline" aria-label="Growth detection pipeline">
+        <li class="reveal">
+          <span class="pipeline-number">01</span>
+          <div class="pipeline-glyph palette-glyph" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <h3>Palette skip</h3>
+          <p>Chunk sections with no growth-relevant block states are rejected before a block-by-block pass begins.</p>
+          <small>LESS WORLD WORK</small>
+        </li>
+        <li class="reveal" data-delay="1">
+          <span class="pipeline-number">02</span>
+          <div class="pipeline-glyph rows-glyph" aria-hidden="true"><i></i><i></i><i></i></div>
+          <h3>Pattern read</h3>
+          <p>Rows, rectangles, farmland support, crop stages, mature density, sapling layouts, and vertical columns.</p>
+          <small>STATIC GEOMETRY</small>
+        </li>
+        <li class="reveal" data-delay="2">
+          <span class="pipeline-number">03</span>
+          <div class="pipeline-glyph pulse-glyph" aria-hidden="true"><i></i></div>
+          <h3>Live delta</h3>
+          <p>Two focused packet hooks watch actual growth advances and harvest/reset cycles without broad event noise.</p>
+          <small>TEMPORAL PROOF</small>
+        </li>
+        <li class="reveal" data-delay="3">
+          <span class="pipeline-number">04</span>
+          <div class="pipeline-glyph lock-glyph" aria-hidden="true"><i></i></div>
+          <h3>Explain &amp; mark</h3>
+          <p>Evidence becomes a reasoned score, chunk tile, radar mark, current-chunk readout, or growth-site label.</p>
+          <small>AUDITABLE OUTPUT</small>
+        </li>
+      </ol>
+    </section>
+
+    <section class="features section" id="features">
+      <div class="feature-heading reveal">
+        <p class="section-index">03 / THE TOOLKIT</p>
+        <h2>One focused scanner.<br><em>A complete field kit.</em></h2>
+      </div>
+
+      <div class="feature-grid">
+        <article class="feature-card feature-card-lead reveal">
+          <div class="feature-label"><span>DISCOVERY</span><b>CORE</b></div>
+          <h3>Growth scanner</h3>
+          <p>
+            Finds crop rows and rectangles, synchronized and mature crops, organized saplings,
+            sugar-cane and cactus columns, non-native plant clusters, plus observed growth and harvest cycles.
+          </p>
+          <ul class="feature-tags">
+            <li>Sensitivity 0–100</li>
+            <li>Radius 2–24</li>
+            <li>Per-dimension history</li>
+            <li>Manual rescan</li>
+          </ul>
+          <div class="field-viz" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </article>
+
+        <article class="feature-card feature-card-radar reveal" data-delay="1">
+          <div class="feature-label"><span>WORLD INTEL</span><b>VISUAL</b></div>
+          <h3>Chunk awareness</h3>
+          <p>Chunk tiles, compact radar HUD, current-chunk evidence, tracers, labels, diagnostics, and alert history.</p>
+          <div class="radar-viz" aria-hidden="true">
+            <i class="radar-ring r1"></i><i class="radar-ring r2"></i><i class="radar-ring r3"></i>
+            <i class="radar-sweep"></i>
+            <b class="radar-point p1"></b><b class="radar-point p2"></b><b class="radar-point p3"></b>
+          </div>
+        </article>
+
+        <article class="feature-card reveal">
+          <div class="feature-label"><span>ESP</span><b>INDEPENDENT</b></div>
+          <h3>Storage ESP</h3>
+          <p>Outlines chests, barrels, shulkers, hoppers, furnaces, spawners, vaults, beacons, and other useful block entities.</p>
+          <div class="separation-note"><i></i> Never changes growth suspicion</div>
+        </article>
+
+        <article class="feature-card reveal" data-delay="1">
+          <div class="feature-label"><span>ESP</span><b>CUSTOM</b></div>
+          <h3>Item ESP</h3>
+          <p>Category filters, individual colors, target limits, and optional tracers for high-value dropped items.</p>
+          <ul class="compact-list">
+            <li>Totems</li><li>Crystals</li><li>Elytra</li>
+            <li>Shulkers</li><li>Gapples</li><li>Valuables</li>
+          </ul>
+        </article>
+
+        <article class="feature-card reveal" data-delay="2">
+          <div class="feature-label"><span>GEOMETRY</span><b>OPTIONAL</b></div>
+          <h3>Tunnel ESP</h3>
+          <p>Separately scans underground geometry for sustained 2×1 and 3×3 passages with configurable colors.</p>
+          <div class="tunnel-viz" aria-hidden="true"><span></span><span></span><span></span></div>
+        </article>
+
+        <article class="feature-card feature-card-tools reveal">
+          <div class="feature-label"><span>PLAYER</span><b>UTILITY</b></div>
+          <div class="tool-split">
+            <div>
+              <span class="tool-key">F6</span>
+              <h3>Freecam</h3>
+              <p>No-clip camera movement with sprint acceleration and interaction blocking while detached.</p>
+            </div>
+            <div>
+              <span class="tool-key">F8</span>
+              <h3>Auto Totem</h3>
+              <p>Refills the offhand from inventory with screen-state safeguards and acknowledgment timing.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature-card reveal" data-delay="1">
+          <div class="feature-label"><span>SOCIAL</span><b>04 SLOTS</b></div>
+          <h3>Chat macros</h3>
+          <p>Four editable, rebindable messages or commands. Each slot is normalized and capped at 256 characters.</p>
+          <div class="macro-line"><span>/home farm</span><b>UNBOUND</b></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="interface section">
+      <div class="interface-copy reveal">
+        <p class="section-index">04 / CONTROL SURFACE</p>
+        <h2>Every module.<br>No menu maze.</h2>
+        <p>
+          Right Shift opens a searchable Click GUI with draggable, collapsible panels.
+          Left-click toggles. Right-click exposes the settings that belong to that module.
+        </p>
+        <ul class="interface-points">
+          <li>Live key rebinding</li>
+          <li>Nested ESP colors and filters</li>
+          <li>Editable macro fields</li>
+          <li>Persistent Arcane, Ember, and Verdant themes</li>
+        </ul>
+
+        <div class="theme-switcher" role="group" aria-label="Preview interface color theme">
+          <button class="theme-swatch is-active" type="button" data-theme-choice="arcane"><i></i>ARCANE</button>
+          <button class="theme-swatch" type="button" data-theme-choice="ember"><i></i>EMBER</button>
+          <button class="theme-swatch" type="button" data-theme-choice="verdant"><i></i>VERDANT</button>
+        </div>
+      </div>
+
+      <div class="gui-window reveal" data-delay="1" data-gui>
+        <div class="gui-topbar">
+          <div><img src="assets/arcane-client-icon.png" alt="" width="22" height="22"><strong>ARCANE CLIENT</strong></div>
+          <span>HIGH FPS&nbsp;&nbsp; 144 FPS</span>
+          <b>ARCANE</b>
+        </div>
+        <div class="gui-search"><span>⌕</span> Search modules...</div>
+        <div class="gui-panels">
+          <section class="gui-panel">
+            <header>DISCOVERY <b>1/1</b></header>
+            <div class="gui-module is-on"><i></i>Growth scanner <span>⌄</span></div>
+            <div class="gui-slider">
+              <span>Sensitivity <b>65%</b></span>
+              <i><em></em></i>
+            </div>
+            <div class="gui-setting"><span>Growth patterns</span><i class="toggle is-on"></i></div>
+            <div class="gui-setting"><span>Live growth</span><i class="toggle is-on"></i></div>
+          </section>
+          <section class="gui-panel">
+            <header>VISUAL <b>6/8</b></header>
+            <div class="gui-module is-on"><i></i>Chunk tiles</div>
+            <div class="gui-module is-on"><i></i>Radar HUD</div>
+            <div class="gui-module is-on"><i></i>Chunk intel</div>
+            <div class="gui-module is-on"><i></i>Storage ESP <span>›</span></div>
+            <div class="gui-module"><i></i>Item ESP <span>›</span></div>
+            <div class="gui-module"><i></i>Tunnel ESP <span>›</span></div>
+          </section>
+          <section class="gui-panel gui-panel-small">
+            <header>PLAYER <b>1/2</b></header>
+            <div class="gui-module"><i></i>Auto Totem</div>
+            <div class="gui-module is-on"><i></i>Freecam</div>
+            <div class="gui-performance"><span>Performance</span><b>HIGH FPS</b></div>
+          </section>
+        </div>
+        <div class="gui-footer">
+          <span>LMB toggle&nbsp;&nbsp; RMB configure&nbsp;&nbsp; Drag headers</span>
+          <b>2.2.0</b>
+        </div>
+      </div>
+    </section>
+
+    <section class="performance section" id="performance">
+      <div class="section-heading reveal">
+        <p class="section-index">05 / PERFORMANCE</p>
+        <h2>Choose the budget.<br><em>Keep full accuracy.</em></h2>
+        <p>
+          Profiles tune time budgets, refresh cadence, fill detail, and render target limits.
+          They do not turn the growth model into a partial scan.
+        </p>
+      </div>
+
+      <div class="profile-grid">
+        <article class="profile-card profile-recommended reveal">
+          <div class="profile-top"><span>01</span><b>DEFAULT</b></div>
+          <h3>High FPS</h3>
+          <strong>1.00 <small>ms/tick</small></strong>
+          <dl>
+            <div><dt>Snapshot cadence</dt><dd>20 ticks</dd></div>
+            <div><dt>Storage targets</dt><dd>256</dd></div>
+            <div><dt>Item targets</dt><dd>128</dd></div>
+            <div><dt>World targets</dt><dd>384</dd></div>
+            <div><dt>Storage style</dt><dd>Outline</dd></div>
+          </dl>
+        </article>
+        <article class="profile-card reveal" data-delay="1">
+          <div class="profile-top"><span>02</span><b>MIDDLE</b></div>
+          <h3>Balanced</h3>
+          <strong>1.85 <small>ms/tick</small></strong>
+          <dl>
+            <div><dt>Snapshot cadence</dt><dd>10 ticks</dd></div>
+            <div><dt>Storage targets</dt><dd>512</dd></div>
+            <div><dt>Item targets</dt><dd>256</dd></div>
+            <div><dt>World targets</dt><dd>768</dd></div>
+            <div><dt>Storage style</dt><dd>Filled</dd></div>
+          </dl>
+        </article>
+        <article class="profile-card reveal" data-delay="2">
+          <div class="profile-top"><span>03</span><b>DETAIL</b></div>
+          <h3>Quality</h3>
+          <strong>2.50 <small>ms/tick</small></strong>
+          <dl>
+            <div><dt>Snapshot cadence</dt><dd>5 ticks</dd></div>
+            <div><dt>Storage targets</dt><dd>1,024</dd></div>
+            <div><dt>Item targets</dt><dd>512</dd></div>
+            <div><dt>World targets</dt><dd>1,500</dd></div>
+            <div><dt>Storage style</dt><dd>Filled</dd></div>
+          </dl>
+        </article>
+      </div>
+
+      <p class="performance-note reveal">
+        When the Click GUI is open, 3D overlays and the HUD pause while background scanning is capped at 0.5 ms/tick.
+        Actual FPS still depends on hardware, shaders, resource packs, and the loaded world.
+      </p>
+    </section>
+
+    <section class="controls section">
+      <div class="controls-heading reveal">
+        <p class="section-index">06 / DEFAULT CONTROLS</p>
+        <h2>Ready at the<br>press of a key.</h2>
+      </div>
+      <div class="key-grid reveal" data-delay="1">
+        <div><kbd>R SHIFT</kbd><span>Open Click GUI</span></div>
+        <div><kbd>B</kbd><span>Growth scanner</span></div>
+        <div><kbd>N</kbd><span>Chunk tiles</span></div>
+        <div><kbd>F6</kbd><span>Freecam</span></div>
+        <div><kbd>F7</kbd><span>Storage ESP</span></div>
+        <div><kbd>F8</kbd><span>Auto Totem</span></div>
+        <div><kbd>F9</kbd><span>Tunnel ESP</span></div>
+        <div><kbd>F10</kbd><span>Item ESP</span></div>
+      </div>
+      <p class="key-note reveal">Every binding can be changed in the Click GUI or Minecraft’s standard keybind screen.</p>
+    </section>
+
+    <section class="install section" id="install">
+      <div class="install-card reveal">
+        <div class="install-copy">
+          <p class="section-index">07 / INSTALL</p>
+          <h2>Drop in.<br><em>Read the field.</em></h2>
+          <p>Arcane Client runs entirely on the Fabric client. No account, license key, or external service is required.</p>
+          <div class="requirements" role="group" aria-label="System requirements">
+            <span>MINECRAFT <b>1.21.11</b></span>
+            <span>JAVA <b>21</b></span>
+            <span>FABRIC LOADER <b>0.19.3+</b></span>
+          </div>
+          <div class="install-actions">
+            <a class="button button-primary" href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">
+              Get Arcane Client <span aria-hidden="true">↗</span>
+            </a>
+            <a class="text-link" href="https://github.com/eiiorejierge/Arcane-Client/issues" target="_blank" rel="noreferrer">Report an issue</a>
+          </div>
+        </div>
+        <ol class="install-steps">
+          <li><span>01</span><div><strong>Install Fabric</strong><p>Use Fabric Loader for Minecraft 1.21.11 and add a compatible Fabric API.</p></div></li>
+          <li><span>02</span><div><strong>Add the JAR</strong><p>Place Arcane Client in the Minecraft <code>mods</code> folder.</p></div></li>
+          <li><span>03</span><div><strong>Open the GUI</strong><p>Launch the Fabric profile and press <kbd>Right Shift</kbd>.</p></div></li>
+        </ol>
+      </div>
+
+      <div class="build-strip reveal">
+        <div><span>BUILD FROM SOURCE</span><code>.\gradlew.bat clean build</code></div>
+        <button type="button" data-copy-command aria-label="Copy build command">COPY</button>
+      </div>
+    </section>
+
+    <section class="truth-strip" aria-label="Arcane Client principles">
+      <div class="marquee" aria-hidden="true">
+        <span>GROWTH ONLY / EXPLAINABLE SCORES / CLIENT SIDE / HIGH FPS / INDEPENDENT ESP / </span>
+        <span>GROWTH ONLY / EXPLAINABLE SCORES / CLIENT SIDE / HIGH FPS / INDEPENDENT ESP / </span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-brand">
+      <img src="assets/arcane-client-icon.png" width="46" height="46" alt="">
+      <div><strong>ARCANE CLIENT</strong><span>Find the pattern. Ignore the noise.</span></div>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">Source</a>
+      <a href="https://github.com/eiiorejierge/Arcane-Client/blob/main/README.md" target="_blank" rel="noreferrer">Documentation</a>
+      <a href="https://github.com/eiiorejierge/Arcane-Client/issues" target="_blank" rel="noreferrer">Issues</a>
+      <a href="assets/Inter-OFL.txt">Font license</a>
+      <a href="#top">Back to top ↑</a>
+    </div>
+    <p class="footer-legal">
+      Client-side Fabric mod for Minecraft 1.21.11. Use only where server rules and applicable terms permit.
+      Arcane Client is not affiliated with Mojang Studios or Microsoft.
+    </p>
+    <span class="footer-version">ARC / 2.2.0 / CC0-1.0</span>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
