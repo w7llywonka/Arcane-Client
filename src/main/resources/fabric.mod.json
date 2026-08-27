@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "arcaneclient",
+  "version": "${version}",
+  "name": "Arcane Client",
+  "description": "A focused DonutSMP utility client with base-finding intelligence, configurable ESP, player tools, and a polished Click GUI.",
+  "authors": [
+    "Eric and Codex"
+  ],
+  "contact": {
+    "sources": "https://github.com/eiiorejierge/Arcane-Client",
+    "issues": "https://github.com/eiiorejierge/Arcane-Client/issues"
+  },
+  "license": "CC0-1.0",
+  "icon": "assets/arcaneclient/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.arcaneclient.ArcaneClient"
+    ]
+  },
+  "mixins": [
+    {
+      "config": "arcaneclient.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "fabric-api": ">=0.141.6"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "key.category.arcaneclient.main": "Arcane Client",
+  "key.arcaneclient.toggle": "Toggle base scanner",
+  "key.arcaneclient.overlay": "Toggle chunk tiles",
+  "key.arcaneclient.freecam": "Toggle freecam",
+  "key.arcaneclient.esp": "Toggle storage ESP",
+  "key.arcaneclient.auto_totem": "Toggle Auto Totem",
+  "key.arcaneclient.tunnel_esp": "Toggle tunnel ESP",
+  "key.arcaneclient.item_esp": "Toggle item ESP",
+  "key.arcaneclient.settings": "Open Arcane Click GUI",
+  "key.arcaneclient.chat_macro_1": "Chat macro 1",
+  "key.arcaneclient.chat_macro_2": "Chat macro 2",
+  "key.arcaneclient.chat_macro_3": "Chat macro 3",
+  "key.arcaneclient.chat_macro_4": "Chat macro 4"
+}
