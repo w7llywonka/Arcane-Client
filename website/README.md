@@ -14,8 +14,9 @@ Then open `http://127.0.0.1:4173`.
 
 ## Structure
 
-- `index.html` — minimal landing page, Hiss Addon startup intro, and explicit $5/$10 feature lists.
-- `styles.css` — flat responsive layout, CSS-only snake animation, and lightweight page motion.
-- `assets/arcane-mark.svg` — the flat Arcane mark.
+- `index.html` — product landing page, scanner proof, feature rows, Hiss Addon, and an explicit plan comparison table.
+- `styles.css` — flat responsive visual system, client mockup, and motion.
+- `script.js` — session-aware Hiss replay control.
+- `assets/arcane-mark.svg` — the three-stroke Arcane mark.
 
-The site has no build step, JavaScript, external requests, or web-font payload.
+The site has no build step, remote asset requests, gradients, or web-font payload. Replace the `https://discord.com/` fallback with the Arcane server invite when it is available.

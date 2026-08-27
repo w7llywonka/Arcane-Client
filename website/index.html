@@ -3,27 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b0b10">
-  <meta name="description" content="Arcane Client for Fabric 1.21.11.">
+  <meta name="theme-color" content="#090a0f">
+  <meta name="description" content="Arcane Client reads deliberate growth patterns in loaded Minecraft chunks without using storage or light to score them.">
   <meta property="og:title" content="Arcane Client">
-  <meta property="og:description" content="Arcane Client for Fabric 1.21.11.">
+  <meta property="og:description" content="Growth leaves a pattern. Arcane reads it.">
   <meta property="og:type" content="website">
   <title>Arcane Client</title>
   <link rel="icon" href="assets/arcane-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
+  <script>
+    try {
+      if (sessionStorage.getItem("arcane-hiss-seen")) {
+        document.documentElement.classList.add("hiss-seen");
+      } else {
+        sessionStorage.setItem("arcane-hiss-seen", "1");
+      }
+    } catch (error) {
+      document.documentElement.dataset.storage = "unavailable";
+    }
+  </script>
 </head>
 <body>
   <div class="hiss-startup" aria-hidden="true">
     <div class="hiss-lockup">
-      <strong class="hiss-title">HISS <span>ADDON</span></strong>
-      <small>ARCANE CLIENT</small>
+      <span>WEB ADDON / 01</span>
+      <strong>HISS <b>ADDON</b></strong>
     </div>
-    <svg class="hiss-snake" viewBox="0 0 240 100" aria-hidden="true" focusable="false">
-      <path class="hiss-body" d="M8 52 C30 14 52 90 76 52 S122 14 146 52 S190 88 208 52"/>
-      <ellipse class="hiss-head" cx="214" cy="52" rx="12" ry="9"/>
-      <circle class="hiss-eye" cx="218" cy="49" r="2"/>
-      <path class="hiss-tongue" d="M225 54 234 58 239 55 M234 58 239 62"/>
+    <svg class="hiss-snake" viewBox="0 0 300 90" aria-hidden="true" focusable="false">
+      <path class="hiss-body" d="M8 47 C35 8 62 84 91 47 S147 8 176 47 S232 82 260 47"/>
+      <ellipse class="hiss-head" cx="269" cy="47" rx="14" ry="10"/>
+      <circle class="hiss-eye" cx="274" cy="44" r="2"/>
+      <path class="hiss-tongue" d="M281 49 290 53 298 49 M290 53 298 58"/>
     </svg>
+    <span class="hiss-rule"></span>
   </div>
 
   <a class="skip-link" href="#main">Skip to content</a>
@@ -33,73 +45,195 @@
       <img src="assets/arcane-mark.svg" width="32" height="32" alt="">
       <span>Arcane Client</span>
     </a>
-    <a class="header-link" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Join Discord ↗</a>
+    <nav class="main-nav" aria-label="Primary navigation">
+      <a href="#tools">Tools</a>
+      <a href="#plans">Plans</a>
+      <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
+    </nav>
+    <a class="header-cta" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
   </header>
 
   <main id="main">
     <section class="hero" id="top">
-      <p class="kicker">Fabric / Minecraft 1.21.11</p>
-      <h1>Arcane<br><span>Client</span></h1>
-      <div class="hero-actions">
-        <a class="button button-primary" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Join Discord</a>
-        <a class="button button-secondary" href="#options">Explore options</a>
+      <div class="hero-copy">
+        <p class="eyebrow">Fabric · 1.21.11 · Client-side</p>
+        <h1>Growth leaves<br>a pattern.</h1>
+        <p class="hero-text">Arcane reads deliberate crop and plant layouts in loaded chunks—without using storage or light to score them.</p>
+        <div class="hero-actions">
+          <a class="button button-solid" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
+          <a class="button button-outline" href="#plans">Explore options</a>
+        </div>
+        <div class="hero-meta" role="group" aria-label="Arcane Client facts">
+          <span>Arcane 2.2</span>
+          <span>High FPS default</span>
+          <span>Right Shift GUI</span>
+        </div>
+      </div>
+
+      <div class="client-window" role="group" aria-label="Arcane growth scanner interface preview">
+        <header class="window-bar">
+          <span><i></i> ARCANE / GROWTH SCANNER</span>
+          <span>SAMPLE</span>
+        </header>
+        <div class="window-body">
+          <div class="map-panel">
+            <div class="map-label">
+              <span>LOADED CHUNKS</span>
+              <span>X +124 / Z −038</span>
+            </div>
+            <div class="chunk-grid" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span class="trace-low">12</span><span></span><span></span><span></span><span></span>
+              <span></span><span class="trace-low">08</span><span class="trace-mid">36</span><span class="trace-mid">44</span><span></span><span></span><span></span>
+              <span></span><span></span><span class="trace-mid">31</span><span class="trace-hot">78</span><span class="trace-mid">40</span><span></span><span></span>
+              <span></span><span></span><span></span><span class="trace-low">16</span><span></span><span></span><span></span>
+              <i class="scan-line"></i>
+            </div>
+          </div>
+          <aside class="scan-readout">
+            <p>CURRENT CHUNK</p>
+            <strong>78</strong>
+            <span>GROWTH SITE</span>
+            <dl>
+              <div><dt>Crop blocks</dt><dd>24</dd></div>
+              <div><dt>Dominant stage</dt><dd>18</dd></div>
+              <div><dt>Farmland support</dt><dd>15</dd></div>
+            </dl>
+          </aside>
+        </div>
+        <footer class="window-footer">
+          <span><i></i> SCANNER READY</span>
+          <span>STORAGE IGNORED · LIGHT IGNORED</span>
+        </footer>
       </div>
     </section>
 
-    <section class="options" id="options">
-      <header class="section-heading">
-        <p>Options</p>
-        <h2>Pick your version.</h2>
+    <section class="proof-strip" aria-label="Compatibility and performance">
+      <div><strong>1.0 ms</strong><span>Default scan budget</span></div>
+      <div><strong>Growth only</strong><span>Scoring input</span></div>
+      <div><strong>1.21.11</strong><span>Minecraft + Fabric</span></div>
+      <div><strong>Local</strong><span>Client-side configuration</span></div>
+    </section>
+
+    <section class="tools-section" id="tools">
+      <header class="section-intro">
+        <p class="eyebrow">What it does</p>
+        <h2>One signal.<br>Four clear views.</h2>
       </header>
-
-      <div class="plans">
-        <article class="plan plan-base">
-          <header class="plan-header">
-            <div>
-              <span class="plan-number">01</span>
-              <h3>Base</h3>
-            </div>
-            <p class="price"><sup>$</sup>5</p>
-          </header>
-          <ul>
-            <li>Growth scanner</li>
-            <li>Chunk radar and growth alerts</li>
-            <li>Storage ESP</li>
-            <li>Item ESP and Tunnel ESP</li>
-            <li>Freecam and Auto Totem</li>
-            <li>All client updates</li>
-          </ul>
-          <a class="plan-button base-button" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Get Base</a>
+      <div class="feature-list">
+        <article class="feature-row">
+          <span class="feature-number">01</span>
+          <h3>Growth Scanner</h3>
+          <p>Finds organized crop rows, synchronized growth stages, mature plots, sapling layouts, vertical farms, and harvest cycles.</p>
+          <span class="feature-state">Core</span>
         </article>
-
-        <article class="plan plan-premium">
-          <header class="plan-header">
-            <div>
-              <span class="plan-number">02</span>
-              <h3>Premium</h3>
-            </div>
-            <p class="price"><sup>$</sup>10</p>
-          </header>
-          <ul>
-            <li>Growth scanner</li>
-            <li>Chunk radar and growth alerts</li>
-            <li>Storage, Item, and Tunnel ESP</li>
-            <li>Freecam and Auto Totem</li>
-            <li>Chat macros and client updates</li>
-            <li>Premium scanner <small>in development</small></li>
-          </ul>
-          <a class="plan-button premium-button" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Get Premium</a>
+        <article class="feature-row">
+          <span class="feature-number">02</span>
+          <h3>Chunk Intel</h3>
+          <p>Shows chunk tiles, radar, current-chunk evidence, growth labels, and alerts without burying the reason behind a score.</p>
+          <span class="feature-state">Live</span>
+        </article>
+        <article class="feature-row">
+          <span class="feature-number">03</span>
+          <h3>Independent ESP</h3>
+          <p>Storage, item, and tunnel ESP stay separate. They help you look, but they never make a chunk suspicious.</p>
+          <span class="feature-state">Visual</span>
+        </article>
+        <article class="feature-row">
+          <span class="feature-number">04</span>
+          <h3>Player Tools</h3>
+          <p>Freecam, Auto Totem, chat macros, configurable keybinds, and three performance profiles remain close at hand.</p>
+          <span class="feature-state">Utility</span>
         </article>
       </div>
+    </section>
+
+    <section class="hiss-feature" id="hiss">
+      <div class="hiss-feature-art" aria-hidden="true">
+        <svg viewBox="0 0 300 90" focusable="false">
+          <path d="M8 47 C35 8 62 84 91 47 S147 8 176 47 S232 82 260 47"/>
+          <ellipse cx="269" cy="47" rx="14" ry="10"/>
+          <circle cx="274" cy="44" r="2"/>
+        </svg>
+      </div>
+      <div>
+        <p class="eyebrow">Hiss Addon</p>
+        <h2>Fast in. Gone in a second.</h2>
+        <p>A small session intro with one job: open Arcane with a little character, then get out of the way.</p>
+      </div>
+      <button class="replay-hiss" type="button">Replay Hiss</button>
+    </section>
+
+    <section class="plans-section" id="plans">
+      <header class="section-intro plans-intro">
+        <div>
+          <p class="eyebrow">Options</p>
+          <h2>Pick your access.</h2>
+        </div>
+        <p>No vague bundles. Every included tool is listed below.</p>
+      </header>
+
+      <div class="price-board">
+        <table class="price-table">
+          <caption class="sr-only">Arcane Client Base and Premium plan comparison</caption>
+          <colgroup>
+            <col class="feature-column">
+            <col>
+            <col>
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="price-head feature-head" scope="col"><span>Feature</span></th>
+              <th class="price-head base-head" scope="col">
+                <span>Base</span>
+                <strong><sup>$</sup>5</strong>
+              </th>
+              <th class="price-head premium-head" scope="col">
+                <span>Premium</span>
+                <strong><sup>$</sup>10</strong>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Growth scanner</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
+            <tr><th scope="row">Chunk tiles, radar, and intel</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
+            <tr><th scope="row">Growth labels and alerts</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
+            <tr><th scope="row">Storage, Item, and Tunnel ESP</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
+            <tr><th scope="row">Freecam and Auto Totem</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
+            <tr><th scope="row">Chat macros and performance profiles</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
+            <tr><th scope="row">All client updates</th><td><span class="plan-status base-status">Included</span></td><td><span class="plan-status premium-status">Included</span></td></tr>
+            <tr class="premium-row"><th scope="row">Premium scanner</th><td><span class="plan-status unavailable-status">—</span></td><td><span class="plan-status premium-status">In development</span></td></tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row"><span class="sr-only">Choose a plan</span></th>
+              <td><a href="https://discord.com/" target="_blank" rel="noreferrer">Get Base</a></td>
+              <td><a class="premium-action" href="https://discord.com/" target="_blank" rel="noreferrer">Join waitlist</a></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="closing">
+      <p class="eyebrow">Arcane Client / 2.2</p>
+      <h2>Read the pattern.</h2>
+      <a class="button button-solid" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
     </section>
   </main>
 
-  <footer>
-    <span>Arcane Client</span>
-    <nav aria-label="Footer">
-      <a href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Discord</a>
+  <footer class="site-footer">
+    <div>
+      <img src="assets/arcane-mark.svg" width="26" height="26" alt="">
+      <span>Arcane Client</span>
+    </div>
+    <p>Use only where server rules permit. Not affiliated with Mojang or Microsoft.</p>
+    <nav aria-label="Footer navigation">
+      <a href="https://discord.com/" target="_blank" rel="noreferrer">Discord</a>
       <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
     </nav>
   </footer>
+
+  <script src="script.js"></script>
 </body>
 </html>

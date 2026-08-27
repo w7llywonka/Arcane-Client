@@ -2,8 +2,8 @@
 
 ## 2.2.0+mc1.21.11
 
-- Added the Hiss Addon website intro: a lightweight CSS-only snake slither shown once on page load.
-- Reworked the product site with flat colors, explicit plan features, no JavaScript, and no bundled web font.
+- Added the Hiss Addon website intro: a lightweight snake slither shown once per session with an optional replay.
+- Reworked the product site with a scanner interface preview, flat colors, an explicit plan comparison, and no bundled web font.
 
 - Replaced broad base suspicion with a growth-only discovery model.
 - Set storage, block-entity, machine, placed-block, entity, interaction, and light category caps to zero.
