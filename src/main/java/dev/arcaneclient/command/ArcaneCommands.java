@@ -46,6 +46,7 @@ public final class ArcaneCommands {
                 .then(command("stashalerts", ArcaneCommands::stashAlerts))
                 .then(command("analysis", ArcaneCommands::analysis))
                 .then(command("settings", ignored -> settings()))
+                .then(command("profile", ArcaneCommands::profile))
                 .then(command("here", ArcaneCommands::here))
                 .then(command("list", source -> list(source, 8))
                     .then(ClientCommandManager.argument("count", IntegerArgumentType.integer(1, 20))
@@ -78,7 +79,7 @@ public final class ArcaneCommands {
     private static int status(FabricClientCommandSource source) {
         ArcaneConfig config = ArcaneClient.config();
         TraceEngine engine = ArcaneClient.engine();
-        ArcaneCommands.feedback(source, "Arcane Client " + (config.enabled ? "on" : "off") + ", sensitivity " + config.sensitivity() + "%, radius " + config.scanRadius + ", speed " + config.chunksPerTick + ", deep focus " + (config.deepFocus ? "on" : "off") + ", item/tunnel/totem " + ArcaneCommands.state(config.itemEsp) + "/" + ArcaneCommands.state(config.tunnelEsp) + "/" + ArcaneCommands.state(config.autoTotem) + ", macros " + ArcaneCommands.state(config.chatMacros) + ", flagged " + engine.flaggedCount() + ", queued " + engine.queueSize());
+        ArcaneCommands.feedback(source, "Arcane Client " + (config.enabled ? "on" : "off") + ", sensitivity " + config.sensitivity() + "%, radius " + config.scanRadius + ", speed " + config.chunksPerTick + ", deep focus " + (config.deepFocus ? "on" : "off") + ", profile " + config.performanceProfile().label() + ", item/tunnel/totem " + ArcaneCommands.state(config.itemEsp) + "/" + ArcaneCommands.state(config.tunnelEsp) + "/" + ArcaneCommands.state(config.autoTotem) + ", macros " + ArcaneCommands.state(config.chatMacros) + ", flagged " + engine.flaggedCount() + ", queued " + engine.queueSize());
         return 1;
     }
 
@@ -189,6 +190,14 @@ public final class ArcaneCommands {
         return 1;
     }
 
+    private static int profile(FabricClientCommandSource source) {
+        ArcaneConfig config = ArcaneClient.config();
+        config.cyclePerformanceProfile();
+        config.save();
+        ArcaneClient.engine().settingsChanged(MinecraftClient.getInstance());
+        ArcaneCommands.feedback(source, "Performance profile set to " + config.performanceProfile().label());
+        return 1;
+    }
     private static int settings() {
         MinecraftClient client = MinecraftClient.getInstance();
         client.send(() -> client.setScreen((Screen)new ArcaneSettingsScreen(null)));

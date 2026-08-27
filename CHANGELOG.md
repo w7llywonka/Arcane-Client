@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.0+mc1.21.11
+
+- Added a professional smooth Inter UI font under the SIL Open Font License.
+- Added soft outlined module cards, modern static toggles, and a live cached FPS/profile readout.
+- Added High FPS, Balanced, and Quality profiles; High FPS is the default.
+- Capped scan time, snapshot cadence, storage/item targets, tunnel outlines, and chunk markers per profile.
+- Paused HUD/3D overlay submission and capped scanning at 0.5 ms/tick while the Click GUI is open.
+- Replaced per-frame GUI model/filter allocations and streams with reusable cached data.
+- Added a chunk snapshot index and replaced quadratic stash-neighbor checks with bounded spatial lookup.
+- Added `/arcane profile` and automated performance-budget tests.
+
 ## 2.0.0+mc1.21.11
 
 - Reconstructed the complete client as readable Yarn-named Java source.

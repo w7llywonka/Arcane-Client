@@ -2,6 +2,8 @@ package dev.arcaneclient.render;
 
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.TraceEngine;
+import dev.arcaneclient.screen.ArcaneFont;
+import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
@@ -29,6 +31,7 @@ public final class StashLabelRenderer {
     }
 
     public static void tick(MinecraftClient client) {
+        if (ArcaneSettingsScreen.isOpen(client)) return;
         if (!ArcaneClient.config().stashAlerts || client.world == null) {
             source = List.of();
             targets = List.of();
@@ -55,7 +58,9 @@ public final class StashLabelRenderer {
             return;
         }
         MinecraftClient client = MinecraftClient.getInstance();
+        if (ArcaneSettingsScreen.isOpen(client)) return;
         Vec3d camera = context.worldState().cameraRenderState.pos;
+        TextRenderer font = ArcaneFont.renderer(client);
         for (Target target : targets) {
             MatrixStack matrices = context.matrices();
             matrices.push();
@@ -63,8 +68,8 @@ public final class StashLabelRenderer {
             matrices.multiply((Quaternionfc)context.worldState().cameraRenderState.orientation);
             matrices.scale(-0.025f, -0.025f, 0.025f);
             String score = "CONFIDENCE " + target.score();
-            StashLabelRenderer.drawCentered(client.textRenderer, LABEL, 0.0f, matrices, context, -1);
-            StashLabelRenderer.drawCentered(client.textRenderer, score, 10.0f, matrices, context, -3092272);
+            StashLabelRenderer.drawCentered(font, LABEL, 0.0f, matrices, context, -1);
+            StashLabelRenderer.drawCentered(font, score, 10.0f, matrices, context, -3092272);
             matrices.pop();
         }
     }

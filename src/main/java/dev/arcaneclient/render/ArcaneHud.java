@@ -4,6 +4,8 @@ import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.TraceEngine;
 import dev.arcaneclient.freecam.FreecamController;
+import dev.arcaneclient.screen.ArcaneFont;
+import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.HashMap;
 import java.util.Map;
 import net.fabricmc.api.EnvType;
@@ -11,6 +13,7 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.ChunkPos;
@@ -41,6 +44,7 @@ public final class ArcaneHud {
     private static void render(DrawContext graphics) {
         ArcaneConfig config = ArcaneClient.config();
         MinecraftClient client = MinecraftClient.getInstance();
+        if (ArcaneSettingsScreen.isOpen(client)) return;
         if (client.player == null) {
             return;
         }
@@ -53,6 +57,7 @@ public final class ArcaneHud {
     }
 
     private static void renderRadar(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
+        TextRenderer font = ArcaneFont.renderer(client);
         TraceEngine engine = ArcaneClient.engine();
         ChunkPos center = client.player.getChunkPos();
         Map<Long, TraceEngine.ChunkMarker> markers = nearbyMarkers(engine, center);
@@ -69,9 +74,9 @@ public final class ArcaneHud {
 
         String state = config.enabled ? "ON" : "PAUSED";
         String header = "ARCANE  " + state + (FreecamController.isActive() ? "  FC" : "") + (config.esp ? "  ESP" : "");
-        graphics.drawText(client.textRenderer, header, PANEL_X + PADDING, PANEL_Y + 6, config.enabled ? 0xFFF8FAFC : 0xFFFB7185, true);
+        graphics.drawText(font, header, PANEL_X + PADDING, PANEL_Y + 6, config.enabled ? 0xFFF8FAFC : 0xFFFB7185, true);
         String flagged = Integer.toString(engine.flaggedCount());
-        graphics.drawText(client.textRenderer, flagged, PANEL_X + panelWidth - PADDING - client.textRenderer.getWidth(flagged), PANEL_Y + 6, secondary, false);
+        graphics.drawText(font, flagged, PANEL_X + panelWidth - PADDING - font.getWidth(flagged), PANEL_Y + 6, secondary, false);
 
         int gridX = PANEL_X + PADDING;
         int gridY = PANEL_Y + HEADER_HEIGHT;
@@ -86,12 +91,12 @@ public final class ArcaneHud {
                 graphics.fill(x + 1, y + 1, x + CELL_SIZE - 1, y + CELL_SIZE - 1, score == 0 ? 0x50231D36 : qualityColor(score, config.threshold));
                 if (score > 0) {
                     int scoreColor = score >= config.threshold && score < 75 ? 0xFF15111F : 0xFFF8FAFC;
-                    graphics.drawCenteredTextWithShadow(client.textRenderer, Integer.toString(Math.min(99, score)), x + CELL_SIZE / 2, y + 3, scoreColor);
+                    graphics.drawCenteredTextWithShadow(font, Integer.toString(Math.min(99, score)), x + CELL_SIZE / 2, y + 3, scoreColor);
                 }
                 if (dx == 0 && dz == 0) {
                     graphics.drawStrokedRectangle(x, y, CELL_SIZE, CELL_SIZE, accent);
                     if (score == 0) {
-                        graphics.drawCenteredTextWithShadow(client.textRenderer, "+", x + CELL_SIZE / 2, y + 3, secondary);
+                        graphics.drawCenteredTextWithShadow(font, "+", x + CELL_SIZE / 2, y + 3, secondary);
                     }
                 }
             }
@@ -99,9 +104,10 @@ public final class ArcaneHud {
     }
 
     private static void renderChunkAnalysis(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
+        TextRenderer font = ArcaneFont.renderer(client);
         TraceEngine engine = ArcaneClient.engine();
         ChunkPos chunk = client.player.getChunkPos();
-        TraceEngine.ChunkMarker marker = engine.markerAt(chunk.x, chunk.z);
+        TraceEngine.ChunkMarker marker = engine.snapshotMarkerAt(chunk.x, chunk.z);
         int accent = accent(config.uiTheme);
         int secondary = secondary(config.uiTheme);
         int panelWidth = 212;
@@ -114,28 +120,34 @@ public final class ArcaneHud {
         graphics.fill(x, y, x + panelWidth, y + height, 0xEC120F20);
         graphics.drawStrokedRectangle(x, y, panelWidth, height, 0xFF4B4168);
         graphics.fill(x + 1, y + 1, x + 4, y + height - 1, accent);
-        graphics.drawText(client.textRenderer, "CURRENT CHUNK", x + 10, y + 7, 0xFFF8FAFC, true);
-        graphics.drawText(client.textRenderer, chunk.x + ", " + chunk.z, x + 10, y + 20, secondary, false);
+        graphics.drawText(font, "CURRENT CHUNK", x + 10, y + 7, 0xFFF8FAFC, true);
+        graphics.drawText(font, chunk.x + ", " + chunk.z, x + 10, y + 20, secondary, false);
 
         if (marker == null || marker.score() == 0) {
-            String empty = client.textRenderer.trimToWidth("No activity evidence detected", panelWidth - 20);
-            graphics.drawText(client.textRenderer, empty, x + 10, y + 33, 0xFF94A3B8, false);
+            String empty = font.trimToWidth("No activity evidence detected", panelWidth - 20);
+            graphics.drawText(font, empty, x + 10, y + 33, 0xFF94A3B8, false);
             return;
         }
 
-        boolean stash = engine.stashCandidates().stream().anyMatch(candidate -> candidate.chunkX() == chunk.x && candidate.chunkZ() == chunk.z);
+        boolean stash = isStashChunk(engine, chunk);
         String score = stash ? "POSSIBLE STASH  " + marker.score() : "SCORE  " + marker.score();
-        int scoreX = x + panelWidth - 9 - client.textRenderer.getWidth(score);
-        graphics.drawText(client.textRenderer, score, scoreX, y + 7, stash ? 0xFFFB7185 : accent, true);
+        int scoreX = x + panelWidth - 9 - font.getWidth(score);
+        graphics.drawText(font, score, scoreX, y + 7, stash ? 0xFFFB7185 : accent, true);
 
         int lineY = y + 34;
         for (int index = 0; index < reasonCount; index++) {
-            String reason = client.textRenderer.trimToWidth(marker.reasons().get(index), panelWidth - 25);
-            graphics.drawText(client.textRenderer, "> " + reason, x + 10, lineY, 0xFFD8D3E4, false);
+            String reason = font.trimToWidth(marker.reasons().get(index), panelWidth - 25);
+            graphics.drawText(font, "> " + reason, x + 10, lineY, 0xFFD8D3E4, false);
             lineY += 11;
         }
     }
 
+    private static boolean isStashChunk(TraceEngine engine, ChunkPos chunk) {
+        for (TraceEngine.StashCandidate candidate : engine.stashCandidates()) {
+            if (candidate.chunkX() == chunk.x && candidate.chunkZ() == chunk.z) return true;
+        }
+        return false;
+    }
     private static Map<Long, TraceEngine.ChunkMarker> nearbyMarkers(TraceEngine engine, ChunkPos center) {
         long tickBucket = engine.currentTick() / 10L;
         if (tickBucket == cachedTickBucket && center.x == cachedCenterX && center.z == cachedCenterZ) {

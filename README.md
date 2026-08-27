@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/eiiorejierge/Arcane-Client/actions/workflows/build.yml/badge.svg)](https://github.com/eiiorejierge/Arcane-Client/actions/workflows/build.yml)
 
-Arcane Client is a client-side Fabric utility suite for Minecraft 1.21.11. This 2.0 source release combines the strongest parts of the archived 1.6 and 1.8 builds: evidence-based chunk discovery, the newer packet and entity filters, storage/item/tunnel visualization, player utilities, chat macros, and a redesigned Click GUI.
+Arcane Client is a client-side Fabric utility suite for Minecraft 1.21.11. This 2.1 source release combines the strongest parts of the archived 1.6 and 1.8 builds: evidence-based chunk discovery, the newer packet and entity filters, storage/item/tunnel visualization, player utilities, chat macros, and a redesigned Click GUI.
 
 ## Highlights
 
@@ -10,7 +10,7 @@ Arcane Client is a client-side Fabric utility suite for Minecraft 1.21.11. This 
 - **Visual intelligence:** chunk tiles, radar HUD, current-chunk intel, storage ESP, item ESP with category colors, tunnel ESP, tracers, stash labels/alerts, and diagnostics.
 - **Player tools:** freecam and Auto Totem.
 - **Social tools:** four editable, rebindable chat macros.
-- **Arcane Click GUI:** searchable modules, draggable and collapsible panels, nested settings, live active counts, in-GUI key rebinding, and Arcane/Ember/Verdant themes that persist in configuration.
+- **Arcane Click GUI:** smooth Inter typography, soft outlined module cards, searchable modules, draggable/collapsible panels, nested settings, live FPS/profile status, in-GUI key rebinding, and three persistent themes.
 - **Clean source:** readable Yarn-named Java, typed collections, warning-free compilation, client-only mixins, Gradle wrapper, sources JAR, and GitHub Actions CI.
 
 Use Arcane Client only where the server rules and applicable terms permit it.
@@ -30,6 +30,18 @@ Use Arcane Client only where the server rules and applicable terms permit it.
 4. Press **Right Shift** to open the Arcane Click GUI.
 
 Configuration is saved to `config/arcane-client.json`.
+
+## Performance profiles
+
+**High FPS** is the default. Click the Performance row in the Player panel or run `/arcane profile` to cycle profiles.
+
+| Profile | Default scan budget | Snapshot cadence | Storage targets | Item targets | Tunnel/chunk targets | Storage fill |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| High FPS | 1.0 ms/tick | 20 ticks | 256 | 128 | 384 | Outline only |
+| Balanced | 1.85 ms/tick | 10 ticks | 512 | 256 | 768 | Enabled |
+| Quality | 2.5 ms/tick | 5 ticks | 1,024 | 512 | 1,500 | Enabled |
+
+While the Click GUI is open, 3D overlays and the HUD pause and background scanning is capped at 0.5 ms/tick. The interface itself uses cached module/filter models, a cached FPS label, static no-animation toggles, and an OFL-licensed Inter TrueType renderer. Actual FPS remains hardware, shader, resource-pack, and world dependent.
 
 ## Default controls
 
@@ -53,6 +65,7 @@ The primary command is `/arcane`; `/dtrace` remains as a compatibility alias for
 
 - `/arcane` — show current status.
 - `/arcane on|off|settings` — control the scanner or open the GUI.
+- `/arcane profile` — cycle High FPS, Balanced, and Quality budgets.
 - `/arcane here` and `/arcane list [count]` — inspect recorded chunk evidence.
 - `/arcane threshold <0-100>` — set the flagged-score threshold.
 - `/arcane radius <2-24>` — set the loaded-chunk scan radius.
@@ -79,8 +92,9 @@ The remapped mod and sources JARs are written to `build/libs/`.
 ## Project layout
 
 - `src/main/java/dev/arcaneclient/` — client logic, UI, rendering, scanners, commands, and mixins.
-- src/main/resources/ — Fabric metadata, mixin config, language strings, and packaged icon.
-- rtwork/ — full-resolution Arcane Client emblem source asset.
+- `src/main/resources/` — Fabric metadata, mixin config, language strings, Inter font, and packaged icon.
+- `artwork/` — full-resolution Arcane Client emblem source asset.
+- `third-party/` — Inter's SIL Open Font License.
 - `legacy/artifacts/` — untouched 1.6 and 1.8 input binaries retained for provenance.
 - `.github/workflows/build.yml` — reproducible Java 21 build.
 
@@ -90,4 +104,4 @@ Version 1.8 was a functional superset of 1.6, so its newer chat macro, block-ent
 
 Useful references used during the rebuild include [Meteor Client](https://github.com/MeteorDevelopment/meteor-client), [67 Client](https://github.com/alx-3/67-Client), [Krypton Client's feature overview](https://kryptonclient.org/features), and the [official Fabric example mod](https://github.com/FabricMC/fabric-example-mod).
 
-The supplied artifacts declared **CC0-1.0**, and this reconstructed source is provided under the same license. See [LICENSE](LICENSE), [legacy/README.md](legacy/README.md), and the detailed [merge/design research](docs/DESIGN-RESEARCH.md).
+The supplied artifacts declared **CC0-1.0**, and this reconstructed source is provided under the same license. The bundled Inter font remains under **OFL-1.1**; its license is included in `third-party/` and inside release JARs. See [LICENSE](LICENSE), [legacy/README.md](legacy/README.md), and the detailed [merge/design research](docs/DESIGN-RESEARCH.md).

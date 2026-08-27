@@ -5,12 +5,14 @@ import com.mojang.blaze3d.platform.DepthTestFunction;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.model.TunnelSegment;
+import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderSetup;
@@ -36,6 +38,7 @@ public final class TunnelEspRenderer {
     }
 
     public static void tick() {
+        if (ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance())) return;
         List<TunnelSegment> current = ArcaneClient.engine().tunnels();
         if (current == source) {
             return;
@@ -50,6 +53,7 @@ public final class TunnelEspRenderer {
     }
 
     private static void render(WorldRenderContext context) {
+        if (ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance())) return;
         ArcaneConfig config = ArcaneClient.config();
         MatrixStack matrices = context.matrices();
         if (!config.tunnelEsp || targets.isEmpty() || matrices == null) {

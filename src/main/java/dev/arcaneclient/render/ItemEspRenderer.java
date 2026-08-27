@@ -5,6 +5,8 @@ import com.mojang.blaze3d.platform.DepthTestFunction;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.esp.ItemEspCategory;
+import dev.arcaneclient.performance.PerformanceProfile;
+import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.render.TracerLines;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +30,6 @@ import org.joml.Vector3fc;
 
 @Environment(value=EnvType.CLIENT)
 public final class ItemEspRenderer {
-    private static final int REFRESH_TICKS = 5;
-    private static final int MAX_TARGETS = 512;
     private static final double MAX_DISTANCE_SQUARED = 25600.0;
     private static final VoxelShape ITEM_BOX = VoxelShapes.cuboid((double)-0.28, (double)-0.05, (double)-0.28, (double)0.28, (double)0.55, (double)0.28);
     private static final RenderPipeline ITEM_LINES = RenderPipelines.register((RenderPipeline)RenderPipeline.builder((RenderPipeline.Snippet[])new RenderPipeline.Snippet[]{RenderPipelines.RENDERTYPE_LINES_SNIPPET}).withLocation(ArcaneClient.id("pipeline/item_esp")).withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).build());
@@ -45,17 +45,20 @@ public final class ItemEspRenderer {
     }
 
     public static void tick(MinecraftClient client) {
+        if (ArcaneSettingsScreen.isOpen(client)) return;
         ArcaneConfig config = ArcaneClient.config();
         if (!config.itemEsp || client.world == null || client.getCameraEntity() == null) {
             targets = List.of();
             return;
         }
+        PerformanceProfile profile = config.performanceProfile();
         long gameTime = client.world.getTime();
-        if (lastRefresh != Long.MIN_VALUE && gameTime >= lastRefresh && gameTime - lastRefresh < 5L) {
+        if (lastRefresh != Long.MIN_VALUE && gameTime >= lastRefresh && gameTime - lastRefresh < profile.itemRefreshTicks()) {
             return;
         }
         lastRefresh = gameTime;
         Entity camera = client.getCameraEntity();
+        int targetLimit = profile.itemTargetLimit();
         ArrayList<Target> refreshed = new ArrayList<Target>();
         for (Entity entity : client.world.getEntities()) {
             ItemEspCategory category;
@@ -63,14 +66,17 @@ public final class ItemEspRenderer {
             ItemEntity item = (ItemEntity)entity;
             if (entity.squaredDistanceTo(camera) > 25600.0 || (category = ItemEspCategory.match(item.getStack())) == null || !config.itemEspEnabled(category)) continue;
             refreshed.add(new Target(item, config.itemEspColor(category)));
-            if (refreshed.size() != 512) continue;
+            if (refreshed.size() < targetLimit) continue;
             break;
         }
         targets = List.copyOf(refreshed);
     }
 
     private static void render(WorldRenderContext context) {
-        if (!ArcaneClient.config().itemEsp || targets.isEmpty()) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (ArcaneSettingsScreen.isOpen(client)) return;
+        ArcaneConfig config = ArcaneClient.config();
+        if (!config.itemEsp || targets.isEmpty()) {
             return;
         }
         MatrixStack matrices = context.matrices();
@@ -79,14 +85,14 @@ public final class ItemEspRenderer {
         }
         Vec3d camera = context.worldState().cameraRenderState.pos;
         VertexConsumer lines = context.consumers().getBuffer(ITEM_LINE_TYPE);
-        Vector3fc forward = MinecraftClient.getInstance().gameRenderer.getCamera().getHorizontalPlane();
+        Vector3fc forward = client.gameRenderer.getCamera().getHorizontalPlane();
         for (Target target : targets) {
             Vec3d position = target.entity().getEntityPos();
             double x = position.x - camera.x;
             double y = position.y + 0.25 - camera.y;
             double z = position.z - camera.z;
             VertexRendering.drawOutline((MatrixStack)matrices, (VertexConsumer)lines, (VoxelShape)ITEM_BOX, (double)(position.x - camera.x), (double)(position.y - camera.y), (double)(position.z - camera.z), (int)target.color(), (float)2.0f);
-            if (!ArcaneClient.config().itemTracers) continue;
+            if (!config.itemTracers) continue;
             TracerLines.draw(matrices.peek(), lines, (double)forward.x() * 0.25, (double)forward.y() * 0.25, (double)forward.z() * 0.25, x, y, z, target.color(), 1.25f);
         }
     }

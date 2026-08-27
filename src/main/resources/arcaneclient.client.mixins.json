@@ -4,8 +4,10 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ClientPacketListenerMixin",
+    "FontManagerAccessor",
     "GameRendererMixin",
-    "KeyboardInputMixin"
+    "KeyboardInputMixin",
+    "MinecraftClientAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

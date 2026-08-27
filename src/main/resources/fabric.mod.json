@@ -11,7 +11,10 @@
     "sources": "https://github.com/eiiorejierge/Arcane-Client",
     "issues": "https://github.com/eiiorejierge/Arcane-Client/issues"
   },
-  "license": "CC0-1.0",
+  "license": [
+    "CC0-1.0",
+    "OFL-1.1"
+  ],
   "icon": "assets/arcaneclient/icon.png",
   "environment": "client",
   "entrypoints": {

@@ -13,6 +13,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
@@ -32,6 +33,8 @@ public final class ArcaneSettingsScreen extends Screen {
     private static final int MACRO_ROW_HEIGHT = 20;
     private static final int TOP_BAR_HEIGHT = 28;
     private static final int GAP = 8;
+    private static final Theme[] THEMES = Theme.values();
+    private static final ItemEspCategory[] ITEM_CATEGORIES = ItemEspCategory.values();
 
     private final Screen parent;
     private final ArcaneConfig config;
@@ -42,9 +45,25 @@ public final class ArcaneSettingsScreen extends Screen {
     private final Panel bindsPanel = new Panel();
     private final Panel chatPanel = new Panel();
     private final List<TextFieldWidget> macroInputs = new ArrayList<>();
+    private final List<ToggleRow> finderSettings;
+    private final List<VisualRow> visualRows;
+    private final List<ToggleRow> playerRows;
+    private final List<ArcaneKeybinds.Entry> bindingRows;
+    private final ToggleRow storageTracerRow;
+    private final ToggleRow itemTracerRow;
+
+    private List<VisualRow> filteredVisualRows;
+    private List<ToggleRow> filteredPlayerRows;
+    private List<ArcaneKeybinds.Entry> filteredBindingRows;
+    private TextRenderer uiFont;
 
     private TextFieldWidget searchInput;
     private String searchText = "";
+    private String normalizedQuery = "";
+    private boolean macroInputsVisible;
+    private String performanceLabel = "";
+    private String compactFpsLabel = "";
+    private long nextPerformanceLabelUpdateNanos;
     private boolean finderExpanded;
     private boolean chatExpanded;
     private VisualModule expandedVisual;
@@ -60,25 +79,60 @@ public final class ArcaneSettingsScreen extends Screen {
         this.parent = parent;
         this.config = ArcaneClient.config();
         this.scannerWasEnabled = this.config.enabled;
+        this.finderSettings = List.of(
+            new ToggleRow("Deep focus", () -> this.config.deepFocus, value -> this.config.deepFocus = value),
+            new ToggleRow("Farms", () -> this.config.farmSignals, value -> this.config.farmSignals = value),
+            new ToggleRow("Machines", () -> this.config.machineSignals, value -> this.config.machineSignals = value),
+            new ToggleRow("Player blocks", () -> this.config.playerBlockSignals, value -> this.config.playerBlockSignals = value),
+            new ToggleRow("Live activity", () -> this.config.packetSignals, value -> this.config.packetSignals = value),
+            new ToggleRow("Light leaks", () -> this.config.lightSignals, value -> this.config.lightSignals = value),
+            new ToggleRow("Entities", () -> this.config.entitySignals, value -> this.config.entitySignals = value)
+        );
+        this.visualRows = List.of(
+            new VisualRow(VisualModule.CHUNK_TILES, "Chunk tiles", () -> this.config.overlay, value -> this.config.overlay = value),
+            new VisualRow(VisualModule.CHUNK_RADAR, "Radar HUD", () -> this.config.hud, value -> this.config.hud = value),
+            new VisualRow(VisualModule.CHUNK_ANALYSIS, "Chunk intel", () -> this.config.chunkAnalysis, value -> this.config.chunkAnalysis = value),
+            new VisualRow(VisualModule.STORAGE_ESP, "Storage ESP", () -> this.config.esp, value -> this.config.esp = value),
+            new VisualRow(VisualModule.ITEM_ESP, "Item ESP", () -> this.config.itemEsp, value -> this.config.itemEsp = value),
+            new VisualRow(VisualModule.TUNNEL_ESP, "Tunnel ESP", () -> this.config.tunnelEsp, value -> {
+                this.config.tunnelEsp = value;
+                ArcaneClient.engine().tunnelSettingsChanged(this.client);
+            }),
+            new VisualRow(VisualModule.STASH_ALERTS, "Stash alerts", () -> this.config.stashAlerts, value -> this.config.stashAlerts = value),
+            new VisualRow(VisualModule.BLOCK_ENTITY_DEBUG, "ESP diagnostics", () -> this.config.blockEntityDebug, value -> this.config.blockEntityDebug = value)
+        );
+        this.playerRows = List.of(
+            new ToggleRow("Auto Totem", () -> this.config.autoTotem, value -> this.config.autoTotem = value),
+            new ToggleRow("Freecam", FreecamController::isActive, value -> {
+                if (value != FreecamController.isActive()) FreecamController.toggle(this.client);
+            })
+        );
+        this.bindingRows = ArcaneClient.keybinds().editable();
+        this.storageTracerRow = new ToggleRow("Tracers", () -> this.config.storageTracers, value -> this.config.storageTracers = value);
+        this.itemTracerRow = new ToggleRow("Tracers", () -> this.config.itemTracers, value -> this.config.itemTracers = value);
+        this.filteredVisualRows = this.visualRows;
+        this.filteredPlayerRows = this.playerRows;
+        this.filteredBindingRows = this.bindingRows;
     }
 
     @Override
     protected void init() {
         layoutPanels();
         int searchWidth = searchWidth();
-        this.searchInput = new TextFieldWidget(this.textRenderer, searchX(searchWidth), 7, searchWidth, 15, Text.literal("Search modules"));
+        this.searchInput = new TextFieldWidget(font(), searchX(searchWidth), 7, searchWidth, 15, Text.literal("Search modules"));
         this.searchInput.setDrawsBackground(false);
         this.searchInput.setTextShadow(false);
         this.searchInput.setMaxLength(48);
         this.searchInput.setPlaceholder(Text.literal("Search modules..."));
         this.searchInput.setText(this.searchText);
-        this.searchInput.setChangedListener(value -> this.searchText = value);
+        this.searchInput.setChangedListener(this::updateFilter);
+        updateFilter(this.searchText);
         this.addDrawableChild(this.searchInput);
 
         this.macroInputs.clear();
         for (int index = 0; index < 4; index++) {
             int slot = index;
-            TextFieldWidget input = new TextFieldWidget(this.textRenderer, 0, 0, 84, 14, Text.literal("Chat macro " + (index + 1)));
+            TextFieldWidget input = new TextFieldWidget(font(), 0, 0, 84, 14, Text.literal("Chat macro " + (index + 1)));
             input.setDrawsBackground(false);
             input.setTextShadow(false);
             input.setMaxLength(256);
@@ -110,25 +164,26 @@ public final class ArcaneSettingsScreen extends Screen {
         graphics.fill(0, 0, this.width, TOP_BAR_HEIGHT, theme.topBar);
         graphics.fill(0, TOP_BAR_HEIGHT - 2, this.width / 2, TOP_BAR_HEIGHT, theme.accent);
         graphics.fill(this.width / 2, TOP_BAR_HEIGHT - 2, this.width, TOP_BAR_HEIGHT, theme.secondary);
-        graphics.drawText(this.textRenderer, "ARCANE", 8, 9, theme.text, true);
-        int clientX = 10 + this.textRenderer.getWidth("ARCANE");
-        graphics.drawText(this.textRenderer, "CLIENT", clientX, 9, theme.accent, true);
-        if (this.width >= 410) {
-            String active = activeModuleCount() + " ACTIVE";
-            graphics.drawText(this.textRenderer, active, clientX + this.textRenderer.getWidth("CLIENT") + 12, 9, theme.muted, false);
+        graphics.drawText(font(), "ARCANE", 8, 9, theme.text, true);
+        int clientX = 10 + font().getWidth("ARCANE");
+        graphics.drawText(font(), "CLIENT", clientX, 9, theme.accent, true);
+        if (this.width >= 360) {
+            updatePerformanceLabel();
+            String status = this.width >= 560 ? this.performanceLabel : this.compactFpsLabel;
+            graphics.drawText(font(), status, clientX + font().getWidth("CLIENT") + 12, 9, theme.muted, false);
         }
 
         int searchWidth = searchWidth();
         int searchX = searchX(searchWidth);
         int searchBorder = this.searchInput != null && this.searchInput.isFocused() ? theme.accent : theme.border;
-        graphics.fill(searchX - 5, 5, searchX + searchWidth + 5, 23, theme.setting);
-        graphics.drawStrokedRectangle(searchX - 5, 5, searchWidth + 10, 18, searchBorder);
+        fillSoftRect(graphics, searchX - 5, 5, searchWidth + 10, 18, searchBorder);
+        fillSoftRect(graphics, searchX - 4, 6, searchWidth + 8, 16, theme.setting);
 
         int themeX = themeButtonX();
         boolean hovered = inside(mouseX, mouseY, themeX, 5, 84, 18);
-        graphics.fill(themeX, 5, themeX + 84, 23, hovered ? theme.hover : theme.setting);
-        graphics.drawStrokedRectangle(themeX, 5, 84, 18, hovered ? theme.accent : theme.border);
-        graphics.drawCenteredTextWithShadow(this.textRenderer, theme.label + "  >", themeX + 42, 9, theme.text);
+        fillSoftRect(graphics, themeX, 5, 84, 18, hovered ? theme.accent : theme.border);
+        fillSoftRect(graphics, themeX + 1, 6, 82, 16, hovered ? theme.hover : theme.setting);
+        graphics.drawCenteredTextWithShadow(font(), theme.label + "  >", themeX + 42, 9, theme.text);
     }
 
     private void drawBottomBar(DrawContext graphics, Theme theme) {
@@ -137,10 +192,10 @@ public final class ArcaneSettingsScreen extends Screen {
         String help = this.listeningFor == null
             ? "LMB toggle   RMB configure   Drag headers to arrange"
             : "Press a key or mouse button   Esc clears";
-        graphics.drawText(this.textRenderer, help, 7, y + 5, this.listeningFor == null ? theme.muted : theme.accent, false);
+        graphics.drawText(font(), help, 7, y + 5, this.listeningFor == null ? theme.muted : theme.accent, false);
         if (!query().isEmpty()) {
             String result = visibleModuleCount() + " results";
-            graphics.drawText(this.textRenderer, result, this.width - 7 - this.textRenderer.getWidth(result), y + 5, theme.secondary, false);
+            graphics.drawText(font(), result, this.width - 7 - font().getWidth(result), y + 5, theme.secondary, false);
         }
     }
 
@@ -166,7 +221,7 @@ public final class ArcaneSettingsScreen extends Screen {
     private void drawRender(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
         List<VisualRow> rows = visibleVisualRows();
         int contentHeight = rows.size() * ROW_HEIGHT;
-        if (this.expandedVisual != null && rows.stream().anyMatch(row -> row.module() == this.expandedVisual)) {
+        if (this.expandedVisual != null && containsVisualModule(rows, this.expandedVisual)) {
             contentHeight += visualSettingsHeight(this.expandedVisual);
         }
         int height = HEADER_HEIGHT + (this.renderPanel.open ? contentHeight : 0);
@@ -186,7 +241,9 @@ public final class ArcaneSettingsScreen extends Screen {
 
     private void drawPlayer(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
         List<ToggleRow> rows = visiblePlayerRows();
-        int height = HEADER_HEIGHT + (this.playerPanel.open ? rows.size() * ROW_HEIGHT : 0);
+        boolean profileVisible = performanceProfileVisible();
+        int rowCount = rows.size() + (profileVisible ? 1 : 0);
+        int height = HEADER_HEIGHT + (this.playerPanel.open ? rowCount * ROW_HEIGHT : 0);
         drawPanel(graphics, this.playerPanel, height, "PLAYER", activeToggleCount(rows) + "/" + rows.size(), mouseX, mouseY, theme);
         if (!this.playerPanel.open) return;
         int rowY = this.playerPanel.y + HEADER_HEIGHT;
@@ -194,6 +251,17 @@ public final class ArcaneSettingsScreen extends Screen {
             drawModuleRow(graphics, this.playerPanel.x, rowY, row.label(), row.value().getAsBoolean(), false, false, mouseX, mouseY, theme);
             rowY += ROW_HEIGHT;
         }
+        if (profileVisible) {
+            drawPerformanceRow(graphics, this.playerPanel.x, rowY, mouseX, mouseY, theme);
+        }
+    }
+
+    private void drawPerformanceRow(DrawContext graphics, int x, int y, int mouseX, int mouseY, Theme theme) {
+        drawRowBackground(graphics, x, y, ROW_HEIGHT, mouseX, mouseY, theme);
+        graphics.fill(x + 8, y + 7, x + 11, y + 10, theme.accent);
+        graphics.drawText(font(), "Performance", x + 15, y + 5, theme.text, false);
+        String label = this.config.performanceProfile().label();
+        graphics.drawText(font(), label, x + PANEL_WIDTH - 8 - font().getWidth(label), y + 5, theme.secondary, false);
     }
 
     private void drawBinds(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
@@ -204,11 +272,11 @@ public final class ArcaneSettingsScreen extends Screen {
         int rowY = this.bindsPanel.y + HEADER_HEIGHT;
         for (ArcaneKeybinds.Entry entry : entries) {
             drawRowBackground(graphics, this.bindsPanel.x, rowY, ROW_HEIGHT, mouseX, mouseY, theme);
-            graphics.drawText(this.textRenderer, entry.label(), this.bindsPanel.x + 8, rowY + 5, theme.text, false);
+            graphics.drawText(font(), entry.label(), this.bindsPanel.x + 8, rowY + 5, theme.text, false);
             String key = this.listeningFor == entry.mapping() ? "..." : entry.mapping().getBoundKeyLocalizedText().getString();
-            key = this.textRenderer.trimToWidth(key, 46);
+            key = font().trimToWidth(key, 46);
             int color = this.listeningFor == entry.mapping() ? theme.accent : theme.muted;
-            graphics.drawText(this.textRenderer, key, this.bindsPanel.x + PANEL_WIDTH - 8 - this.textRenderer.getWidth(key), rowY + 5, color, false);
+            graphics.drawText(font(), key, this.bindsPanel.x + PANEL_WIDTH - 8 - font().getWidth(key), rowY + 5, color, false);
             rowY += ROW_HEIGHT;
         }
     }
@@ -229,7 +297,7 @@ public final class ArcaneSettingsScreen extends Screen {
         for (int index = 0; index < 4; index++) {
             graphics.fill(this.chatPanel.x + 1, rowY, this.chatPanel.x + PANEL_WIDTH - 1, rowY + MACRO_ROW_HEIGHT, theme.setting);
             graphics.fill(this.chatPanel.x + 7, rowY + 5, this.chatPanel.x + 10, rowY + 15, theme.secondary);
-            graphics.drawText(this.textRenderer, "M" + (index + 1), this.chatPanel.x + 14, rowY + 6, theme.muted, false);
+            graphics.drawText(font(), "M" + (index + 1), this.chatPanel.x + 14, rowY + 6, theme.muted, false);
             int inputX = this.chatPanel.x + 31;
             graphics.fill(inputX - 2, rowY + 3, inputX + 82, rowY + 18, theme.row);
             graphics.drawStrokedRectangle(inputX - 2, rowY + 3, 84, 15, theme.border);
@@ -240,40 +308,41 @@ public final class ArcaneSettingsScreen extends Screen {
 
             KeyBinding mapping = ArcaneClient.keybinds().chatMacros().get(index);
             String key = this.listeningFor == mapping ? "..." : mapping.getBoundKeyLocalizedText().getString();
-            key = this.textRenderer.trimToWidth(key, 26);
+            key = font().trimToWidth(key, 26);
             if (inside(mouseX, mouseY, this.chatPanel.x + 116, rowY, 32, MACRO_ROW_HEIGHT)) {
                 graphics.fill(this.chatPanel.x + 115, rowY + 2, this.chatPanel.x + PANEL_WIDTH - 2, rowY + 18, theme.hover);
             }
             int keyColor = this.listeningFor == mapping ? theme.accent : theme.muted;
-            graphics.drawText(this.textRenderer, key, this.chatPanel.x + PANEL_WIDTH - 6 - this.textRenderer.getWidth(key), rowY + 6, keyColor, false);
+            graphics.drawText(font(), key, this.chatPanel.x + PANEL_WIDTH - 6 - font().getWidth(key), rowY + 6, keyColor, false);
             rowY += MACRO_ROW_HEIGHT;
         }
     }
 
     private void drawPanel(DrawContext graphics, Panel panel, int height, String title, String badge, int mouseX, int mouseY, Theme theme) {
-        graphics.fill(panel.x + 3, panel.y + 4, panel.x + PANEL_WIDTH + 3, panel.y + height + 4, 0x55000000);
-        graphics.fill(panel.x, panel.y, panel.x + PANEL_WIDTH, panel.y + height, theme.panel);
-        graphics.drawStrokedRectangle(panel.x, panel.y, PANEL_WIDTH, height, theme.border);
-        graphics.fill(panel.x + 1, panel.y + 1, panel.x + PANEL_WIDTH - 1, panel.y + HEADER_HEIGHT, theme.header);
-        graphics.fill(panel.x + 1, panel.y + 1, panel.x + 4, panel.y + HEADER_HEIGHT, theme.accent);
+        panel.lastHeight = height;
+        fillSoftRect(graphics, panel.x + 3, panel.y + 4, PANEL_WIDTH, height, 0x50000000);
+        fillSoftRect(graphics, panel.x, panel.y, PANEL_WIDTH, height, theme.border);
+        fillSoftRect(graphics, panel.x + 1, panel.y + 1, PANEL_WIDTH - 2, height - 2, theme.panel);
+        graphics.fill(panel.x + 2, panel.y + 3, panel.x + PANEL_WIDTH - 2, panel.y + HEADER_HEIGHT, theme.header);
+        graphics.fill(panel.x + 9, panel.y + 1, panel.x + 47, panel.y + 3, theme.accent);
         if (inside(mouseX, mouseY, panel.x, panel.y, PANEL_WIDTH, HEADER_HEIGHT)) {
-            graphics.fill(panel.x + 4, panel.y + 1, panel.x + PANEL_WIDTH - 1, panel.y + HEADER_HEIGHT, 0x18FFFFFF);
+            graphics.fill(panel.x + 2, panel.y + 3, panel.x + PANEL_WIDTH - 2, panel.y + HEADER_HEIGHT, 0x18FFFFFF);
         }
-        graphics.drawText(this.textRenderer, title, panel.x + 9, panel.y + 6, theme.text, true);
-        int toggleX = panel.x + PANEL_WIDTH - 12;
-        graphics.drawText(this.textRenderer, panel.open ? "-" : "+", toggleX, panel.y + 6, theme.muted, false);
+        graphics.drawText(font(), title, panel.x + 9, panel.y + 6, theme.text, false);
+        int toggleX = panel.x + PANEL_WIDTH - 13;
+        graphics.drawText(font(), panel.open ? "−" : "+", toggleX, panel.y + 6, theme.muted, false);
         if (badge != null && !badge.isEmpty()) {
-            int badgeX = toggleX - 7 - this.textRenderer.getWidth(badge);
-            graphics.drawText(this.textRenderer, badge, badgeX, panel.y + 6, theme.secondary, false);
+            int badgeX = toggleX - 7 - font().getWidth(badge);
+            graphics.drawText(font(), badge, badgeX, panel.y + 6, theme.secondary, false);
         }
     }
 
     private void drawModuleRow(DrawContext graphics, int x, int y, String label, boolean enabled, boolean hasSettings, boolean expanded, int mouseX, int mouseY, Theme theme) {
         drawRowBackground(graphics, x, y, ROW_HEIGHT, mouseX, mouseY, theme);
-        if (enabled) graphics.fill(x + 1, y + 1, x + 4, y + ROW_HEIGHT - 1, theme.accent);
-        graphics.drawText(this.textRenderer, label, x + 8, y + 5, enabled ? theme.text : theme.muted, false);
-        if (hasSettings) graphics.drawText(this.textRenderer, expanded ? "v" : ">", x + PANEL_WIDTH - 38, y + 5, theme.muted, false);
-        drawSwitch(graphics, x + PANEL_WIDTH - 25, y + 5, enabled, theme);
+        fillSoftRect(graphics, x + 8, y + 7, 5, 5, enabled ? theme.accent : theme.border);
+        graphics.drawText(font(), label, x + 17, y + 5, enabled ? theme.text : theme.muted, false);
+        if (hasSettings) graphics.drawText(font(), expanded ? "⌄" : "›", x + PANEL_WIDTH - 40, y + 5, theme.muted, false);
+        drawSwitch(graphics, x + PANEL_WIDTH - 27, y + 4, enabled, theme);
     }
 
     private void drawSettingToggle(DrawContext graphics, int x, int y, ToggleRow row, int mouseX, int mouseY, Theme theme) {
@@ -282,7 +351,7 @@ public final class ArcaneSettingsScreen extends Screen {
         if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT)) {
             graphics.fill(x + 8, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.hover);
         }
-        graphics.drawText(this.textRenderer, row.label(), x + 13, y + 4, theme.muted, false);
+        graphics.drawText(font(), row.label(), x + 13, y + 4, theme.muted, false);
         drawSwitch(graphics, x + PANEL_WIDTH - 25, y + 4, row.value().getAsBoolean(), theme);
     }
 
@@ -292,9 +361,9 @@ public final class ArcaneSettingsScreen extends Screen {
         if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, SLIDER_HEIGHT) || this.draggingSensitivity) {
             graphics.fill(x + 8, y, x + PANEL_WIDTH - 1, y + SLIDER_HEIGHT, theme.hover);
         }
-        graphics.drawText(this.textRenderer, "Sensitivity", x + 13, y + 4, theme.muted, false);
+        graphics.drawText(font(), "Sensitivity", x + 13, y + 4, theme.muted, false);
         String value = this.config.sensitivity() + "%";
-        graphics.drawText(this.textRenderer, value, x + PANEL_WIDTH - 8 - this.textRenderer.getWidth(value), y + 4, theme.text, false);
+        graphics.drawText(font(), value, x + PANEL_WIDTH - 8 - font().getWidth(value), y + 4, theme.text, false);
         int barX = x + 13;
         int barY = y + 19;
         int barWidth = PANEL_WIDTH - 26;
@@ -306,11 +375,11 @@ public final class ArcaneSettingsScreen extends Screen {
 
     private void drawVisualSettings(DrawContext graphics, VisualModule module, int x, int y, int mouseX, int mouseY, Theme theme) {
         switch (module) {
-            case STORAGE_ESP -> drawSettingToggle(graphics, x, y, new ToggleRow("Tracers", () -> this.config.storageTracers, value -> this.config.storageTracers = value), mouseX, mouseY, theme);
+            case STORAGE_ESP -> drawSettingToggle(graphics, x, y, this.storageTracerRow, mouseX, mouseY, theme);
             case ITEM_ESP -> {
-                drawSettingToggle(graphics, x, y, new ToggleRow("Tracers", () -> this.config.itemTracers, value -> this.config.itemTracers = value), mouseX, mouseY, theme);
+                drawSettingToggle(graphics, x, y, this.itemTracerRow, mouseX, mouseY, theme);
                 int settingY = y + SETTING_HEIGHT;
-                for (ItemEspCategory category : ItemEspCategory.values()) {
+                for (ItemEspCategory category : ITEM_CATEGORIES) {
                     drawItemSetting(graphics, x, settingY, category, mouseX, mouseY, theme);
                     settingY += SETTING_HEIGHT;
                 }
@@ -321,9 +390,9 @@ public final class ArcaneSettingsScreen extends Screen {
             }
             case BLOCK_ENTITY_DEBUG -> {
                 graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.setting);
-                graphics.drawText(this.textRenderer, "Visible targets", x + 13, y + 4, theme.muted, false);
+                graphics.drawText(font(), "Visible targets", x + 13, y + 4, theme.muted, false);
                 String count = Integer.toString(EspRenderer.targetCount());
-                graphics.drawText(this.textRenderer, count, x + PANEL_WIDTH - 8 - this.textRenderer.getWidth(count), y + 4, theme.secondary, false);
+                graphics.drawText(font(), count, x + PANEL_WIDTH - 8 - font().getWidth(count), y + 4, theme.secondary, false);
             }
             default -> {
             }
@@ -335,7 +404,7 @@ public final class ArcaneSettingsScreen extends Screen {
         if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT)) {
             graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.hover);
         }
-        graphics.drawText(this.textRenderer, category.label(), x + 13, y + 4, theme.muted, false);
+        graphics.drawText(font(), category.label(), x + 13, y + 4, theme.muted, false);
         drawSwatch(graphics, x + PANEL_WIDTH - 46, y + 4, this.config.itemEspColor(category), theme);
         drawSwitch(graphics, x + PANEL_WIDTH - 25, y + 4, this.config.itemEspEnabled(category), theme);
     }
@@ -345,7 +414,7 @@ public final class ArcaneSettingsScreen extends Screen {
         if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT)) {
             graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.hover);
         }
-        graphics.drawText(this.textRenderer, label, x + 13, y + 4, theme.muted, false);
+        graphics.drawText(font(), label, x + 13, y + 4, theme.muted, false);
         drawSwatch(graphics, x + PANEL_WIDTH - 19, y + 4, color, theme);
     }
 
@@ -357,14 +426,24 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private static void drawSwitch(DrawContext graphics, int x, int y, boolean enabled, Theme theme) {
-        graphics.fill(x, y, x + 17, y + 9, enabled ? theme.accent : theme.border);
-        int knobX = enabled ? x + 10 : x + 2;
-        graphics.fill(knobX, y + 2, knobX + 5, y + 7, enabled ? theme.text : theme.muted);
+        fillSoftRect(graphics, x, y, 20, 10, enabled ? theme.accent : theme.border);
+        int knobX = enabled ? x + 11 : x + 2;
+        fillSoftRect(graphics, knobX, y + 2, 7, 6, enabled ? theme.text : theme.muted);
     }
 
     private static void drawSwatch(DrawContext graphics, int x, int y, int color, Theme theme) {
-        graphics.fill(x, y, x + 10, y + 10, color);
-        graphics.drawStrokedRectangle(x, y, 10, 10, theme.border);
+        fillSoftRect(graphics, x, y, 10, 10, theme.border);
+        fillSoftRect(graphics, x + 1, y + 1, 8, 8, color);
+    }
+
+    private static void fillSoftRect(DrawContext graphics, int x, int y, int width, int height, int color) {
+        if (width <= 2 || height <= 2) {
+            graphics.fill(x, y, x + width, y + height, color);
+            return;
+        }
+        graphics.fill(x + 2, y, x + width - 2, y + height, color);
+        graphics.fill(x, y + 2, x + width, y + height - 2, color);
+        graphics.fill(x + 1, y + 1, x + width - 1, y + height - 1, color);
     }
 
     @Override
@@ -379,7 +458,7 @@ public final class ArcaneSettingsScreen extends Screen {
         int mouseX = (int) click.x();
         int mouseY = (int) click.y();
         if (button == 0 && inside(mouseX, mouseY, themeButtonX(), 5, 84, 18)) {
-            this.config.uiTheme = (this.config.uiTheme + 1) % Theme.values().length;
+            this.config.uiTheme = (this.config.uiTheme + 1) % THEMES.length;
             return true;
         }
 
@@ -451,10 +530,10 @@ public final class ArcaneSettingsScreen extends Screen {
         switch (module) {
             case STORAGE_ESP -> this.config.storageTracers = !this.config.storageTracers;
             case ITEM_ESP -> {
-                int index = rowIndex(mouseY, settingsY, ItemEspCategory.values().length + 1, SETTING_HEIGHT);
+                int index = rowIndex(mouseY, settingsY, ITEM_CATEGORIES.length + 1, SETTING_HEIGHT);
                 if (index == 0) this.config.itemTracers = !this.config.itemTracers;
                 else if (index > 0) {
-                    ItemEspCategory category = ItemEspCategory.values()[index - 1];
+                    ItemEspCategory category = ITEM_CATEGORIES[index - 1];
                     int swatchX = this.renderPanel.x + PANEL_WIDTH - 46;
                     if (inside(mouseX, mouseY, swatchX, settingsY + index * SETTING_HEIGHT + 3, 12, 12)) {
                         this.config.setItemEspColor(category, ColorPalette.next(this.config.itemEspColor(category)));
@@ -479,6 +558,13 @@ public final class ArcaneSettingsScreen extends Screen {
         int index = rowIndex(mouseY, rowY, rows.size(), ROW_HEIGHT);
         if (index >= 0 && inside(mouseX, mouseY, this.playerPanel.x, rowY, PANEL_WIDTH, rows.size() * ROW_HEIGHT)) {
             rows.get(index).toggle();
+            return true;
+        }
+        int profileY = rowY + rows.size() * ROW_HEIGHT;
+        if (performanceProfileVisible() && inside(mouseX, mouseY, this.playerPanel.x, profileY, PANEL_WIDTH, ROW_HEIGHT)) {
+            this.config.cyclePerformanceProfile();
+            this.nextPerformanceLabelUpdateNanos = 0L;
+            ArcaneClient.engine().settingsChanged(this.client);
             return true;
         }
         return false;
@@ -576,77 +662,102 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private void setMacroInputsVisible(boolean visible) {
+        if (this.macroInputsVisible == visible) return;
+        this.macroInputsVisible = visible;
         for (TextFieldWidget input : this.macroInputs) {
             input.setVisible(visible);
             if (!visible) input.setFocused(false);
         }
     }
 
+    private TextRenderer font() {
+        if (this.uiFont == null) {
+            this.uiFont = ArcaneFont.renderer(this.client);
+        }
+        return this.uiFont;
+    }
+
     private List<ToggleRow> finderSettings() {
-        return List.of(
-            new ToggleRow("Deep focus", () -> this.config.deepFocus, value -> this.config.deepFocus = value),
-            new ToggleRow("Farms", () -> this.config.farmSignals, value -> this.config.farmSignals = value),
-            new ToggleRow("Machines", () -> this.config.machineSignals, value -> this.config.machineSignals = value),
-            new ToggleRow("Player blocks", () -> this.config.playerBlockSignals, value -> this.config.playerBlockSignals = value),
-            new ToggleRow("Live activity", () -> this.config.packetSignals, value -> this.config.packetSignals = value),
-            new ToggleRow("Light leaks", () -> this.config.lightSignals, value -> this.config.lightSignals = value),
-            new ToggleRow("Entities", () -> this.config.entitySignals, value -> this.config.entitySignals = value)
-        );
+        return this.finderSettings;
     }
 
     private List<VisualRow> visualRows() {
-        return List.of(
-            new VisualRow(VisualModule.CHUNK_TILES, "Chunk tiles", () -> this.config.overlay, value -> this.config.overlay = value),
-            new VisualRow(VisualModule.CHUNK_RADAR, "Radar HUD", () -> this.config.hud, value -> this.config.hud = value),
-            new VisualRow(VisualModule.CHUNK_ANALYSIS, "Chunk intel", () -> this.config.chunkAnalysis, value -> this.config.chunkAnalysis = value),
-            new VisualRow(VisualModule.STORAGE_ESP, "Storage ESP", () -> this.config.esp, value -> this.config.esp = value),
-            new VisualRow(VisualModule.ITEM_ESP, "Item ESP", () -> this.config.itemEsp, value -> this.config.itemEsp = value),
-            new VisualRow(VisualModule.TUNNEL_ESP, "Tunnel ESP", () -> this.config.tunnelEsp, value -> {
-                this.config.tunnelEsp = value;
-                ArcaneClient.engine().tunnelSettingsChanged(this.client);
-            }),
-            new VisualRow(VisualModule.STASH_ALERTS, "Stash alerts", () -> this.config.stashAlerts, value -> this.config.stashAlerts = value),
-            new VisualRow(VisualModule.BLOCK_ENTITY_DEBUG, "ESP diagnostics", () -> this.config.blockEntityDebug, value -> this.config.blockEntityDebug = value)
-        );
+        return this.visualRows;
     }
 
     private List<ToggleRow> playerRows() {
-        return List.of(
-            new ToggleRow("Auto Totem", () -> this.config.autoTotem, value -> this.config.autoTotem = value),
-            new ToggleRow("Freecam", FreecamController::isActive, value -> {
-                if (value != FreecamController.isActive()) FreecamController.toggle(this.client);
-            })
-        );
+        return this.playerRows;
     }
 
     private List<VisualRow> visibleVisualRows() {
-        return visualRows().stream().filter(row -> matches(row.label())).toList();
+        return this.filteredVisualRows;
     }
 
     private List<ToggleRow> visiblePlayerRows() {
-        return playerRows().stream().filter(row -> matches(row.label())).toList();
+        return this.filteredPlayerRows;
     }
 
     private List<ArcaneKeybinds.Entry> visibleBindings() {
-        return ArcaneClient.keybinds().editable().stream().filter(entry -> matches(entry.label())).toList();
+        return this.filteredBindingRows;
+    }
+
+    private void updateFilter(String value) {
+        this.searchText = value;
+        this.normalizedQuery = value.trim().toLowerCase(Locale.ROOT);
+        if (this.normalizedQuery.isEmpty()) {
+            this.filteredVisualRows = this.visualRows;
+            this.filteredPlayerRows = this.playerRows;
+            this.filteredBindingRows = this.bindingRows;
+            return;
+        }
+
+        ArrayList<VisualRow> visuals = new ArrayList<>();
+        for (VisualRow row : this.visualRows) {
+            if (matches(row.label())) visuals.add(row);
+        }
+        this.filteredVisualRows = List.copyOf(visuals);
+
+        ArrayList<ToggleRow> players = new ArrayList<>();
+        for (ToggleRow row : this.playerRows) {
+            if (matches(row.label())) players.add(row);
+        }
+        this.filteredPlayerRows = List.copyOf(players);
+
+        ArrayList<ArcaneKeybinds.Entry> bindings = new ArrayList<>();
+        for (ArcaneKeybinds.Entry entry : this.bindingRows) {
+            if (matches(entry.label())) bindings.add(entry);
+        }
+        this.filteredBindingRows = List.copyOf(bindings);
     }
 
     private boolean matches(String label) {
-        String query = query();
-        return query.isEmpty() || label.toLowerCase(Locale.ROOT).contains(query);
+        return this.normalizedQuery.isEmpty() || label.toLowerCase(Locale.ROOT).contains(this.normalizedQuery);
     }
 
     private String query() {
-        return this.searchText.trim().toLowerCase(Locale.ROOT);
+        return this.normalizedQuery;
     }
 
     private int visibleModuleCount() {
         return (matches("Base scanner") ? 1 : 0)
             + visibleVisualRows().size()
             + visiblePlayerRows().size()
-            + (matches("Chat macros") ? 1 : 0);
+            + (matches("Chat macros") ? 1 : 0)
+            + (performanceProfileVisible() ? 1 : 0);
     }
 
+    private boolean performanceProfileVisible() {
+        return matches("Performance profile High FPS Balanced Quality");
+    }
+
+    private void updatePerformanceLabel() {
+        long now = System.nanoTime();
+        if (now < this.nextPerformanceLabelUpdateNanos && !this.performanceLabel.isEmpty()) return;
+        this.compactFpsLabel = this.client.getCurrentFps() + " FPS";
+        this.performanceLabel = activeModuleCount() + " ACTIVE   " + this.compactFpsLabel + "   "
+            + this.config.performanceProfile().label();
+        this.nextPerformanceLabelUpdateNanos = now + 250_000_000L;
+    }
     private int activeModuleCount() {
         int active = 0;
         if (this.config.enabled) active++;
@@ -665,17 +776,32 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private static int activeVisualCount(List<VisualRow> rows) {
-        return (int) rows.stream().filter(row -> row.value().getAsBoolean()).count();
+        int active = 0;
+        for (VisualRow row : rows) {
+            if (row.value().getAsBoolean()) active++;
+        }
+        return active;
     }
 
     private static int activeToggleCount(List<ToggleRow> rows) {
-        return (int) rows.stream().filter(row -> row.value().getAsBoolean()).count();
+        int active = 0;
+        for (ToggleRow row : rows) {
+            if (row.value().getAsBoolean()) active++;
+        }
+        return active;
+    }
+
+    private static boolean containsVisualModule(List<VisualRow> rows, VisualModule module) {
+        for (VisualRow row : rows) {
+            if (row.module() == module) return true;
+        }
+        return false;
     }
 
     private static int visualSettingsHeight(VisualModule module) {
         return switch (module) {
             case STORAGE_ESP, BLOCK_ENTITY_DEBUG -> SETTING_HEIGHT;
-            case ITEM_ESP -> SETTING_HEIGHT * (ItemEspCategory.values().length + 1);
+            case ITEM_ESP -> SETTING_HEIGHT * (ITEM_CATEGORIES.length + 1);
             case TUNNEL_ESP -> SETTING_HEIGHT * 2;
             default -> 0;
         };
@@ -714,15 +840,17 @@ public final class ArcaneSettingsScreen extends Screen {
             place(this.finderPanel, start, top);
             place(this.renderPanel, start + (PANEL_WIDTH + GAP), top);
             place(this.playerPanel, start + (PANEL_WIDTH + GAP) * 2, top);
-            place(this.bindsPanel, start, top + 78);
+            place(this.bindsPanel, start, top + 46);
+            this.bindsPanel.open = false;
             place(this.chatPanel, start + (PANEL_WIDTH + GAP) * 2, top + 78);
         } else if (this.width >= requiredTwo) {
             int start = (this.width - (PANEL_WIDTH * 2 + GAP)) / 2;
             place(this.finderPanel, start, top);
             place(this.renderPanel, start + PANEL_WIDTH + GAP, top);
-            place(this.playerPanel, start, top + 58);
-            place(this.chatPanel, start, top + 120);
-            place(this.bindsPanel, start + PANEL_WIDTH + GAP, top + 174);
+            place(this.playerPanel, start, top + 46);
+            place(this.chatPanel, start, top + 128);
+            place(this.bindsPanel, start + PANEL_WIDTH + GAP, this.height - 18 - HEADER_HEIGHT);
+            this.bindsPanel.open = false;
         } else {
             int x = Math.max(0, (this.width - PANEL_WIDTH) / 2);
             place(this.finderPanel, x, top);
@@ -764,7 +892,7 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private Theme theme() {
-        return Theme.values()[Math.floorMod(this.config.uiTheme, Theme.values().length)];
+        return THEMES[Math.floorMod(this.config.uiTheme, THEMES.length)];
     }
 
     private static int rowIndex(int mouseY, int startY, int count, int rowHeight) {
@@ -774,6 +902,10 @@ public final class ArcaneSettingsScreen extends Screen {
 
     private static boolean inside(int mouseX, int mouseY, int x, int y, int width, int height) {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+    }
+
+    public static boolean isOpen(net.minecraft.client.MinecraftClient client) {
+        return client.currentScreen instanceof ArcaneSettingsScreen;
     }
 
     @Override
@@ -799,10 +931,11 @@ public final class ArcaneSettingsScreen extends Screen {
         private int x;
         private int y;
         private boolean open = true;
+        private int lastHeight = HEADER_HEIGHT;
 
         private void clamp(int screenWidth, int screenHeight) {
             this.x = Math.clamp(this.x, 0, Math.max(0, screenWidth - PANEL_WIDTH));
-            this.y = Math.clamp(this.y, TOP_BAR_HEIGHT + 4, Math.max(TOP_BAR_HEIGHT + 4, screenHeight - HEADER_HEIGHT - 18));
+            this.y = Math.clamp(this.y, TOP_BAR_HEIGHT + 4, Math.max(TOP_BAR_HEIGHT + 4, screenHeight - this.lastHeight - 18));
         }
     }
 
@@ -851,12 +984,12 @@ public final class ArcaneSettingsScreen extends Screen {
         private final String label;
         private final int accent;
         private final int secondary;
-        private final int backdrop = 0xB00A0714;
+        private final int backdrop = 0xE60A0714;
         private final int topBar = 0xF00C0916;
-        private final int panel = 0xEC120F20;
+        private final int panel = 0xFA120F20;
         private final int header = 0xF0181429;
-        private final int row = 0xE7181428;
-        private final int setting = 0xE71D1830;
+        private final int row = 0xF2181428;
+        private final int setting = 0xF21D1830;
         private final int hover = 0xF02A2342;
         private final int border = 0xFF4B4168;
         private final int text = 0xFFF8FAFC;

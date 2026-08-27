@@ -5,7 +5,9 @@ import com.mojang.blaze3d.platform.DepthTestFunction;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.esp.BlockEntityEspClassifier;
+import dev.arcaneclient.performance.PerformanceProfile;
 import dev.arcaneclient.render.TracerLines;
+import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
@@ -33,8 +35,6 @@ import org.joml.Vector3fc;
 
 @Environment(value=EnvType.CLIENT)
 public final class EspRenderer {
-    private static final int RADIUS = 8;
-    private static final int MAX_TARGETS = 1024;
     private static final VoxelShape BLOCK_BOX = VoxelShapes.cuboid((double)0.03, (double)0.03, (double)0.03, (double)0.97, (double)0.97, (double)0.97);
     private static final RenderPipeline ESP_LINES = RenderPipelines.register((RenderPipeline)RenderPipeline.builder((RenderPipeline.Snippet[])new RenderPipeline.Snippet[]{RenderPipelines.RENDERTYPE_LINES_SNIPPET}).withLocation(ArcaneClient.id("pipeline/storage_esp")).withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).build());
     private static final RenderLayer ESP_LINE_TYPE = RenderLayer.of((String)"arcaneclient_storage_esp", (RenderSetup)RenderSetup.builder((RenderPipeline)ESP_LINES).build());
@@ -51,22 +51,26 @@ public final class EspRenderer {
     }
 
     public static void tick(MinecraftClient client) {
+        if (ArcaneSettingsScreen.isOpen(client)) return;
         ArcaneConfig config = ArcaneClient.config();
-        if (!config.esp && !config.blockEntityDebug || client.world == null || client.getCameraEntity() == null) {
+        if ((!config.esp && !config.blockEntityDebug) || client.world == null || client.getCameraEntity() == null) {
             targets = List.of();
             return;
         }
+        PerformanceProfile profile = config.performanceProfile();
         long gameTime = client.world.getTime();
-        if (lastRefresh != Long.MIN_VALUE && gameTime >= lastRefresh && gameTime - lastRefresh < 10L) {
+        if (lastRefresh != Long.MIN_VALUE && gameTime >= lastRefresh && gameTime - lastRefresh < profile.snapshotRefreshTicks()) {
             return;
         }
         lastRefresh = gameTime;
         Entity cameraEntity = client.getCameraEntity();
         int centerX = ChunkSectionPos.getSectionCoord((int)cameraEntity.getBlockX());
         int centerZ = ChunkSectionPos.getSectionCoord((int)cameraEntity.getBlockZ());
+        int radius = profile.storageRadiusChunks();
+        int targetLimit = profile.storageTargetLimit();
         ArrayList<Target> refreshed = new ArrayList<Target>();
-        for (int dz = -8; dz <= 8; ++dz) {
-            for (int dx = -8; dx <= 8; ++dx) {
+        for (int dz = -radius; dz <= radius; ++dz) {
+            for (int dx = -radius; dx <= radius; ++dx) {
                 WorldChunk chunk = client.world.getChunkManager().getWorldChunk(centerX + dx, centerZ + dz, false);
                 if (chunk == null) continue;
                 for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
@@ -75,7 +79,7 @@ public final class EspRenderer {
                     int color = BlockEntityEspClassifier.color(path, config.esp, config.blockEntityDebug);
                     if (color == 0) continue;
                     refreshed.add(new Target(blockEntity.getPos().toImmutable(), color, BlockEntityEspClassifier.isStorageTarget(path)));
-                    if (refreshed.size() != 1024) continue;
+                    if (refreshed.size() < targetLimit) continue;
                     targets = List.copyOf(refreshed);
                     return;
                 }
@@ -87,7 +91,7 @@ public final class EspRenderer {
     private static void render(WorldRenderContext context) {
         MinecraftClient client = MinecraftClient.getInstance();
         ArcaneConfig config = ArcaneClient.config();
-        if (!config.esp && !config.blockEntityDebug || client.world == null || targets.isEmpty()) {
+        if (ArcaneSettingsScreen.isOpen(client) || (!config.esp && !config.blockEntityDebug) || client.world == null || targets.isEmpty()) {
             return;
         }
         MatrixStack matrices = context.matrices();
@@ -97,7 +101,8 @@ public final class EspRenderer {
         }
         Vec3d camera = context.worldState().cameraRenderState.pos;
         VertexConsumer lines = context.consumers().getBuffer(ESP_LINE_TYPE);
-        VertexConsumer fills = context.consumers().getBuffer(ESP_FILL_TYPE);
+        PerformanceProfile profile = config.performanceProfile();
+        VertexConsumer fills = profile.filledStorageBoxes() ? context.consumers().getBuffer(ESP_FILL_TYPE) : null;
         Vector3fc forward = client.gameRenderer.getCamera().getHorizontalPlane();
         for (Target target : targets) {
             BlockPos pos = target.pos();
@@ -105,7 +110,7 @@ public final class EspRenderer {
             double y = (double)pos.getY() + 0.5 - camera.y;
             double z = (double)pos.getZ() + 0.5 - camera.z;
             VertexRendering.drawOutline((MatrixStack)matrices, (VertexConsumer)lines, (VoxelShape)BLOCK_BOX, (double)((double)pos.getX() - camera.x), (double)((double)pos.getY() - camera.y), (double)((double)pos.getZ() - camera.z), (int)target.color(), (float)2.0f);
-            EspRenderer.drawFilledBox(matrices.peek(), fills, (double)pos.getX() - camera.x, (double)pos.getY() - camera.y, (double)pos.getZ() - camera.z, 0x30000000 | target.color() & 0xFFFFFF);
+            if (fills != null) EspRenderer.drawFilledBox(matrices.peek(), fills, (double)pos.getX() - camera.x, (double)pos.getY() - camera.y, (double)pos.getZ() - camera.z, 0x30000000 | target.color() & 0xFFFFFF);
             if (!target.storageTarget() || !config.storageTracers) continue;
             TracerLines.draw(matrices.peek(), lines, (double)forward.x() * 0.25, (double)forward.y() * 0.25, (double)forward.z() * 0.25, x, y, z, target.color(), 1.25f);
         }

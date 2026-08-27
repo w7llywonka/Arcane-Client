@@ -6,6 +6,7 @@ import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.chat.ChatMacroMessage;
 import dev.arcaneclient.esp.ItemEspCategory;
 import dev.arcaneclient.model.SignalCategory;
+import dev.arcaneclient.performance.PerformanceProfile;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -61,6 +62,7 @@ public final class ArcaneConfig {
     public int chunksPerTick = 3;
     public int rescanSeconds = 30;
     public int uiTheme = 0;
+    public int performanceProfile = 0;
     public String chatMacro1 = "";
     public String chatMacro2 = "";
     public String chatMacro3 = "";
@@ -125,6 +127,14 @@ public final class ArcaneConfig {
             case SignalCategory.LIVE_ACTIVITY -> this.packetSignals;
             case SignalCategory.ENTITY -> this.entitySignals;
         };
+    }
+
+    public PerformanceProfile performanceProfile() {
+        return PerformanceProfile.fromConfig(this.performanceProfile);
+    }
+
+    public void cyclePerformanceProfile() {
+        this.performanceProfile = this.performanceProfile().next().ordinal();
     }
 
     public int sensitivity() {
@@ -256,6 +266,7 @@ public final class ArcaneConfig {
         this.chunksPerTick = Math.clamp((long)this.chunksPerTick, 1, 8);
         this.rescanSeconds = Math.clamp((long)this.rescanSeconds, 10, 300);
         this.uiTheme = Math.clamp(this.uiTheme, 0, 2);
+        this.performanceProfile = Math.clamp(this.performanceProfile, 0, 2);
         this.chatMacro1 = ChatMacroMessage.normalize(this.chatMacro1);
         this.chatMacro2 = ChatMacroMessage.normalize(this.chatMacro2);
         this.chatMacro3 = ChatMacroMessage.normalize(this.chatMacro3);

@@ -9,7 +9,9 @@ import dev.arcaneclient.model.ScoreSummary;
 import dev.arcaneclient.model.SignalCategory;
 import dev.arcaneclient.model.StashHeuristics;
 import dev.arcaneclient.model.TunnelSegment;
+import dev.arcaneclient.performance.PerformanceProfile;
 import dev.arcaneclient.scan.ChunkScanner;
+import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -38,7 +40,6 @@ public final class TraceEngine {
     private static final int LIVE_DECAY_TICKS = 9600;
     private static final int SCAN_SLICE_BLOCKS = 2048;
     private static final int MAX_SCAN_SLICES_PER_TICK = 128;
-    private static final int MAX_RENDERED_TUNNELS = 1500;
     private static final int MAX_STASH_LABELS = 24;
     private final ArcaneConfig config;
     private final ChunkScanner scanner = new ChunkScanner();
@@ -55,6 +56,8 @@ public final class TraceEngine {
     private String dimension = "unknown";
     private @Nullable ClientWorld level;
     private volatile List<ChunkMarker> markerSnapshot = List.of();
+    private volatile Map<Long, ChunkMarker> scoreIndexSnapshot = Map.of();
+    private volatile int flaggedMarkerCount;
     private volatile List<TunnelSegment> tunnelSnapshot = List.of();
     private volatile List<StashCandidate> stashSnapshot = List.of();
 
@@ -73,6 +76,8 @@ public final class TraceEngine {
         this.eventCooldowns.clear();
         this.tunnelSegments.clear();
         this.markerSnapshot = List.of();
+        this.scoreIndexSnapshot = Map.of();
+        this.flaggedMarkerCount = 0;
         this.tunnelSnapshot = List.of();
         this.stashSnapshot = List.of();
         if (newLevel == null) {
@@ -116,7 +121,8 @@ public final class TraceEngine {
         }
         this.startScanJobs(client);
         this.processScanJobs(client);
-        if (this.tick % 10L == 0L) {
+        int snapshotRefreshTicks = this.config.performanceProfile().snapshotRefreshTicks();
+        if (this.tick % snapshotRefreshTicks == 0L) {
             this.refreshMarkers(client);
             this.refreshTunnelSnapshot(client);
         }
@@ -150,6 +156,8 @@ public final class TraceEngine {
         this.tunnelSegments.clear();
         this.scanner.resetTemporalHistory();
         this.markerSnapshot = List.of();
+        this.scoreIndexSnapshot = Map.of();
+        this.flaggedMarkerCount = 0;
         this.tunnelSnapshot = List.of();
         this.stashSnapshot = List.of();
     }
@@ -187,7 +195,7 @@ public final class TraceEngine {
     }
 
     public int flaggedCount() {
-        return this.markerSnapshot.size();
+        return this.flaggedMarkerCount;
     }
 
     public boolean hasScanBaseline(int chunkX, int chunkZ, int observerSectionY) {
@@ -239,13 +247,19 @@ public final class TraceEngine {
     }
 
     public List<ChunkMarker> nearby(int centerX, int centerZ, int radius) {
-        ArrayList<ChunkMarker> nearby = new ArrayList<ChunkMarker>();
-        for (Map.Entry<TraceKey, ChunkTrace> entry : this.traces.entrySet()) {
-            TraceKey traceKey = entry.getKey();
-            if (!this.isCurrent(traceKey) || Math.abs(traceKey.x - centerX) > radius || Math.abs(traceKey.z - centerZ) > radius) continue;
-            nearby.add(this.marker(traceKey, entry.getValue()));
+        ArrayList<ChunkMarker> nearby = new ArrayList<>(Math.min((radius * 2 + 1) * (radius * 2 + 1), 64));
+        Map<Long, ChunkMarker> index = this.scoreIndexSnapshot;
+        for (int dz = -radius; dz <= radius; dz++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                ChunkMarker marker = index.get(chunkKey(centerX + dx, centerZ + dz));
+                if (marker != null) nearby.add(marker);
+            }
         }
         return List.copyOf(nearby);
+    }
+
+    public @Nullable ChunkMarker snapshotMarkerAt(int chunkX, int chunkZ) {
+        return this.scoreIndexSnapshot.get(chunkKey(chunkX, chunkZ));
     }
 
     public List<ChunkMarker> top(int count) {
@@ -288,7 +302,7 @@ public final class TraceEngine {
 
     private void processScanJobs(MinecraftClient client) {
         long started = System.nanoTime();
-        long deadline = started + this.scanBudgetNanos();
+        long deadline = started + this.scanBudgetNanos(client);
         int slices = 0;
         while (!(this.activeScans.isEmpty() || slices >= 128 || slices > 0 && System.nanoTime() >= deadline)) {
             ActiveScan active = this.activeScans.removeFirst();
@@ -322,8 +336,9 @@ public final class TraceEngine {
         }
     }
 
-    private long scanBudgetNanos() {
-        return Math.min(5000000L, 1000000L + (long)this.config.chunksPerTick * 500000L);
+    private long scanBudgetNanos(MinecraftClient client) {
+        long profileBudget = this.config.performanceProfile().scanBudgetNanos(this.config.chunksPerTick);
+        return ArcaneSettingsScreen.isOpen(client) ? Math.min(500_000L, profileBudget) : profileBudget;
     }
 
     private void merge(TraceKey traceKey, ScanResult result) {
@@ -340,13 +355,10 @@ public final class TraceEngine {
     }
 
     private void refreshMarkers(MinecraftClient client) {
-        if (!this.config.enabled) {
+        if (!this.config.enabled || client.player == null) {
             this.markerSnapshot = List.of();
-            this.stashSnapshot = List.of();
-            return;
-        }
-        if (client.player == null) {
-            this.markerSnapshot = List.of();
+                this.scoreIndexSnapshot = Map.of();
+            this.flaggedMarkerCount = 0;
             this.stashSnapshot = List.of();
             return;
         }
@@ -366,34 +378,60 @@ public final class TraceEngine {
         }
         markers.sort(Comparator.comparingInt(ChunkMarker::score).reversed());
         scored.sort(Comparator.comparingInt(ChunkMarker::score).reversed());
-        this.markerSnapshot = List.copyOf(markers);
-        this.refreshStashSnapshot(scored);
+        this.flaggedMarkerCount = markers.size();
+        HashMap<Long, ChunkMarker> scoreIndex = new HashMap<>(Math.max(16, scored.size() * 4 / 3 + 1));
+        for (ChunkMarker marker : scored) {
+            scoreIndex.putIfAbsent(chunkKey(marker.chunkX, marker.chunkZ), marker);
+        }
+        this.scoreIndexSnapshot = Map.copyOf(scoreIndex);
+        int markerLimit = this.config.performanceProfile().markerTargetLimit();
+        this.markerSnapshot = List.copyOf(markers.subList(0, Math.min(markerLimit, markers.size())));
+        this.refreshStashSnapshot(scored, scoreIndex);
     }
 
-    private void refreshStashSnapshot(List<ChunkMarker> scored) {
-        ArrayList<StashCandidate> candidates = new ArrayList<StashCandidate>();
+    private void refreshStashSnapshot(List<ChunkMarker> scored, Map<Long, ChunkMarker> byChunk) {
+        ArrayList<StashCandidate> candidates = new ArrayList<>();
         for (ChunkMarker marker : scored) {
-            boolean clustered;
             boolean direct = StashHeuristics.direct(marker.score, marker.deepAnchor, marker.categoryBreakdown);
-            boolean bl = clustered = !direct && StashHeuristics.clusterMember(marker.score, marker.deepAnchor, marker.categoryBreakdown) && TraceEngine.hasStrongNeighbor(marker, scored);
-            if (!direct && !clustered || TraceEngine.nearExistingLabel(marker, candidates)) continue;
+            boolean clustered = !direct
+                && StashHeuristics.clusterMember(marker.score, marker.deepAnchor, marker.categoryBreakdown)
+                && hasStrongNeighbor(marker, byChunk);
+            if ((!direct && !clustered) || nearExistingLabel(marker, candidates)) continue;
             candidates.add(new StashCandidate(marker.chunkX, marker.chunkZ, marker.score));
-            if (candidates.size() != 24) continue;
-            break;
+            if (candidates.size() >= MAX_STASH_LABELS) break;
         }
         this.stashSnapshot = List.copyOf(candidates);
     }
 
-    private static boolean hasStrongNeighbor(ChunkMarker marker, List<ChunkMarker> scored) {
-        for (ChunkMarker neighbor : scored) {
-            if (neighbor == marker || Math.abs(marker.chunkX - neighbor.chunkX) > 2 || Math.abs(marker.chunkZ - neighbor.chunkZ) > 2 || !StashHeuristics.clusterPair(marker.score, marker.deepAnchor, marker.categoryBreakdown, neighbor.score, neighbor.deepAnchor, neighbor.categoryBreakdown)) continue;
-            return true;
+    private static boolean hasStrongNeighbor(ChunkMarker marker, Map<Long, ChunkMarker> byChunk) {
+        for (int dz = -2; dz <= 2; dz++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                if (dx == 0 && dz == 0) continue;
+                ChunkMarker neighbor = byChunk.get(chunkKey(marker.chunkX + dx, marker.chunkZ + dz));
+                if (neighbor != null && StashHeuristics.clusterPair(
+                    marker.score,
+                    marker.deepAnchor,
+                    marker.categoryBreakdown,
+                    neighbor.score,
+                    neighbor.deepAnchor,
+                    neighbor.categoryBreakdown
+                )) return true;
+            }
         }
         return false;
     }
 
     private static boolean nearExistingLabel(ChunkMarker marker, List<StashCandidate> candidates) {
-        return candidates.stream().anyMatch(candidate -> Math.abs(marker.chunkX - candidate.chunkX) <= 2 && Math.abs(marker.chunkZ - candidate.chunkZ) <= 2);
+        for (StashCandidate candidate : candidates) {
+            if (Math.abs(marker.chunkX - candidate.chunkX) <= 2 && Math.abs(marker.chunkZ - candidate.chunkZ) <= 2) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static long chunkKey(int chunkX, int chunkZ) {
+        return ((long) chunkX & 0xFFFFFFFFL) | ((long) chunkZ << 32);
     }
 
     private void refreshTunnelSnapshot(MinecraftClient client) {
@@ -402,13 +440,15 @@ public final class TraceEngine {
             return;
         }
         ChunkPos center = client.player.getChunkPos();
-        ArrayList<TunnelSegment> visible = new ArrayList<TunnelSegment>();
+        PerformanceProfile profile = this.config.performanceProfile();
+        int tunnelLimit = profile.tunnelTargetLimit();
+        ArrayList<TunnelSegment> visible = new ArrayList<>(Math.min(tunnelLimit, 256));
         for (Map.Entry<TraceKey, List<TunnelSegment>> entry : this.tunnelSegments.entrySet()) {
             TraceKey traceKey = entry.getKey();
             if (!this.isCurrent(traceKey) || Math.abs(traceKey.x - center.x) > this.config.scanRadius || Math.abs(traceKey.z - center.z) > this.config.scanRadius) continue;
             for (TunnelSegment segment : entry.getValue()) {
                 visible.add(segment);
-                if (visible.size() != 1500) continue;
+                if (visible.size() < tunnelLimit) continue;
                 this.tunnelSnapshot = List.copyOf(visible);
                 return;
             }
