@@ -3,14 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f6f2">
-  <meta name="description" content="Arcane Client is a focused growth-discovery utility client for Minecraft 1.21.11.">
+  <meta name="theme-color" content="#090914">
+  <meta name="description" content="Arcane Client — a focused Minecraft utility client for Fabric 1.21.11.">
   <meta property="og:title" content="Arcane Client">
-  <meta property="og:description" content="Growth-only discovery, independent ESP, and practical player tools for Fabric 1.21.11.">
+  <meta property="og:description" content="Simple. Fast. Arcane.">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="assets/arcane-client-icon.png">
-  <title>Arcane Client — Minecraft Utility Client</title>
-  <link rel="icon" href="assets/arcane-client-icon.png">
+  <title>Arcane Client</title>
+  <link rel="icon" href="assets/arcane-mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script>
     window.__consoleErrors = [];
@@ -21,357 +20,89 @@
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
+  <div class="glow glow-one" aria-hidden="true"></div>
+  <div class="glow glow-two" aria-hidden="true"></div>
 
   <header class="site-header">
-    <div class="header-inner">
-      <a class="brand" href="#top" aria-label="Arcane Client home">
-        <img src="assets/arcane-client-icon.png" width="34" height="34" alt="">
-        <span>Arcane Client</span>
-        <small>2.2</small>
-      </a>
-
-      <button class="menu-button" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-button>
-        Menu
-      </button>
-
-      <nav id="site-nav" class="site-nav" aria-label="Primary navigation" data-menu>
-        <a href="#scanner">Scanner</a>
-        <a href="#features">Features</a>
-        <a href="#performance">Performance</a>
-        <a href="#install">Install</a>
-      </nav>
-
-      <a class="github-link" href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">
-        GitHub <span aria-hidden="true">↗</span>
-      </a>
-    </div>
+    <a class="brand" href="#top" aria-label="Arcane Client home">
+      <img src="assets/arcane-mark.svg" width="34" height="34" alt="">
+      <span>Arcane</span>
+    </a>
+    <a class="small-link" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Join Discord</a>
   </header>
 
   <main id="main">
-    <section class="hero container" id="top">
-      <div class="hero-copy">
-        <p class="eyebrow"><span></span> Fabric · Minecraft 1.21.11</p>
-        <h1>A focused utility client for Minecraft.</h1>
-        <p class="hero-text">
-          Arcane Client finds deliberate growth patterns while keeping storage, lighting,
-          entities, and other world noise out of the score.
-        </p>
+    <section class="hero" id="top">
+      <div class="hero-inner">
+        <img class="hero-mark" src="assets/arcane-mark.svg" width="104" height="104" alt="">
+        <p class="release">Fabric · Minecraft 1.21.11</p>
+        <h1>Arcane Client</h1>
+        <p class="tagline">Simple. Fast. Arcane.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#install">Install Arcane Client</a>
-          <a class="button button-secondary" href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">View source</a>
+          <a class="button button-primary" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Join Discord</a>
+          <a class="button button-secondary" href="#options">Explore options</a>
         </div>
-        <ul class="hero-meta" aria-label="Release information">
-          <li><strong>2.2.0</strong><span>Current version</span></li>
-          <li><strong>Client-side</strong><span>No server install</span></li>
-          <li><strong>Java 21</strong><span>Fabric 0.19.3+</span></li>
-        </ul>
       </div>
-
-      <div class="client-preview" role="img" aria-label="Preview of the Arcane Client module interface">
-        <div class="preview-header">
-          <span><img src="assets/arcane-client-icon.png" width="24" height="24" alt=""> Arcane Client</span>
-          <small>HIGH FPS</small>
-        </div>
-        <section class="preview-group">
-          <header><span>Discovery</span><small>1 enabled</small></header>
-          <div class="preview-row">
-            <span><i class="status-on"></i>Growth scanner</span>
-            <b>65%</b>
-          </div>
-          <div class="preview-setting"><span>Growth patterns</span><i class="toggle-on"></i></div>
-          <div class="preview-setting"><span>Live growth</span><i class="toggle-on"></i></div>
-        </section>
-        <section class="preview-group">
-          <header><span>Visual</span><small>4 enabled</small></header>
-          <div class="preview-row"><span><i class="status-on"></i>Chunk tiles</span></div>
-          <div class="preview-row"><span><i class="status-on"></i>Radar HUD</span></div>
-          <div class="preview-row"><span><i class="status-on"></i>Storage ESP</span><em>Independent</em></div>
-          <div class="preview-row is-off"><span><i></i>Tunnel ESP</span></div>
-        </section>
-        <p class="preview-note">Right Shift opens the Click GUI</p>
-      </div>
+      <a class="scroll-cue" href="#options" aria-label="Scroll to plans"><span></span></a>
     </section>
 
-    <section class="summary">
-      <div class="container summary-grid">
-        <div>
-          <strong>Growth-only scoring</strong>
-          <p>Only natural growth and cultivation evidence can affect suspicion.</p>
-        </div>
-        <div>
-          <strong>Independent visual tools</strong>
-          <p>Storage, item, and tunnel ESP never influence the growth score.</p>
-        </div>
-        <div>
-          <strong>Designed for performance</strong>
-          <p>Palette skipping and fixed scan budgets keep background work controlled.</p>
-        </div>
-      </div>
-    </section>
-
-    <section class="section container" id="scanner">
-      <div class="section-heading">
-        <p class="eyebrow">Growth scanner</p>
-        <h2>Find patterns, not random blocks.</h2>
-        <p>
-          Arcane 2.2 intentionally narrowed the scanner. Broad world activity no longer
-          contributes to chunk suspicion.
-        </p>
-      </div>
-
-      <div class="scanner-card">
-        <div class="scanner-column">
-          <span class="column-label label-positive">Counts toward the score</span>
-          <h3>Cultivation and growth</h3>
-          <ul class="check-list">
-            <li>Crop rows and rectangular plots</li>
-            <li>Supporting farmland</li>
-            <li>Synchronized crop stages</li>
-            <li>Mature crop concentrations</li>
-            <li>Organized sapling layouts</li>
-            <li>Sugar-cane and cactus columns</li>
-            <li>Plants outside their native biome</li>
-            <li>Observed growth and harvest cycles</li>
-          </ul>
-        </div>
-        <div class="scanner-column scanner-column-muted">
-          <span class="column-label">Always ignored</span>
-          <h3>Everything unrelated</h3>
-          <ul class="plain-list">
-            <li><span>Storage and block entities</span><b>0</b></li>
-            <li><span>Light data</span><b>0</b></li>
-            <li><span>Machines and infrastructure</span><b>0</b></li>
-            <li><span>Generic placed blocks</span><b>0</b></li>
-            <li><span>Players and entities</span><b>0</b></li>
-            <li><span>Sounds and particles</span><b>0</b></li>
-          </ul>
-          <p class="scanner-note">
-            Natural growth alone stays below the default alert threshold.
-            Organized cultivation or repeated activity is needed to flag a chunk.
-          </p>
-        </div>
-      </div>
-
-      <div class="process-row" role="group" aria-label="Scanner process">
-        <div><span>1</span><strong>Skip</strong><p>Ignore chunk sections without relevant growth states.</p></div>
-        <div><span>2</span><strong>Read</strong><p>Measure layout, stages, maturity, and biome context.</p></div>
-        <div><span>3</span><strong>Observe</strong><p>Watch focused block updates for growth and harvest cycles.</p></div>
-        <div><span>4</span><strong>Explain</strong><p>Show a score with clear evidence reasons.</p></div>
-      </div>
-    </section>
-
-    <section class="section section-muted" id="features">
-      <div class="container">
-        <div class="section-heading section-heading-compact">
-          <p class="eyebrow">Complete feature list</p>
-          <h2>Everything Arcane Client does.</h2>
+    <section class="options" id="options">
+      <div class="options-inner">
+        <div class="options-heading reveal">
+          <p>Explore options</p>
+          <h2>Choose your access.</h2>
         </div>
 
-        <div class="feature-groups">
-          <article class="feature-group">
-            <header>
-              <span>01</span>
-              <div><h3>Discovery</h3><p>Growth-focused chunk intelligence.</p></div>
-            </header>
-            <dl>
-              <div><dt>Growth scanner</dt><dd>Static patterns and live growth or harvest activity.</dd></div>
-              <div><dt>Chunk tiles</dt><dd>World overlays for scored chunks.</dd></div>
-              <div><dt>Radar HUD</dt><dd>Nearby chunk scores in a compact grid.</dd></div>
-              <div><dt>Chunk intel</dt><dd>Current chunk score and evidence reasons.</dd></div>
-              <div><dt>Growth alerts</dt><dd>Labels and notifications for likely growth sites.</dd></div>
-              <div><dt>History</dt><dd>Separate remembered evidence for each server dimension.</dd></div>
-            </dl>
-          </article>
-
-          <article class="feature-group">
-            <header>
-              <span>02</span>
-              <div><h3>Visual tools</h3><p>Useful overlays, separate from discovery.</p></div>
-            </header>
-            <dl>
-              <div><dt>Storage ESP</dt><dd>Chests, barrels, shulkers, hoppers, furnaces, spawners, vaults, and more.</dd></div>
-              <div><dt>Item ESP</dt><dd>Totems, crystals, elytra, shulkers, golden apples, and valuables.</dd></div>
-              <div><dt>Item filters</dt><dd>Per-category visibility and custom colors.</dd></div>
-              <div><dt>Tunnel ESP</dt><dd>Separate detection for sustained 2×1 and 3×3 underground passages.</dd></div>
-              <div><dt>Tracers</dt><dd>Optional lines to storage and item targets.</dd></div>
-              <div><dt>Diagnostics</dt><dd>Visible-target counts for ESP troubleshooting.</dd></div>
-            </dl>
-          </article>
-
-          <article class="feature-group">
-            <header>
-              <span>03</span>
-              <div><h3>Player tools</h3><p>Small utilities for everyday play.</p></div>
-            </header>
-            <dl>
-              <div><dt>Freecam</dt><dd>No-clip camera movement with sprint acceleration.</dd></div>
-              <div><dt>Safe freecam</dt><dd>Blocks attacks and interactions while the camera is detached.</dd></div>
-              <div><dt>Auto Totem</dt><dd>Refills the offhand from inventory when a totem is available.</dd></div>
-              <div><dt>Screen safeguards</dt><dd>Avoids unsafe inventory actions in incompatible menus.</dd></div>
-              <div><dt>Performance profiles</dt><dd>High FPS, Balanced, and Quality presets.</dd></div>
-              <div><dt>Rebindable controls</dt><dd>Change every main key from the GUI or Minecraft settings.</dd></div>
-            </dl>
-          </article>
-
-          <article class="feature-group">
-            <header>
-              <span>04</span>
-              <div><h3>Interface and social</h3><p>Simple control over the whole client.</p></div>
-            </header>
-            <dl>
-              <div><dt>Click GUI</dt><dd>Searchable, draggable, and collapsible module panels.</dd></div>
-              <div><dt>Module settings</dt><dd>Sensitivity, colors, filters, tracers, and toggles in context.</dd></div>
-              <div><dt>Three themes</dt><dd>Arcane, Ember, and Verdant color presets.</dd></div>
-              <div><dt>Chat macros</dt><dd>Four editable and rebindable messages or commands.</dd></div>
-              <div><dt>Client commands</dt><dd>Control modules and inspect evidence through <code>/arcane</code>.</dd></div>
-              <div><dt>Persistent config</dt><dd>Settings save to <code>config/arcane-client.json</code>.</dd></div>
-            </dl>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section container" id="performance">
-      <div class="section-heading">
-        <p class="eyebrow">Performance</p>
-        <h2>Choose how much time Arcane can use.</h2>
-        <p>Profiles change budgets, refresh cadence, render limits, and fill detail without reducing scanner accuracy.</p>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Profile</th>
-              <th scope="col">Scan budget</th>
-              <th scope="col">Refresh</th>
-              <th scope="col">Storage</th>
-              <th scope="col">Items</th>
-              <th scope="col">World targets</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="recommended">
-              <th scope="row">High FPS <small>Default</small></th>
-              <td>1.00 ms/tick</td>
-              <td>20 ticks</td>
-              <td>256</td>
-              <td>128</td>
-              <td>384</td>
-            </tr>
-            <tr>
-              <th scope="row">Balanced</th>
-              <td>1.85 ms/tick</td>
-              <td>10 ticks</td>
-              <td>512</td>
-              <td>256</td>
-              <td>768</td>
-            </tr>
-            <tr>
-              <th scope="row">Quality</th>
-              <td>2.50 ms/tick</td>
-              <td>5 ticks</td>
-              <td>1,024</td>
-              <td>512</td>
-              <td>1,500</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="fine-print">
-        Opening the Click GUI pauses the HUD and 3D overlays and caps background scanning at 0.5 ms/tick.
-        Actual FPS depends on hardware, shaders, resource packs, and the loaded world.
-      </p>
-    </section>
-
-    <section class="section section-muted">
-      <div class="container controls-layout">
-        <div class="section-heading section-heading-compact">
-          <p class="eyebrow">Controls</p>
-          <h2>Useful defaults. Fully rebindable.</h2>
-        </div>
-        <div class="key-list">
-          <div><kbd>Right Shift</kbd><span>Open Click GUI</span></div>
-          <div><kbd>B</kbd><span>Growth scanner</span></div>
-          <div><kbd>N</kbd><span>Chunk tiles</span></div>
-          <div><kbd>F6</kbd><span>Freecam</span></div>
-          <div><kbd>F7</kbd><span>Storage ESP</span></div>
-          <div><kbd>F8</kbd><span>Auto Totem</span></div>
-          <div><kbd>F9</kbd><span>Tunnel ESP</span></div>
-          <div><kbd>F10</kbd><span>Item ESP</span></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section container">
-      <details class="command-reference">
-        <summary>
-          <span>Command reference</span>
-          <small>View every <code>/arcane</code> command</small>
-        </summary>
-        <div class="command-grid">
-          <code>/arcane on | off | settings</code>
-          <code>/arcane profile</code>
-          <code>/arcane here</code>
-          <code>/arcane list [count]</code>
-          <code>/arcane threshold &lt;0–100&gt;</code>
-          <code>/arcane radius &lt;2–24&gt;</code>
-          <code>/arcane speed &lt;1–8&gt;</code>
-          <code>/arcane rescan | clear</code>
-          <code>/arcane overlay | hud | analysis</code>
-          <code>/arcane freecam | autototem</code>
-          <code>/arcane esp | itemesp | tunnelesp</code>
-          <code>/arcane macros | tracers | growthalerts</code>
-        </div>
-      </details>
-    </section>
-
-    <section class="section install-section" id="install">
-      <div class="container">
-        <div class="install-card">
-          <div class="install-copy">
-            <p class="eyebrow">Install</p>
-            <h2>Ready in three steps.</h2>
-            <p>Arcane Client is a standard client-side Fabric mod. No account, license key, or external service is required.</p>
-            <div class="requirements">
-              <span>Minecraft <b>1.21.11</b></span>
-              <span>Java <b>21</b></span>
-              <span>Fabric Loader <b>0.19.3+</b></span>
-              <span>Fabric API <b>0.141.6+</b></span>
+        <div class="plans">
+          <article class="plan reveal">
+            <div class="plan-top">
+              <div>
+                <span class="plan-name">Base</span>
+                <h3><sup>$</sup>5</h3>
+              </div>
+              <span class="plan-type">Arcane</span>
             </div>
-            <a class="button button-primary" href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">Get Arcane Client</a>
-          </div>
-          <ol class="install-steps">
-            <li><span>1</span><div><strong>Install Fabric</strong><p>Set up Fabric Loader and Fabric API for Minecraft 1.21.11.</p></div></li>
-            <li><span>2</span><div><strong>Add the mod</strong><p>Place the Arcane Client JAR in your Minecraft <code>mods</code> folder.</p></div></li>
-            <li><span>3</span><div><strong>Open Arcane</strong><p>Launch the Fabric profile and press <kbd>Right Shift</kbd>.</p></div></li>
-          </ol>
-        </div>
+            <ul>
+              <li>Growth scanner</li>
+              <li>Chunk radar &amp; alerts</li>
+              <li>Storage, item &amp; tunnel ESP</li>
+              <li>Freecam &amp; Auto Totem</li>
+              <li>All client updates</li>
+            </ul>
+            <a class="plan-button" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Get Base</a>
+          </article>
 
-        <div class="build-row">
-          <div><span>Build from source</span><code>.\gradlew.bat clean build</code></div>
-          <button type="button" data-copy-command aria-label="Copy build command">Copy</button>
+          <article class="plan plan-premium reveal">
+            <div class="popular">Premium</div>
+            <div class="plan-top">
+              <div>
+                <span class="plan-name">Premium</span>
+                <h3><sup>$</sup>10</h3>
+              </div>
+              <span class="plan-type">Arcane+</span>
+            </div>
+            <ul>
+              <li>Everything in Base</li>
+              <li>Premium scanner <small>Coming soon</small></li>
+              <li>Early feature builds</li>
+              <li>Premium Discord role</li>
+              <li>Priority support</li>
+            </ul>
+            <a class="plan-button plan-button-premium" href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Get Premium</a>
+          </article>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <div class="footer-brand">
-        <img src="assets/arcane-client-icon.png" width="32" height="32" alt="">
-        <div><strong>Arcane Client</strong><span>Fabric utility client for Minecraft 1.21.11</span></div>
-      </div>
-      <nav aria-label="Footer navigation">
-        <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">Source</a>
-        <a href="https://github.com/eiiorejierge/Arcane-Client/issues" target="_blank" rel="noreferrer">Issues</a>
-        <a href="assets/Inter-OFL.txt">Font license</a>
-        <a href="#top">Back to top</a>
-      </nav>
-      <p>
-        Use Arcane Client only where server rules and applicable terms permit it.
-        Not affiliated with Mojang Studios or Microsoft.
-      </p>
+  <footer>
+    <div class="footer-brand">
+      <img src="assets/arcane-mark.svg" width="26" height="26" alt="">
+      <span>Arcane Client</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://discord.gg/replace-me" target="_blank" rel="noreferrer">Discord</a>
+      <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
     </div>
   </footer>
 
