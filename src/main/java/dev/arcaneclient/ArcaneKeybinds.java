@@ -69,15 +69,7 @@ public final class ArcaneKeybinds {
         return this.chatMacros;
     }
 
-    public List<Entry> editable() {
-        return List.of(new Entry("Scanner", this.scanner), new Entry("Chunk tiles", this.overlay), new Entry("Freecam", this.freecam), new Entry("Storage ESP", this.esp), new Entry("Auto Totem", this.autoTotem), new Entry("Tunnel ESP", this.tunnelEsp), new Entry("Item ESP", this.itemEsp), new Entry("Click GUI", this.settings));
-    }
-
     private static KeyBinding register(String name, int key, KeyBinding.Category category) {
         return KeyBindingHelper.registerKeyBinding((KeyBinding)new KeyBinding(name, key, category));
-    }
-
-    @Environment(value=EnvType.CLIENT)
-    public record Entry(String label, KeyBinding mapping) {
     }
 }
