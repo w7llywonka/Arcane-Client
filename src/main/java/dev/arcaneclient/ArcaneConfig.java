@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.chat.ChatMacroMessage;
+import dev.arcaneclient.combat.SwingDuration;
 import dev.arcaneclient.esp.ItemEspCategory;
 import dev.arcaneclient.model.SignalCategory;
 import dev.arcaneclient.performance.PerformanceProfile;
@@ -23,7 +24,7 @@ import net.fabricmc.loader.api.FabricLoader;
 @Environment(value=EnvType.CLIENT)
 public final class ArcaneConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final int CURRENT_CONFIG_VERSION = 3;
+    private static final int CURRENT_CONFIG_VERSION = 4;
     public boolean enabled = true;
     public boolean overlay = true;
     public boolean hud = true;
@@ -48,6 +49,17 @@ public final class ArcaneConfig {
     public boolean swingSpeed = false;
     public boolean attackMeter = false;
     public boolean totemCounter = false;
+
+    // Utility and information modules.
+    public boolean autoTool = false;
+    public boolean autoToolPreserveDurability = true;
+    public boolean infoHud = true;
+    public boolean infoFps = true;
+    public boolean infoCoordinates = true;
+    public boolean infoDirection = true;
+    public boolean infoSpeed = true;
+    public boolean infoPing = true;
+    public boolean infoBiome = true;
 
     // Entity and terrain ESP modules.
     public boolean playerEsp = false;
@@ -98,7 +110,7 @@ public final class ArcaneConfig {
     public int autoEatHunger = 8;
     public int lowHealthHearts = 4;
     public int armorAlertPercent = 15;
-    public int swingDuration = 4;
+    public int swingDuration = SwingDuration.DEFAULT_TICKS;
     public int zoomPercent = 35;
     public int notificationVolume = 70;
     public int entityEspRange = 96;
@@ -135,9 +147,10 @@ public final class ArcaneConfig {
                 config.chunksPerTick = 3;
                 config.rescanSeconds = 30;
             }
-            boolean upgradedFeatureDefaults = config.configVersion < CURRENT_CONFIG_VERSION;
+            int loadedConfigVersion = config.configVersion;
+            boolean upgradedFeatureDefaults = loadedConfigVersion < 3;
+            boolean upgradedSlowSwingAndInfo = loadedConfigVersion < 4;
             if (upgradedFeatureDefaults) {
-                config.configVersion = CURRENT_CONFIG_VERSION;
                 config.entityNameTags = true;
                 config.soundNotifications = true;
                 config.freecamMining = true;
@@ -145,7 +158,7 @@ public final class ArcaneConfig {
                 config.autoEatHunger = 8;
                 config.lowHealthHearts = 4;
                 config.armorAlertPercent = 15;
-                config.swingDuration = 4;
+                config.swingDuration = SwingDuration.DEFAULT_TICKS;
                 config.zoomPercent = 35;
                 config.notificationVolume = 70;
                 config.entityEspRange = 96;
@@ -159,9 +172,24 @@ public final class ArcaneConfig {
                 config.uiPanelColor = 0xFF121317;
                 config.uiTextColor = 0xFFF4F4F5;
             }
+            if (upgradedSlowSwingAndInfo) {
+                config.swingDuration = SwingDuration.DEFAULT_TICKS;
+                config.autoTool = false;
+                config.autoToolPreserveDurability = true;
+                config.infoHud = true;
+                config.infoFps = true;
+                config.infoCoordinates = true;
+                config.infoDirection = true;
+                config.infoSpeed = true;
+                config.infoPing = true;
+                config.infoBiome = true;
+            }
+            if (upgradedFeatureDefaults || upgradedSlowSwingAndInfo) {
+                config.configVersion = CURRENT_CONFIG_VERSION;
+            }
 
             config.clamp();
-            if (upgradedSpeedDefaults || upgradedFeatureDefaults) {
+            if (upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo) {
                 config.save();
             }
             return config;
@@ -353,7 +381,7 @@ public final class ArcaneConfig {
         this.autoEatHunger = Math.clamp(this.autoEatHunger, 1, 20);
         this.lowHealthHearts = Math.clamp(this.lowHealthHearts, 1, 10);
         this.armorAlertPercent = Math.clamp(this.armorAlertPercent, 1, 100);
-        this.swingDuration = Math.clamp(this.swingDuration, 1, 12);
+        this.swingDuration = SwingDuration.clamp(this.swingDuration);
         this.zoomPercent = Math.clamp(this.zoomPercent, 10, 90);
         this.notificationVolume = Math.clamp(this.notificationVolume, 0, 100);
         this.entityEspRange = Math.clamp(this.entityEspRange, 16, 192);

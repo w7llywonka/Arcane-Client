@@ -2,15 +2,15 @@
 
 [![Build](https://github.com/eiiorejierge/Arcane-Client/actions/workflows/build.yml/badge.svg)](https://github.com/eiiorejierge/Arcane-Client/actions/workflows/build.yml)
 
-Arcane Client is a 40-module client-side Fabric utility suite for Minecraft 1.21.11. It retains the combined archived 1.6/1.8 discovery engine while adding a complete combat, entity ESP, camera, media, notification, and custom-interface layer.
+Arcane Client is a 42-module client-side Fabric utility suite for Minecraft 1.21.11. It retains the combined archived 1.6/1.8 discovery engine while adding a complete combat, entity ESP, camera, media, notification, and custom-interface layer.
 
 ## Highlights
 
 - **Discovery engine:** incremental loaded-chunk scanning, evidence scoring, sensitivity control, deep-Y focus, configurable farm/machine/player-block/light/entity signals, packet activity, rescans, and per-dimension history.
 - **ESP:** storage, items, tunnels, players, mobs, projectiles, crystals, entity tracers, safe holes, chunk tiles, and diagnostics.
-- **Combat:** Auto Totem, Auto Sprint, Auto Eat, health/armor alerts, Hit Sound, Swing Speed, and a configurable combat HUD.
+- **Combat:** Auto Totem, Auto Sprint, Auto Eat, health/armor alerts, Hit Sound, slow-only Swing Speed, and a configurable combat HUD.
 - **Camera and media:** smooth Freecam with wheel speed and body-reach directional mining, anchored third-person Freelook, Zoom, Fullbright, No Hurt Cam, Clean Capture, and Streamer Mode.
-- **Arcane Click GUI:** exactly 40 validated modules, searchable draggable categories, collision-safe labels, arbitrary RGB accent/panel/text colors, notification volume, persistent settings, and the Sora interface font.
+- **Arcane Click GUI:** exactly 42 validated modules, searchable draggable categories, collision-safe labels, arbitrary RGB accent/panel/text colors, notification volume, persistent settings, and the Sora interface font.
 - **Clean source:** readable Yarn-named Java, typed collections, warning-free compilation, client-only mixins, Gradle wrapper, sources JAR, and GitHub Actions CI.
 
 Use Arcane Client only where the server rules and applicable terms permit it.
@@ -43,18 +43,18 @@ Press **Right Shift** to open the module menu. Each category is its own window: 
 | Drag a title bar | Move that category window |
 | Click a title bar | Collapse or expand that category |
 
-The exact 40 modules are grouped by purpose, with the new combat, ESP, render, and client controls presented first:
+The exact 42 modules are grouped by purpose, with the new combat, ESP, render, and client controls presented first:
 
 | Category | Modules |
 | --- | --- |
 | Combat | Auto Totem, Auto Sprint, Auto Eat, Health Alert, Armor Alert, Hit Sound, Swing Speed, Combat HUD |
 | ESP | Storage ESP, Item ESP, Tunnel ESP, Chunk Tiles, ESP Debug, Player ESP, Mob ESP, Projectile ESP, Crystal ESP, Entity Tracers, Hole ESP |
 | Render | Base Radar, Freecam, Freelook, Fullbright, No Hurt Cam, Zoom, Clean Capture |
-| Client | Performance, Interface, Sound Notifications, Streamer Mode |
-| Utility | Chat Macros |
+| Client | Performance, Interface, Info HUD, Sound Notifications, Streamer Mode |
+| Utility | Auto Tool, Chat Macros |
 | Base Finding | Chunk Finder, Growth Signals, Build Traces, Machine Signals, Live Changes, Light Signals, Entity Signals, Stash Finder, Chunk Intel |
 
-Chunk Finder carries the scan budget and sensitivity controls. The original scanner internals remain unchanged; the new work is isolated to combat, ESP, camera, media, notifications, and interface customization. Search filters every category by module name, description, or setting name.
+Chunk Finder carries the scan budget and sensitivity controls. Auto Tool picks the strongest suitable hotbar tool before mining and safely restores the selected slot afterward. Info HUD provides individually switchable FPS, XYZ, facing, movement speed, ping, and biome lines. The original scanner internals remain unchanged; the new work is isolated to combat, ESP, camera, media, notifications, utility, and interface customization. Search filters every category by module name, description, or setting name.
 
 ## Freecam and Freelook
 

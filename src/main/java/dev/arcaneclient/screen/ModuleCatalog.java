@@ -4,6 +4,7 @@ import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.ArcaneKeybinds;
 import dev.arcaneclient.combat.CombatController;
+import dev.arcaneclient.combat.SwingDuration;
 import dev.arcaneclient.esp.ItemEspCategory;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.freecam.FreelookController;
@@ -18,16 +19,16 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 
-/** Builds and validates Arcane's exact 40-module Click GUI catalog. */
+/** Builds and validates Arcane's exact 42-module Click GUI catalog. */
 @Environment(EnvType.CLIENT)
 public final class ModuleCatalog {
-    public static final int EXPECTED_MODULE_COUNT = 40;
+    public static final int EXPECTED_MODULE_COUNT = 42;
     private static final List<String> REQUIRED_MODULE_NAMES = List.of(
         "Auto Totem", "Auto Sprint", "Auto Eat", "Health Alert", "Armor Alert", "Hit Sound", "Swing Speed", "Combat HUD",
         "Storage ESP", "Item ESP", "Tunnel ESP", "Chunk Tiles", "ESP Debug", "Player ESP", "Mob ESP", "Projectile ESP", "Crystal ESP", "Entity Tracers", "Hole ESP",
         "Base Radar", "Freecam", "Freelook", "Fullbright", "No Hurt Cam", "Zoom", "Clean Capture",
-        "Performance", "Interface", "Sound Notifications", "Streamer Mode",
-        "Chat Macros",
+        "Performance", "Interface", "Info HUD", "Sound Notifications", "Streamer Mode",
+        "Auto Tool", "Chat Macros",
         "Chunk Finder", "Growth Signals", "Build Traces", "Machine Signals", "Live Changes", "Light Signals", "Entity Signals", "Stash Finder", "Chunk Intel"
     );
 
@@ -50,7 +51,7 @@ public final class ModuleCatalog {
             for (GuiModule module : category.modules()) actualNames.add(module.name());
         }
         if (count != EXPECTED_MODULE_COUNT || !actualNames.equals(REQUIRED_MODULE_NAMES)) {
-            throw new IllegalStateException("Arcane module catalog does not match the exact 40-module product contract: " + actualNames);
+            throw new IllegalStateException("Arcane module catalog does not match the exact 42-module product contract: " + actualNames);
         }
         return categories;
     }
@@ -176,8 +177,8 @@ public final class ModuleCatalog {
         GuiModule armor = GuiModule.toggle("Armor Alert", "Warns once when the weakest equipped armor reaches the threshold.", () -> config.armorAlert, value -> config.armorAlert = value)
             .with(new GuiSetting.Slider("Durability", () -> config.armorAlertPercent, value -> config.armorAlertPercent = value, 1, 100, "%")).build();
         GuiModule hitSound = GuiModule.toggle("Hit Sound", "Plays a clean confirmation tone on entity attacks.", () -> config.hitSound, value -> config.hitSound = value).build();
-        GuiModule swing = GuiModule.toggle("Swing Speed", "Changes the local first-person hand animation duration.", () -> config.swingSpeed, value -> config.swingSpeed = value)
-            .with(new GuiSetting.Slider("Duration", () -> config.swingDuration, value -> config.swingDuration = value, 1, 12, "t")).build();
+        GuiModule swing = GuiModule.toggle("Swing Speed", "Lengthens the local hand animation; more ticks means a slower swing.", () -> config.swingSpeed, value -> config.swingSpeed = value)
+            .with(new GuiSetting.Slider("Slow duration", () -> config.swingDuration, value -> config.swingDuration = value, SwingDuration.MIN_TICKS, SwingDuration.MAX_TICKS, "t")).build();
         GuiModule combatHud = GuiModule.toggle("Combat HUD", "Shows attack cooldown and optional totem count near the crosshair.", () -> config.attackMeter, value -> config.attackMeter = value)
             .with(new GuiSetting.Toggle("Totem count", () -> config.totemCounter, value -> config.totemCounter = value)).build();
         return List.of(autoTotem, autoSprint, autoEat, health, armor, hitSound, swing, combatHud);
@@ -205,10 +206,12 @@ public final class ModuleCatalog {
     }
 
     private static List<GuiModule> utility(ArcaneConfig config, ArcaneKeybinds keybinds) {
+        GuiModule autoTool = GuiModule.toggle("Auto Tool", "Selects the best hotbar tool before mining, then restores your slot.", () -> config.autoTool, value -> config.autoTool = value)
+            .with(new GuiSetting.Toggle("Protect 1 durability", () -> config.autoToolPreserveDurability, value -> config.autoToolPreserveDurability = value)).build();
         GuiModule.Builder macros = GuiModule.toggle("Chat Macros", "Sends four saved messages, each on its own key.", () -> config.chatMacros, value -> config.chatMacros = value);
         List<KeyBinding> macroKeys = keybinds.chatMacros();
         for (int slot = 0; slot < macroKeys.size(); slot++) macros.with(new GuiSetting.Message(Integer.toString(slot + 1), slot, macroKeys.get(slot)));
-        return List.of(macros.build());
+        return List.of(autoTool, macros.build());
     }
 
     private static List<GuiModule> clientTools(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
@@ -233,10 +236,18 @@ public final class ModuleCatalog {
             .with(channel("Text blue", 0, () -> config.uiTextColor, value -> config.uiTextColor = value))
             .with(new GuiSetting.Bind("Bind", keybinds.settings())).build();
 
+        GuiModule infoHud = GuiModule.toggle("Info HUD", "Compact live FPS, position, direction, movement, ping, and biome readout.", () -> config.infoHud, value -> config.infoHud = value)
+            .with(new GuiSetting.Toggle("FPS", () -> config.infoFps, value -> config.infoFps = value))
+            .with(new GuiSetting.Toggle("Coordinates", () -> config.infoCoordinates, value -> config.infoCoordinates = value))
+            .with(new GuiSetting.Toggle("Direction", () -> config.infoDirection, value -> config.infoDirection = value))
+            .with(new GuiSetting.Toggle("Movement speed", () -> config.infoSpeed, value -> config.infoSpeed = value))
+            .with(new GuiSetting.Toggle("Ping", () -> config.infoPing, value -> config.infoPing = value))
+            .with(new GuiSetting.Toggle("Biome", () -> config.infoBiome, value -> config.infoBiome = value)).build();
+
         GuiModule sounds = GuiModule.toggle("Sound Notifications", "Master volume for combat and safety notification tones.", () -> config.soundNotifications, value -> config.soundNotifications = value)
             .with(new GuiSetting.Slider("Volume", () -> config.notificationVolume, value -> config.notificationVolume = value, 0, 100, "%")).build();
         GuiModule streamer = GuiModule.toggle("Streamer Mode", "Redacts coordinates and player names from Arcane overlays.", () -> config.streamerMode, value -> config.streamerMode = value).build();
-        return List.of(performance, interfaceModule, sounds, streamer);
+        return List.of(performance, interfaceModule, infoHud, sounds, streamer);
     }
 
     private static GuiSetting.Slider channel(
