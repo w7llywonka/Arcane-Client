@@ -14,10 +14,10 @@
   <script>
     document.documentElement.classList.add("js");
     try {
-      if (sessionStorage.getItem("arcane-hiss-seen")) {
-        document.documentElement.classList.add("hiss-seen");
+      if (sessionStorage.getItem("arcane-intro-seen")) {
+        document.documentElement.classList.add("intro-seen");
       } else {
-        sessionStorage.setItem("arcane-hiss-seen", "1");
+        sessionStorage.setItem("arcane-intro-seen", "1");
       }
     } catch (error) {
       document.documentElement.dataset.storage = "unavailable";
@@ -25,20 +25,12 @@
   </script>
 </head>
 <body>
-  <div class="hiss-startup" aria-hidden="true">
-    <div class="hiss-startup-copy">
-      <span>HISS ADDON</span>
-      <strong>ARCANE</strong>
+  <div class="site-startup" aria-hidden="true">
+    <div class="site-startup-copy">
+      <strong>ARCANE CLIENT</strong>
     </div>
-    <svg class="hiss-startup-snake" viewBox="0 0 520 130" focusable="false">
-      <path d="M16 68 C62 8 106 126 154 68 S248 8 296 68 S390 126 438 68"/>
-      <ellipse cx="465" cy="68" rx="27" ry="19"/>
-      <circle cx="473" cy="62" r="3"/>
-      <path class="hiss-tongue" d="M490 69 H510 M510 69 L518 61 M510 69 L518 77"/>
-    </svg>
-    <span class="hiss-startup-rule"></span>
+    <span class="site-startup-rule"></span>
   </div>
-
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <nav class="site-nav" aria-label="Primary navigation">
@@ -343,31 +335,8 @@
       </div>
     </section>
 
-    <section class="section section-large" id="hiss" aria-labelledby="hiss-title">
+    <section class="section section-medium" id="community" aria-label="Arcane community">
       <div class="container container-wide">
-        <header class="section-heading reveal">
-          <span class="section-kicker">Hiss Addon</span>
-          <h2 id="hiss-title">A quick <em>hello.</em><br>Then out of the way.</h2>
-        </header>
-
-        <div class="hiss-card reveal">
-          <div class="hiss-art" aria-hidden="true">
-            <span class="hiss-orbit hiss-orbit-one"></span>
-            <span class="hiss-orbit hiss-orbit-two"></span>
-            <svg viewBox="0 0 420 140" focusable="false">
-              <path d="M12 74 C52 14 94 130 136 74 S220 14 262 74 S346 126 386 74"/>
-              <ellipse cx="398" cy="74" rx="18" ry="14"/>
-              <circle cx="403" cy="70" r="2.5"/>
-            </svg>
-          </div>
-          <div class="hiss-copy">
-            <span class="section-kicker">Website startup</span>
-            <h3>Character without the wait.</h3>
-            <p>Hiss appears once per browsing session, slithers across the screen, and clears in about a second and a half.</p>
-            <button class="replay-hiss" type="button">Replay Hiss</button>
-          </div>
-        </div>
-
         <a class="discord-callout reveal" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">
           <span class="discord-mark" aria-hidden="true">A</span>
           <span>
@@ -437,7 +406,7 @@
           <h2>Project</h2>
           <a href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Discord</a>
           <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
-          <a href="#hiss">Hiss Addon</a>
+          <a href="#community">Community</a>
         </div>
       </div>
       <div class="footer-bottom">
