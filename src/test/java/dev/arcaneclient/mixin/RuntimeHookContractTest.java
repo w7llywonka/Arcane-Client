@@ -29,6 +29,8 @@ final class RuntimeHookContractTest {
         method(GameRenderer.class, "getNightVisionStrength", LivingEntity.class, float.class);
         method(LivingEntity.class, "getHandSwingDuration");
         method(Entity.class, "changeLookDirection", double.class, double.class);
+        method(Entity.class, "resetPosition");
+        method(Entity.class, "updateLastAngles");
         method(MinecraftClient.class, "doAttack");
         method(MinecraftClient.class, "handleBlockBreaking", boolean.class);
         method(MinecraftClient.class, "doItemUse");

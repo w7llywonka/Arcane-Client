@@ -33,11 +33,14 @@ public final class FreelookController {
         FreecamController.disable(client);
         previousPerspective = client.options.getPerspective();
         camera = new ArmorStandEntity((World) client.world, player.getX(), player.getY(), player.getZ());
-        camera.setPosition(player.getX(), player.getEyeY() - camera.getStandingEyeHeight(), player.getZ());
-        camera.setYaw(player.getYaw());
-        camera.setPitch(Math.clamp(player.getPitch(), -89.9f, 89.9f));
-        camera.lastYaw = camera.getYaw();
-        camera.lastPitch = camera.getPitch();
+        DetachedCameraPose.initialize(
+            camera,
+            player.getX(),
+            player.getEyeY() - camera.getStandingEyeHeight(),
+            player.getZ(),
+            player.getYaw(),
+            Math.clamp(player.getPitch(), -89.9f, 89.9f)
+        );
         camera.setInvisible(true);
         camera.setNoGravity(true);
         camera.noClip = true;
@@ -61,9 +64,12 @@ public final class FreelookController {
             disable(client);
             return;
         }
-        camera.setPosition(player.getX(), player.getEyeY() - camera.getStandingEyeHeight(), player.getZ());
-        camera.lastYaw = camera.getYaw();
-        camera.lastPitch = camera.getPitch();
+        DetachedCameraPose.advance(
+            camera,
+            player.getX(),
+            player.getEyeY() - camera.getStandingEyeHeight(),
+            player.getZ()
+        );
     }
 
     /** Receives vanilla's sensitivity-adjusted mouse deltas and rotates only the orbit camera. */
@@ -72,10 +78,7 @@ public final class FreelookController {
         CameraRotation.Angles next = CameraRotation.apply(
             camera.getYaw(), camera.getPitch(), cursorDeltaX, cursorDeltaY
         );
-        camera.setYaw(next.yaw());
-        camera.setPitch(next.pitch());
-        camera.lastYaw = next.yaw();
-        camera.lastPitch = next.pitch();
+        DetachedCameraPose.rotate(camera, next.yaw(), next.pitch());
         return true;
     }
 }
