@@ -116,6 +116,19 @@ public final class FreecamController {
         tickMining(client, player);
     }
 
+    /** Receives vanilla's sensitivity-adjusted mouse deltas and rotates only the detached camera. */
+    public static boolean changeLookDirection(double cursorDeltaX, double cursorDeltaY) {
+        if (camera == null) return false;
+        CameraRotation.Angles next = CameraRotation.apply(
+            camera.getYaw(), camera.getPitch(), cursorDeltaX, cursorDeltaY
+        );
+        camera.setYaw(next.yaw());
+        camera.setPitch(next.pitch());
+        camera.lastYaw = next.yaw();
+        camera.lastPitch = next.pitch();
+        return true;
+    }
+
     private static void tickMining(MinecraftClient client, ClientPlayerEntity player) {
         if (!ArcaneClient.config().freecamMining || !client.options.attackKey.isPressed() || client.interactionManager == null) {
             stopMining(client);

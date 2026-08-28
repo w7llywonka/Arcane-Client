@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 2.2.1+mc1.21.11
+
+- Fixed Freecam and Freelook mouse control on Minecraft 1.21.11 by routing vanilla look input to the active detached camera while keeping the real player's head rotation unchanged.
+
 - Expanded Arcane to an exact runtime-validated 40-module catalog across Base Finding, ESP, Combat, Render, Utility, and Client.
 - Added Player, Mob, Projectile, Crystal, Entity Tracer, and Hole ESP with configurable ranges, names, and colors.
 - Added Auto Sprint, Auto Eat, Health Alert, Armor Alert, Hit Sound, Swing Speed, and a Combat HUD alongside Auto Totem.
