@@ -10,7 +10,7 @@ Arcane Client is a client-side Fabric utility suite for Minecraft 1.21.11. This 
 - **Visual intelligence:** chunk tiles, radar HUD, current-chunk intel, storage ESP, item ESP with category colors, tunnel ESP, tracers, stash labels/alerts, and diagnostics.
 - **Player tools:** freecam and Auto Totem.
 - **Social tools:** four editable, rebindable chat macros.
-- **Arcane Click GUI:** smooth Inter typography, soft outlined module cards, searchable modules, draggable/collapsible panels, nested settings, live FPS/profile status, in-GUI key rebinding, and three persistent themes.
+- **Arcane Click GUI:** a base-finding module menu in the Krypton mould — one draggable window per category, left click to toggle, right click for nested settings, middle click to rebind, per-module descriptions, sliders, colour swatches, search, live FPS/profile status, and three persistent themes shared with the HUD.
 - **Clean source:** readable Yarn-named Java, typed collections, warning-free compilation, client-only mixins, Gradle wrapper, sources JAR, and GitHub Actions CI.
 
 Use Arcane Client only where the server rules and applicable terms permit it.
@@ -31,9 +31,33 @@ Use Arcane Client only where the server rules and applicable terms permit it.
 
 Configuration is saved to `config/arcane-client.json`.
 
+## Click GUI
+
+Press **Right Shift** to open the module menu. Each category is its own window: drag a title bar to move it, click the title bar to collapse it.
+
+| Input | Action |
+| --- | --- |
+| Left click a module | Toggle it on or off |
+| Right click a module | Open or close its settings |
+| Middle click a module | Rebind its key |
+| Drag a title bar | Move that category window |
+| Click a title bar | Collapse or expand that category |
+
+Modules are grouped for base finding first:
+
+| Category | Modules |
+| --- | --- |
+| Base Finding | Chunk Finder, Stash Finder, Chunk Intel |
+| ESP | Storage ESP, Item ESP, Tunnel ESP, Chunk Tiles, ESP Debug |
+| Render | Base Radar, Freecam |
+| Utility | Auto Totem, Chat Macros |
+| Client | Performance, Interface |
+
+Chunk Finder carries the full scan configuration in its settings: sensitivity, scan radius, scan speed, rescan delay, the seven evidence signals, and live flagged/queue counters. Search filters every category by module name, description, or setting name.
+
 ## Performance profiles
 
-**High FPS** is the default. Click the Performance row in the Player panel or run `/arcane profile` to cycle profiles.
+**High FPS** is the default. Cycle it from the Performance module in the Client window or run `/arcane profile`.
 
 | Profile | Default scan budget | Snapshot cadence | Storage targets | Item targets | Tunnel/chunk targets | Storage fill |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
@@ -105,7 +129,7 @@ The remapped mod and sources JARs are written to `build/libs/`.
 
 ## Design and provenance
 
-Version 1.8 was a functional superset of 1.6, so its newer chat macro, block-entity classification, transient-entity filtering, and expanded visual settings form the base. The older artifact is retained to make that comparison auditable. The rebuilt UI follows the module-oriented discoverability seen in established Fabric clients while using an original Arcane visual system and implementation; no source was copied from those projects.
+Version 1.8 was a functional superset of 1.6, so its newer chat macro, block-entity classification, transient-entity filtering, and expanded visual settings form the base. The older artifact is retained to make that comparison auditable. The rebuilt UI follows the category-window module menu that established Fabric clients share — Krypton's in particular, where a right click on a module opens its settings — while using an original Arcane visual system and implementation. No source or asset was copied from those projects; the palette is the same forest/mint system as the Arcane product site.
 
 Useful references used during the rebuild include [Meteor Client](https://github.com/MeteorDevelopment/meteor-client), [67 Client](https://github.com/alx-3/67-Client), [Krypton Client's feature overview](https://kryptonclient.org/features), and the [official Fabric example mod](https://github.com/FabricMC/fabric-example-mod).
 
