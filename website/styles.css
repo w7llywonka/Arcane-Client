@@ -1973,3 +1973,225 @@ svg {
     transform: none;
   }
 }
+/* Download gate */
+body.download-open {
+  overflow: hidden;
+}
+
+.nav-action,
+.mobile-menu-action,
+.pill,
+.plan-action,
+.download-close,
+.download-form button {
+  cursor: pointer;
+}
+
+.mobile-menu .mobile-menu-action {
+  width: 100%;
+  border: 0;
+}
+
+.mobile-menu .mobile-menu-discord {
+  justify-content: center;
+  color: var(--text);
+}
+
+.download-dialog {
+  width: min(548px, calc(100% - 32px));
+  max-width: none;
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+}
+
+.download-dialog::backdrop {
+  background: rgba(2, 7, 4, 0.82);
+  backdrop-filter: blur(8px);
+}
+
+.download-panel {
+  position: relative;
+  overflow: hidden;
+  padding: 42px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 18px;
+  background: #101b15;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.48);
+}
+
+.download-panel::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--primary);
+  content: "";
+}
+
+.download-dialog[open] .download-panel {
+  animation: download-enter 280ms var(--ease-out) both;
+}
+
+.download-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 22px;
+  line-height: 1;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.download-close:hover,
+.download-close:focus-visible {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.download-panel h2 {
+  max-width: 400px;
+  margin: 14px 0 0;
+  font-size: clamp(28px, 5vw, 38px);
+  letter-spacing: -0.05em;
+  line-height: 1.1;
+}
+
+.download-panel > p {
+  max-width: 430px;
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.download-form {
+  margin-top: 30px;
+}
+
+.download-form label {
+  display: block;
+  margin-bottom: 9px;
+  color: #c2d4c7;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.download-code-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.download-code-row input {
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 10px;
+  outline: 0;
+  color: var(--text);
+  background: #09120e;
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.download-code-row input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(120, 199, 150, 0.12);
+}
+
+.download-code-row input[aria-invalid="true"] {
+  border-color: #d77a76;
+}
+
+.download-code-row button {
+  min-height: 50px;
+  padding: 0 19px;
+  border-radius: 10px;
+  color: #07120b;
+  background: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.download-code-row button:hover,
+.download-code-row button:focus-visible {
+  background: var(--primary-light);
+  transform: translateY(-1px);
+}
+
+.download-code-row button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+  transform: none;
+}
+
+.download-status {
+  min-height: 19px;
+  margin: 9px 0 0;
+  color: #d99b96;
+  font-size: 11px;
+}
+
+.download-status[data-state="success"] {
+  color: var(--primary-light);
+}
+
+.download-build {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+
+.download-build span {
+  padding: 5px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+@keyframes download-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .download-panel {
+    padding: 34px 24px 26px;
+  }
+
+  .download-code-row {
+    grid-template-columns: 1fr;
+  }
+
+  .download-code-row button {
+    width: 100%;
+  }
+}

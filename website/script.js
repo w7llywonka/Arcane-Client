@@ -112,3 +112,103 @@ if (!root.classList.contains("hiss-seen")) {
 if (replayButton) {
   replayButton.addEventListener("click", replayHiss);
 }
+const downloadDialog = document.querySelector("#download-dialog");
+const downloadForm = document.querySelector(".download-form");
+const downloadInput = document.querySelector("#download-code");
+const downloadStatus = document.querySelector("#download-status");
+const downloadButtons = Array.from(document.querySelectorAll("[data-download-open]"));
+const downloadClose = document.querySelector("[data-download-close]");
+const expectedDownloadCodeHash = "eb374395dbca9ae038c691f18bedddd16fd748d106aa2e424c6987b5ed4b7348";
+const releaseDownloadUrl = "https://github.com/eiiorejierge/Arcane-Client/releases/download/v2.3.4/Arcane-Client-2.3.4%2Bmc1.21.11.jar";
+
+function resetDownloadForm() {
+  if (!downloadForm || !downloadInput || !downloadStatus) return;
+  downloadForm.reset();
+  downloadInput.removeAttribute("aria-invalid");
+  downloadStatus.textContent = "";
+  delete downloadStatus.dataset.state;
+}
+
+function openDownloadDialog() {
+  if (!downloadDialog || !downloadInput) return;
+  setMenu(false);
+  resetDownloadForm();
+  document.body.classList.add("download-open");
+  if (typeof downloadDialog.showModal === "function") {
+    downloadDialog.showModal();
+  } else {
+    downloadDialog.setAttribute("open", "");
+  }
+  window.requestAnimationFrame(() => downloadInput.focus());
+}
+
+function closeDownloadDialog() {
+  if (!downloadDialog) return;
+  if (typeof downloadDialog.close === "function" && downloadDialog.open) {
+    downloadDialog.close();
+  } else {
+    downloadDialog.removeAttribute("open");
+  }
+  document.body.classList.remove("download-open");
+  resetDownloadForm();
+}
+
+async function hashDownloadCode(value) {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await window.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+downloadButtons.forEach((button) => button.addEventListener("click", openDownloadDialog));
+
+if (downloadClose) {
+  downloadClose.addEventListener("click", closeDownloadDialog);
+}
+
+if (downloadDialog) {
+  downloadDialog.addEventListener("cancel", () => {
+    document.body.classList.remove("download-open");
+    resetDownloadForm();
+  });
+
+  downloadDialog.addEventListener("click", (event) => {
+    if (event.target === downloadDialog) closeDownloadDialog();
+  });
+}
+
+if (downloadForm && downloadInput && downloadStatus) {
+  downloadForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submitButton = downloadForm.querySelector('button[type="submit"]');
+    const value = downloadInput.value.trim();
+
+    if (!value) {
+      downloadInput.setAttribute("aria-invalid", "true");
+      downloadStatus.textContent = "Enter your access code.";
+      downloadInput.focus();
+      return;
+    }
+
+    submitButton.disabled = true;
+    downloadInput.removeAttribute("aria-invalid");
+    downloadStatus.textContent = "Checking code…";
+
+    try {
+      const codeHash = await hashDownloadCode(value);
+      if (codeHash !== expectedDownloadCodeHash) {
+        downloadInput.setAttribute("aria-invalid", "true");
+        downloadStatus.textContent = "That code is not valid.";
+        downloadInput.select();
+        return;
+      }
+
+      downloadStatus.dataset.state = "success";
+      downloadStatus.textContent = "Code accepted. Starting download…";
+      window.setTimeout(() => window.location.assign(releaseDownloadUrl), 180);
+    } catch (error) {
+      downloadStatus.textContent = "Your browser could not verify the code. Try a current browser.";
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+}

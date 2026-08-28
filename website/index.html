@@ -55,7 +55,7 @@
         <a href="#faq">FAQ</a>
       </div>
 
-      <a class="nav-action" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
+      <button class="nav-action" type="button" data-download-open>Download</button>
 
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
         <span></span>
@@ -69,7 +69,8 @@
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
-      <a class="mobile-menu-action" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
+      <button class="mobile-menu-action" type="button" data-download-open>Download Arcane</button>
+      <a class="mobile-menu-discord" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
     </div>
   </nav>
 
@@ -91,7 +92,7 @@
         </h1>
         <p>Tracks changes from selected crops, saplings, sugar cane, cactus, and other growth states to surface possible base locations. Storage and light never affect a lead.</p>
         <div class="hero-actions">
-          <a class="pill pill-primary pill-glint" href="#pricing">View plans</a>
+          <button class="pill pill-primary pill-glint" type="button" data-download-open>Download 2.3.4</button>
           <a class="pill pill-secondary" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
         </div>
         <div class="hero-meta" role="group" aria-label="Client compatibility">
@@ -305,7 +306,7 @@
               <small>Current release</small>
             </header>
             <div class="plan-price"><sup>$</sup>5</div>
-            <p>The complete Arcane 2.2 client available today.</p>
+            <p>The complete Arcane 2.3.4 client available today.</p>
             <ul>
               <li><span class="check" aria-hidden="true"></span>Growth-based base finder</li>
               <li><span class="check" aria-hidden="true"></span>Chunk map, radar, and intel</li>
@@ -315,7 +316,7 @@
               <li><span class="check" aria-hidden="true"></span>Chat macros and performance profiles</li>
               <li><span class="check" aria-hidden="true"></span>All client updates</li>
             </ul>
-            <a class="plan-action plan-action-secondary" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Ask about Base</a>
+            <button class="plan-action plan-action-secondary" type="button" data-download-open>Download 2.3.4</button>
           </article>
 
           <article class="plan-card plan-card-featured reveal" style="--reveal-delay: 80ms">
@@ -400,7 +401,7 @@
           </details>
           <details class="faq-item reveal">
             <summary>Which Minecraft version is supported?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Arcane 2.2 targets Minecraft 1.21.11 with Fabric and runs entirely on the client.</p>
+            <p>Arcane 2.3.4 targets Minecraft 1.21.11 with Fabric and runs entirely on the client.</p>
           </details>
           <details class="faq-item reveal">
             <summary>How do I open Arcane?<span class="faq-plus" aria-hidden="true"></span></summary>
@@ -445,6 +446,31 @@
       </div>
     </div>
   </footer>
+
+
+  <dialog class="download-dialog" id="download-dialog" aria-labelledby="download-title">
+    <div class="download-panel">
+      <button class="download-close" type="button" data-download-close aria-label="Close download window">×</button>
+      <span class="section-kicker">Arcane Client 2.3.4</span>
+      <h2 id="download-title">Enter your download code.</h2>
+      <p>One verified Fabric 1.21.11 build. The download starts as soon as the code is accepted.</p>
+
+      <form class="download-form" novalidate>
+        <label for="download-code">Access code</label>
+        <div class="download-code-row">
+          <input id="download-code" name="download-code" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" required aria-describedby="download-status">
+          <button type="submit">Unlock download</button>
+        </div>
+        <p class="download-status" id="download-status" aria-live="polite"></p>
+      </form>
+
+      <div class="download-build">
+        <span>2.3.4</span>
+        <span>Fabric</span>
+        <span>Minecraft 1.21.11</span>
+      </div>
+    </div>
+  </dialog>
 
   <script src="script.js"></script>
 </body>
