@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2.3.0+mc1.21.11
+
+- Corrected Swing Speed semantics: Arcane now lengthens the hand animation from 7 to 30 ticks, with a slower 12-tick default and migration from the old fast value.
+- Added a configurable Info HUD for FPS, coordinates, facing direction, horizontal speed, ping, and biome.
+- Added Auto Tool with first-click selection, best-tool scoring, optional one-durability protection, server slot synchronization, and safe restoration.
+- Expanded the validated Click GUI catalog from 40 to 42 modules.
+
 ## 2.2.1+mc1.21.11
 
 - Fixed Freecam and Freelook mouse control on Minecraft 1.21.11 by routing vanilla look input to the active detached camera while keeping the real player's head rotation unchanged.

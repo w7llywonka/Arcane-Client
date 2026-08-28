@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.Mouse;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
@@ -26,6 +27,8 @@ final class RuntimeHookContractTest {
         method(GameRenderer.class, "getNightVisionStrength", LivingEntity.class, float.class);
         method(LivingEntity.class, "getHandSwingDuration");
         method(Entity.class, "changeLookDirection", double.class, double.class);
+        method(MinecraftClient.class, "doAttack");
+        method(MinecraftClient.class, "handleBlockBreaking", boolean.class);
         method(Mouse.class, "onMouseScroll", long.class, double.class, double.class);
     }
 
@@ -43,6 +46,7 @@ final class RuntimeHookContractTest {
             assertTrue(names.contains("GameRendererMixin"));
             assertTrue(names.contains("LivingEntityMixin"));
             assertTrue(names.contains("MouseMixin"));
+            assertTrue(names.contains("MinecraftClientMixin"));
             assertTrue(names.contains("KeyboardInputMixin"));
         }
     }

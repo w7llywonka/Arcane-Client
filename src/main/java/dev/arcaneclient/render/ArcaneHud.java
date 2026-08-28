@@ -11,13 +11,17 @@ import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.screen.ClickGuiColors;
 import dev.arcaneclient.screen.RoundedGui;
 import dev.arcaneclient.screen.UiGeometry;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.OrderedText;
@@ -55,6 +59,7 @@ public final class ArcaneHud {
         if (config.hud) renderRadar(graphics, client, config);
         if (config.chunkAnalysis) renderChunkAnalysis(graphics, client, config);
         if (config.attackMeter) renderCombatHud(graphics, client, config);
+        if (config.infoHud) renderInfoHud(graphics, client, config);
     }
 
     private static void renderRadar(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
@@ -160,6 +165,52 @@ public final class ArcaneHud {
         if (config.totemCounter) {
             String count = "TOTEMS " + CombatController.totemCount(client.player);
             graphics.drawText(font, ArcaneFont.text(count), x + (width - ArcaneFont.width(font, count)) / 2, y + 7, theme.text(), false);
+        }
+    }
+
+    private static void renderInfoHud(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
+        TextRenderer font = ArcaneFont.renderer(client);
+        ClickGuiColors theme = ClickGuiColors.resolve(config);
+        List<String> lines = new ArrayList<>(6);
+        if (config.infoFps) lines.add("FPS  " + client.getCurrentFps());
+        if (config.infoCoordinates) {
+            lines.add(config.streamerMode
+                ? "XYZ  HIDDEN"
+                : InfoHudFormatter.coordinates(client.player.getX(), client.player.getY(), client.player.getZ()));
+        }
+        if (config.infoDirection) {
+            lines.add("FACING  " + client.player.getHorizontalFacing().asString().toUpperCase(Locale.ROOT));
+        }
+        if (config.infoSpeed) {
+            lines.add(InfoHudFormatter.speed(client.player.getVelocity().x, client.player.getVelocity().z));
+        }
+        if (config.infoPing) {
+            PlayerListEntry entry = client.getNetworkHandler() == null
+                ? null
+                : client.getNetworkHandler().getPlayerListEntry(client.player.getUuid());
+            lines.add("PING  " + (entry == null ? "--" : entry.getLatency() + " ms"));
+        }
+        if (config.infoBiome) {
+            String biome = client.world.getBiome(client.player.getBlockPos()).getKey()
+                .map(key -> InfoHudFormatter.readableId(key.getValue().getPath()))
+                .orElse("UNKNOWN");
+            lines.add("BIOME  " + biome);
+        }
+        if (lines.isEmpty()) return;
+
+        int panelWidth = 80;
+        for (String line : lines) panelWidth = Math.max(panelWidth, ArcaneFont.width(font, line) + 16);
+        int lineHeight = font.fontHeight + 3;
+        int panelHeight = lines.size() * lineHeight + 9;
+        int x = 7;
+        int y = graphics.getScaledWindowHeight() - panelHeight - 7;
+        RoundedGui.fill(graphics, x + 2, y + 3, panelWidth, panelHeight, 7, 0x40000000);
+        RoundedGui.outline(graphics, x, y, panelWidth, panelHeight, 7, 1, theme.outlineSoft(), theme.window());
+        RoundedGui.fill(graphics, x + 8, y + 2, 28, 2, 1, theme.accent());
+        int textY = y + 6;
+        for (String line : lines) {
+            graphics.drawText(font, ArcaneFont.text(line), x + 8, textY, theme.text(), false);
+            textY += lineHeight;
         }
     }
 

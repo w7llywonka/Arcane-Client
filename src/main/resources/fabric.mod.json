@@ -3,7 +3,7 @@
   "id": "arcaneclient",
   "version": "${version}",
   "name": "Arcane Client",
-  "description": "A 40-module Fabric client with combat tools, configurable ESP, smooth camera modes, media controls, notifications, and a fully customizable Click GUI.",
+  "description": "A 42-module Fabric client with combat tools, Auto Tool, a live Info HUD, configurable ESP, smooth camera modes, notifications, and a customizable Click GUI.",
   "authors": [
     "Eric and Codex"
   ],

@@ -18,6 +18,7 @@ import dev.arcaneclient.render.TraceRenderer;
 import dev.arcaneclient.render.TunnelEspRenderer;
 import dev.arcaneclient.render.VisualController;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
+import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -48,6 +49,7 @@ implements ClientModInitializer {
         ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, level) -> {
             FreecamController.disable(client);
             FreelookController.disable(client);
+            AutoToolController.restore(client);
             engine.onWorldChange(client, level);
         });
         ClientChunkEvents.CHUNK_LOAD.register(engine::onChunkLoad);
