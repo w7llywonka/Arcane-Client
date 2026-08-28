@@ -16,6 +16,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.OrderedText;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.ChunkPos;
 
@@ -78,9 +79,9 @@ public final class ArcaneHud {
 
         String state = config.enabled ? "ON" : "PAUSED";
         String header = "ARCANE  " + state + (FreecamController.isActive() ? "  FC" : "") + (config.esp ? "  ESP" : "");
-        graphics.drawText(font, header, PANEL_X + PADDING, PANEL_Y + 6, config.enabled ? theme.text() : PAUSED_COLOR, true);
+        graphics.drawText(font, ArcaneFont.text(header), PANEL_X + PADDING, PANEL_Y + 6, config.enabled ? theme.text() : PAUSED_COLOR, true);
         String flagged = Integer.toString(engine.flaggedCount());
-        graphics.drawText(font, flagged, PANEL_X + panelWidth - PADDING - font.getWidth(flagged), PANEL_Y + 6, secondary, false);
+        graphics.drawText(font, ArcaneFont.text(flagged), PANEL_X + panelWidth - PADDING - ArcaneFont.width(font, flagged), PANEL_Y + 6, secondary, false);
 
         int gridX = PANEL_X + PADDING;
         int gridY = PANEL_Y + HEADER_HEIGHT;
@@ -95,12 +96,12 @@ public final class ArcaneHud {
                 graphics.fill(x + 1, y + 1, x + CELL_SIZE - 1, y + CELL_SIZE - 1, score == 0 ? 0x50000000 | theme.nest() & 0xFFFFFF : qualityColor(score, config.threshold));
                 if (score > 0) {
                     int scoreColor = score >= config.threshold && score < 75 ? 0xFF15111F : theme.text();
-                    graphics.drawCenteredTextWithShadow(font, Integer.toString(Math.min(99, score)), x + CELL_SIZE / 2, y + 3, scoreColor);
+                    graphics.drawCenteredTextWithShadow(font, ArcaneFont.text(Integer.toString(Math.min(99, score))), x + CELL_SIZE / 2, y + 3, scoreColor);
                 }
                 if (dx == 0 && dz == 0) {
                     graphics.drawStrokedRectangle(x, y, CELL_SIZE, CELL_SIZE, accent);
                     if (score == 0) {
-                        graphics.drawCenteredTextWithShadow(font, "+", x + CELL_SIZE / 2, y + 3, secondary);
+                        graphics.drawCenteredTextWithShadow(font, ArcaneFont.text("+"), x + CELL_SIZE / 2, y + 3, secondary);
                     }
                 }
             }
@@ -125,24 +126,24 @@ public final class ArcaneHud {
         graphics.fill(x, y, x + panelWidth, y + height, theme.window());
         graphics.drawStrokedRectangle(x, y, panelWidth, height, theme.outline());
         graphics.fill(x + 1, y + 1, x + 4, y + height - 1, accent);
-        graphics.drawText(font, "CURRENT CHUNK", x + 10, y + 7, theme.text(), true);
-        graphics.drawText(font, chunk.x + ", " + chunk.z, x + 10, y + 20, secondary, false);
+        graphics.drawText(font, ArcaneFont.text("CURRENT CHUNK"), x + 10, y + 7, theme.text(), true);
+        graphics.drawText(font, ArcaneFont.text(chunk.x + ", " + chunk.z), x + 10, y + 20, secondary, false);
 
         if (marker == null || marker.score() == 0) {
-            String empty = font.trimToWidth("No activity evidence detected", panelWidth - 20);
+            OrderedText empty = ArcaneFont.trimmed(font, "No activity evidence detected", panelWidth - 20);
             graphics.drawText(font, empty, x + 10, y + 33, theme.muted(), false);
             return;
         }
 
         boolean stash = isStashChunk(engine, chunk);
         String score = stash ? "POSSIBLE STASH  " + marker.score() : "SCORE  " + marker.score();
-        int scoreX = x + panelWidth - 9 - font.getWidth(score);
-        graphics.drawText(font, score, scoreX, y + 7, stash ? STASH_COLOR : accent, true);
+        int scoreX = x + panelWidth - 9 - ArcaneFont.width(font, score);
+        graphics.drawText(font, ArcaneFont.text(score), scoreX, y + 7, stash ? STASH_COLOR : accent, true);
 
         int lineY = y + 34;
         for (int index = 0; index < reasonCount; index++) {
-            String reason = font.trimToWidth(marker.reasons().get(index), panelWidth - 25);
-            graphics.drawText(font, "> " + reason, x + 10, lineY, theme.text(), false);
+            OrderedText reason = ArcaneFont.trimmed(font, "> " + marker.reasons().get(index), panelWidth - 25);
+            graphics.drawText(font, reason, x + 10, lineY, theme.text(), false);
             lineY += 11;
         }
     }

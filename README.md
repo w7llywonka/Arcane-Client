@@ -59,9 +59,16 @@ Chunk Finder carries the full scan configuration in its settings: sensitivity, s
 
 Minecraft bakes a TrueType glyph once, at `size x oversample` pixels, and samples the glyph atlas with `FilterMode.NEAREST` — there is no filtering anywhere in that path. A glyph is then drawn at `size x guiScale` physical pixels. Unless `oversample` matches the GUI scale, every glyph is an antialiased bitmap resampled with no interpolation, which is what makes custom fonts look blocky at GUI scale 3 and above.
 
-Arcane ships the same font at six bake resolutions and picks the one matching the current GUI scale, so glyphs land one texel per physical pixel. Glyph metrics are divided by `oversample`, so all six variants lay out identically and only the texture resolution changes; nothing in the layout shifts when the scale changes. The cost is six FreeType faces over one 856 KB file, about 5 MB, and the atlases fill in lazily.
+Arcane picks its font per frame, from a style on the text rather than through a private text renderer:
 
-If you want *all* Minecraft text smooth rather than just Arcane's, install [Caxton](https://modrinth.com/mod/caxton). It replaces the font pipeline with multi-channel signed distance fields, which stay crisp at any size, and it supports 1.21.11 on Fabric.
+| Situation | Font used | Result |
+| --- | --- | --- |
+| [Caxton](https://modrinth.com/mod/caxton) installed | `ui_caxton`, Inter as multi-channel signed distance fields | Crisp at any size |
+| Otherwise | `ui_x1` to `ui_x6`, Inter baked at the matching oversample | One texel per physical pixel |
+
+Caxton is optional and listed under `suggests`. Arcane checks that its font actually resolved before using it, so a missing native library falls back to the bundled variants rather than rendering blank. Note that Caxton is [incompatible with Iris Shaders](https://gitlab.com/Kyarei/caxton#incompatible); without it the bundled variants already give sharp text at every GUI scale, so install it only if you want every font in the game smooth.
+
+All variants share Inter's metrics, so the layout is identical whichever is chosen.
 
 ## Performance profiles
 
