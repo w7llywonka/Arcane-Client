@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 2.3.2+mc1.21.11
+
+- Fixed Freecam and Freelook camera instability by keeping both interpolation endpoints synchronized for their non-ticking detached camera entities.
+- Preserved normal tick-to-tick position interpolation while eliminating stale activation coordinates and stale mouse angles.
+
 ## 2.3.1+mc1.21.11
 
 - Fixed multiplayer Freecam disconnects caused by camera-origin entity attacks reaching strict servers.

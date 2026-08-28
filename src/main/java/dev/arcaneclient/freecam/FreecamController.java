@@ -58,11 +58,14 @@ public final class FreecamController {
         playerPitch = player.getPitch();
         previousPerspective = client.options.getPerspective();
         camera = new ArmorStandEntity((World) client.world, player.getX(), player.getY(), player.getZ());
-        camera.setPosition(player.getX(), player.getEyeY() - camera.getStandingEyeHeight(), player.getZ());
-        camera.setYaw(playerYaw);
-        camera.setPitch(playerPitch);
-        camera.lastYaw = playerYaw;
-        camera.lastPitch = playerPitch;
+        DetachedCameraPose.initialize(
+            camera,
+            player.getX(),
+            player.getEyeY() - camera.getStandingEyeHeight(),
+            player.getZ(),
+            playerYaw,
+            playerPitch
+        );
         camera.setInvisible(true);
         camera.setNoGravity(true);
         camera.noClip = true;
@@ -114,7 +117,12 @@ public final class FreecamController {
             target = direction.multiply(speed);
         }
         velocity = FreecamMotion.step(velocity, target, moving);
-        camera.setPosition(camera.getX() + velocity.x, camera.getY() + velocity.y, camera.getZ() + velocity.z);
+        DetachedCameraPose.advance(
+            camera,
+            camera.getX() + velocity.x,
+            camera.getY() + velocity.y,
+            camera.getZ() + velocity.z
+        );
         tickMining(client, player);
     }
 
@@ -124,10 +132,7 @@ public final class FreecamController {
         CameraRotation.Angles next = CameraRotation.apply(
             camera.getYaw(), camera.getPitch(), cursorDeltaX, cursorDeltaY
         );
-        camera.setYaw(next.yaw());
-        camera.setPitch(next.pitch());
-        camera.lastYaw = next.yaw();
-        camera.lastPitch = next.pitch();
+        DetachedCameraPose.rotate(camera, next.yaw(), next.pitch());
         return true;
     }
 
