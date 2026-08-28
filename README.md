@@ -55,6 +55,14 @@ Modules are grouped for base finding first:
 
 Chunk Finder carries the full scan configuration in its settings: sensitivity, scan radius, scan speed, rescan delay, the seven evidence signals, and live flagged/queue counters. Search filters every category by module name, description, or setting name.
 
+## Text sharpness
+
+Minecraft bakes a TrueType glyph once, at `size x oversample` pixels, and samples the glyph atlas with `FilterMode.NEAREST` — there is no filtering anywhere in that path. A glyph is then drawn at `size x guiScale` physical pixels. Unless `oversample` matches the GUI scale, every glyph is an antialiased bitmap resampled with no interpolation, which is what makes custom fonts look blocky at GUI scale 3 and above.
+
+Arcane ships the same font at six bake resolutions and picks the one matching the current GUI scale, so glyphs land one texel per physical pixel. Glyph metrics are divided by `oversample`, so all six variants lay out identically and only the texture resolution changes; nothing in the layout shifts when the scale changes. The cost is six FreeType faces over one 856 KB file, about 5 MB, and the atlases fill in lazily.
+
+If you want *all* Minecraft text smooth rather than just Arcane's, install [Caxton](https://modrinth.com/mod/caxton). It replaces the font pipeline with multi-channel signed distance fields, which stay crisp at any size, and it supports 1.21.11 on Fabric.
+
 ## Performance profiles
 
 **High FPS** is the default. Cycle it from the Performance module in the Client window or run `/arcane profile`.

@@ -7,6 +7,7 @@
 - Added a typed setting model behind the GUI: checkboxes, sliders, colour swatches, value cyclers, key binds, and live counters.
 - Exposed scan radius, scan speed, and rescan delay as Chunk Finder sliders; they were previously command-only.
 - Regrouped modules into Base Finding, ESP, Render, Utility, and Client, and folded the standalone keybind panel into each module's own bind row.
+- Fixed blocky Click GUI and HUD text: the font is now baked at six resolutions and the one matching the player's GUI scale is selected, so glyphs map one texel per physical pixel instead of being resampled by an unfiltered glyph atlas.
 - Reworked the palette around the forest/mint system used by the product site, and made the radar and chunk-intel HUD read their colours from the same themes as the GUI.
 
 ## 2.2.0+mc1.21.11
