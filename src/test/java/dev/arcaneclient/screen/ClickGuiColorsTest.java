@@ -16,8 +16,10 @@ final class ClickGuiColorsTest {
         config.uiTextColor = 0xFFEEDDCC;
         ClickGuiColors colors = ClickGuiColors.resolve(config);
         assertEquals(0xFF12AB34, colors.accent());
-        assertEquals(0xF0203040, colors.window());
+        assertEquals(0xF4203040, colors.window());
         assertEquals(0xFFEEDDCC, colors.text());
+        assertEquals(0x5C, colors.outline() >>> 24);
+        assertEquals(0x32, colors.outlineSoft() >>> 24);
         assertNotEquals(colors.row(), colors.window());
     }
 

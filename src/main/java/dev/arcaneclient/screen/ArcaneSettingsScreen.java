@@ -312,7 +312,7 @@ public final class ArcaneSettingsScreen extends Screen {
         int thumbHeight = Math.max(8, trackHeight * visibleBody / contentBody);
         int travel = Math.max(0, trackHeight - thumbHeight);
         int thumbY = trackY + (category.maxScroll() == 0 ? 0 : travel * category.scrollOffset() / category.maxScroll());
-        graphics.fill(category.x() + WINDOW_WIDTH - 4, trackY, category.x() + WINDOW_WIDTH - 2, trackY + trackHeight, theme.outline());
+        graphics.fill(category.x() + WINDOW_WIDTH - 4, trackY, category.x() + WINDOW_WIDTH - 2, trackY + trackHeight, theme.outlineSoft());
         graphics.fill(category.x() + WINDOW_WIDTH - 4, thumbY, category.x() + WINDOW_WIDTH - 2, thumbY + thumbHeight, theme.accent());
     }
 
@@ -323,7 +323,8 @@ public final class ArcaneSettingsScreen extends Screen {
         if (category.open()) {
             RoundedGui.fill(graphics, x + 2, y + 3, WINDOW_WIDTH, height, 7, 0x48000000);
         }
-        RoundedGui.outline(graphics, x, y, WINDOW_WIDTH, height, 7, 1, theme.outlineSoft(), theme.window());
+        RoundedGui.fill(graphics, x, y, WINDOW_WIDTH, height, 7, theme.window());
+        RoundedGui.fill(graphics, x + 11, y + 1, WINDOW_WIDTH - 22, 1, 1, theme.outlineSoft());
     }
 
     private void drawRow(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
@@ -345,9 +346,9 @@ public final class ArcaneSettingsScreen extends Screen {
         int y = row.y();
         RoundedGui.fill(graphics, x + 3, y + 2, WINDOW_WIDTH - 6, HEADER_HEIGHT - 3, 5, theme.header());
         if (row.contains(mouseX, mouseY)) {
-            RoundedGui.fill(graphics, x + 3, y + 2, WINDOW_WIDTH - 6, HEADER_HEIGHT - 3, 5, 0x14FFFFFF);
+            RoundedGui.fill(graphics, x + 3, y + 2, WINDOW_WIDTH - 6, HEADER_HEIGHT - 3, 5, theme.outlineSoft());
         }
-        graphics.fill(x + 1, y + HEADER_HEIGHT - 1, x + WINDOW_WIDTH - 1, y + HEADER_HEIGHT, category.open() ? theme.accentDim() : theme.outline());
+        graphics.fill(x + 1, y + HEADER_HEIGHT - 1, x + WINDOW_WIDTH - 1, y + HEADER_HEIGHT, category.open() ? theme.accentDim() : theme.outlineSoft());
         RoundedGui.fill(graphics, x + 8, y + 6, 3, 7, 2, theme.accent());
 
         int textY = y + (HEADER_HEIGHT - lineHeight()) / 2;
@@ -457,7 +458,7 @@ public final class ArcaneSettingsScreen extends Screen {
                 int trackX = sliderTrackX(x);
                 int trackWidth = sliderTrackWidth();
                 int trackY = y + height - 9;
-                fillRounded(graphics, trackX, trackY, trackWidth, 3, theme.outline());
+                fillRounded(graphics, trackX, trackY, trackWidth, 3, theme.outlineSoft());
                 int filled = Math.round(trackWidth * slider.fraction());
                 if (filled > 0) {
                     fillRounded(graphics, trackX, trackY, filled, 3, theme.accent());
@@ -480,7 +481,7 @@ public final class ArcaneSettingsScreen extends Screen {
             case GuiSetting.Message message -> {
                 int fieldX = macroFieldX(x);
                 fillRounded(graphics, fieldX - 3, y + 3, MACRO_FIELD_WIDTH + 6, 14, theme.window());
-                outlineRounded(graphics, fieldX - 3, y + 3, MACRO_FIELD_WIDTH + 6, 14, theme.outline());
+                outlineRounded(graphics, fieldX - 3, y + 3, MACRO_FIELD_WIDTH + 6, 14, theme.outlineSoft());
                 TextFieldWidget input = this.macroInputs.get(message.slot());
                 input.setX(fieldX);
                 input.setY(y + 6);
@@ -502,7 +503,7 @@ public final class ArcaneSettingsScreen extends Screen {
         int width = Math.max(20, keyWidth + 8);
         int pillY = y + (height - 12) / 2;
         fillRounded(graphics, right - width, pillY, width, 12, listening ? theme.accentDim() : theme.window());
-        outlineRounded(graphics, right - width, pillY, width, 12, listening ? theme.accent() : theme.outline());
+        outlineRounded(graphics, right - width, pillY, width, 12, listening ? theme.accent() : theme.outlineSoft());
         graphics.drawText(font(), key, right - width + (width - keyWidth) / 2, pillY + (12 - lineHeight()) / 2 + 1, listening ? theme.text() : theme.muted(), false);
     }
 
@@ -519,7 +520,12 @@ public final class ArcaneSettingsScreen extends Screen {
         int searchWidth = searchWidth();
         int searchX = searchX(searchWidth);
         boolean focused = this.searchInput != null && this.searchInput.isFocused();
-        RoundedGui.outline(graphics, searchX - 5, barY + 3, searchWidth + 10, 17, 7, 1, focused ? theme.accent() : theme.outline(), theme.window());
+        RoundedGui.fill(graphics, searchX - 5, barY + 3, searchWidth + 10, 17, 7, theme.window());
+        if (focused) {
+            RoundedGui.outlineOnly(graphics, searchX - 5, barY + 3, searchWidth + 10, 17, 7, theme.accentDim());
+        } else {
+            RoundedGui.fill(graphics, searchX + 4, barY + 4, searchWidth - 8, 1, 1, theme.outlineSoft());
+        }
 
         if (this.width >= 520) {
             updateFpsLabel();
@@ -541,14 +547,16 @@ public final class ArcaneSettingsScreen extends Screen {
             : (this.width >= 500 ? "LMB toggle   RMB settings   MMB bind   Drag titles" : "LMB toggle   RMB settings");
         int hintWidth = ArcaneFont.width(font(), hint) + 14;
         RoundedGui.fill(graphics, 7, y + 2, hintWidth, 16, 7, 0x38000000);
-        RoundedGui.outline(graphics, 6, y, hintWidth, 16, 7, 1, theme.outline(), theme.bar());
+        RoundedGui.fill(graphics, 6, y, hintWidth, 16, 7, theme.bar());
+        RoundedGui.fill(graphics, 14, y + 1, hintWidth - 16, 1, 1, theme.outlineSoft());
         graphics.drawText(font(), ArcaneFont.text(hint), 13, textY, this.listeningFor != null ? theme.accent() : theme.muted(), false);
 
         if (!this.query.isEmpty() && this.width >= 360) {
             String results = visibleModuleCount() + " results";
             int resultWidth = ArcaneFont.width(font(), results) + 14;
             int resultX = this.width - resultWidth - 6;
-            RoundedGui.outline(graphics, resultX, y, resultWidth, 16, 7, 1, theme.outline(), theme.bar());
+            RoundedGui.fill(graphics, resultX, y, resultWidth, 16, 7, theme.bar());
+            RoundedGui.fill(graphics, resultX + 8, y + 1, resultWidth - 16, 1, 1, theme.outlineSoft());
             graphics.drawText(font(), ArcaneFont.text(results), resultX + 7, textY, theme.accentBright(), false);
         }
     }
@@ -570,7 +578,7 @@ public final class ArcaneSettingsScreen extends Screen {
 
         fillRounded(graphics, x + 2, y + 2, width, height, 0x60000000);
         fillRounded(graphics, x, y, width, height, theme.bar());
-        outlineRounded(graphics, x, y, width, height, theme.outline());
+        RoundedGui.fill(graphics, x + 9, y + 1, width - 18, 1, 1, theme.outlineSoft());
         graphics.fill(x + 1, y + 1, x + 3, y + height - 1, theme.accent());
         graphics.drawText(font(), ArcaneFont.text(module.name()), x + 8, y + 6, theme.text(), false);
         int lineY = y + 9 + lineHeight();
@@ -606,7 +614,7 @@ public final class ArcaneSettingsScreen extends Screen {
 
     private static void drawCheckbox(DrawContext graphics, int x, int y, boolean checked, ClickGuiColors theme) {
         fillRounded(graphics, x, y, 9, 9, checked ? theme.accent() : theme.window());
-        outlineRounded(graphics, x, y, 9, 9, checked ? theme.accentBright() : theme.outline());
+        outlineRounded(graphics, x, y, 9, 9, checked ? theme.accentBright() : theme.outlineSoft());
         if (!checked) {
             return;
         }
@@ -620,7 +628,7 @@ public final class ArcaneSettingsScreen extends Screen {
 
     private static void drawSwatch(DrawContext graphics, int x, int y, int width, int color, ClickGuiColors theme) {
         fillRounded(graphics, x, y, width, 9, color | 0xFF000000);
-        outlineRounded(graphics, x, y, width, 9, theme.outline());
+        outlineRounded(graphics, x, y, width, 9, theme.outlineSoft());
     }
 
     // -----------------------------------------------------------------------------------------

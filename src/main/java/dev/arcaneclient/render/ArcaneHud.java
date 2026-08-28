@@ -73,8 +73,7 @@ public final class ArcaneHud {
         int panelWidth = gridPixels + PADDING * 2;
         int panelHeight = HEADER_HEIGHT + gridPixels + PADDING;
 
-        RoundedGui.fill(graphics, PANEL_X + 2, PANEL_Y + 3, panelWidth, panelHeight, 7, 0x40000000);
-        RoundedGui.outline(graphics, PANEL_X, PANEL_Y, panelWidth, panelHeight, 7, 1, theme.outlineSoft(), theme.window());
+        drawGlassPanel(graphics, PANEL_X, PANEL_Y, panelWidth, panelHeight, theme);
         RoundedGui.fill(graphics, PANEL_X + 8, PANEL_Y + 2, 28, 2, 1, theme.accent());
 
         String state = config.enabled ? "ON" : "PAUSED";
@@ -127,8 +126,7 @@ public final class ArcaneHud {
         int reasonCount = marker == null ? 0 : Math.min(3, marker.reasons().size());
         int height = marker == null || marker.score() == 0 ? 45 : 37 + reasonCount * 10;
 
-        RoundedGui.fill(graphics, x + 2, y + 3, panelWidth, height, 7, 0x40000000);
-        RoundedGui.outline(graphics, x, y, panelWidth, height, 7, 1, theme.outlineSoft(), theme.window());
+        drawGlassPanel(graphics, x, y, panelWidth, height, theme);
         RoundedGui.fill(graphics, x + 8, y + 2, 28, 2, 1, theme.accent());
         graphics.drawText(font, ArcaneFont.text("CURRENT CHUNK"), x + 9, y + 6, theme.text(), false);
         String coordinates = config.streamerMode ? "COORDINATES HIDDEN" : chunk.x + ", " + chunk.z;
@@ -204,14 +202,26 @@ public final class ArcaneHud {
         int panelHeight = lines.size() * lineHeight + 9;
         int x = 7;
         int y = graphics.getScaledWindowHeight() - panelHeight - 7;
-        RoundedGui.fill(graphics, x + 2, y + 3, panelWidth, panelHeight, 7, 0x40000000);
-        RoundedGui.outline(graphics, x, y, panelWidth, panelHeight, 7, 1, theme.outlineSoft(), theme.window());
+        drawGlassPanel(graphics, x, y, panelWidth, panelHeight, theme);
         RoundedGui.fill(graphics, x + 8, y + 2, 28, 2, 1, theme.accent());
         int textY = y + 6;
         for (String line : lines) {
             graphics.drawText(font, ArcaneFont.text(line), x + 8, textY, theme.text(), false);
             textY += lineHeight;
         }
+    }
+
+    private static void drawGlassPanel(
+        DrawContext graphics,
+        int x,
+        int y,
+        int width,
+        int height,
+        ClickGuiColors theme
+    ) {
+        RoundedGui.fill(graphics, x + 2, y + 3, width, height, 7, 0x52000000);
+        RoundedGui.fill(graphics, x, y, width, height, 7, theme.window());
+        RoundedGui.fill(graphics, x + 11, y + 1, width - 22, 1, 1, theme.outlineSoft());
     }
 
     private static boolean isStashChunk(TraceEngine engine, ChunkPos chunk) {

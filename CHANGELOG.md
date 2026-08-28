@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.3.6+mc1.21.11
+
+- Replaced bright perimeter outlines across the Click GUI and HUD with dense smoked-glass surfaces and low-alpha dark edges.
+- Added subtle glass highlights, softer hover states, and accent-only focus rings while keeping text and controls readable.
+- Applied the glass treatment to preset themes and fully custom RGB palettes.
+
 ## 2.3.5+mc1.21.11
 
 - Made both Freecam and Freelook render a synchronized client-only copy of the local player, including skin, pose, health, and equipment.
