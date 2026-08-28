@@ -35,6 +35,12 @@ The August 2026 GitHub releases for 67 Client and Krypton Client were inspected 
 
 No external client source was copied into Arcane Client.
 
+## Renderer correctness review
+
+Minecraft 1.21.11's [`TrueTypeFontLoader`](https://maven.fabricmc.net/docs/yarn-1.21.11%2Bbuild.1/net/minecraft/client/font/TrueTypeFontLoader.html) prefixes the configured font identifier with `font/` before opening it, so Arcane packages Sora at `assets/arcaneclient/font/sora.ttf`. Each scale-specific definition also references `minecraft:default` after Sora to guarantee missing glyphs degrade to the vanilla font rather than tofu boxes.
+
+Rounded surfaces use a standalone 68×68 signed-distance-derived alpha mask split into nine high-density slices and submitted through Minecraft's [`DrawContext.drawTexture`](https://maven.fabricmc.net/docs/yarn-1.21.11%2Bbuild.1/net/minecraft/client/gui/DrawContext.html) with `RenderPipelines.GUI_TEXTURED`. The texture metadata enables linear filtering and clamping; each 32-pixel source corner is sampled into the requested logical radius, preserving subpixel coverage at GUI scales where integer scanlines become visibly blocky.
+
 ## Arcane product decisions
 
 - One searchable Click GUI with a window per category: Base Finding, ESP, Render, Utility, and Client. Base finding leads because that is what the client is for.

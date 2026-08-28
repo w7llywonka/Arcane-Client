@@ -68,7 +68,7 @@ Arcane picks its font per frame, from a style on the text rather than through a 
 
 Caxton is optional and listed under `suggests`. Arcane checks that its font actually resolved before using it, so a missing native library falls back to the bundled variants rather than rendering blank. Note that Caxton is [incompatible with Iris Shaders](https://gitlab.com/Kyarei/caxton#incompatible); without it the bundled variants already give sharp text at every GUI scale, so install it only if you want every font in the game smooth.
 
-All variants share Sora's metrics, so the layout is identical whichever is chosen.
+All variants load Sora from Minecraft's required `assets/arcaneclient/font/` path and fall back to `minecraft:default` for glyphs Sora does not provide. Their metrics remain identical across GUI scales.
 
 ## Performance profiles
 
