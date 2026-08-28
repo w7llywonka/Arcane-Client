@@ -1,5 +1,6 @@
 package dev.arcaneclient.mixin;
 
+import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -10,17 +11,30 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Puts Auto Tool ahead of both the initial click and continued block breaking. */
+/** Cancels vanilla Freecam interactions and puts Auto Tool ahead of normal mining. */
 @Environment(EnvType.CLIENT)
 @Mixin(MinecraftClient.class)
 public abstract class MinecraftClientMixin {
-    @Inject(method = "doAttack", at = @At("HEAD"))
-    private void arcaneclient$prepareAutoToolForAttack(CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "doAttack", at = @At("HEAD"), cancellable = true)
+    private void arcaneclient$guardAttackAndPrepareAutoTool(CallbackInfoReturnable<Boolean> cir) {
+        if (FreecamController.isActive()) {
+            cir.setReturnValue(false);
+            return;
+        }
         AutoToolController.prepareForCrosshair((MinecraftClient) (Object) this, true);
     }
 
-    @Inject(method = "handleBlockBreaking", at = @At("HEAD"))
-    private void arcaneclient$prepareAutoToolForBreaking(boolean breaking, CallbackInfo ci) {
+    @Inject(method = "handleBlockBreaking", at = @At("HEAD"), cancellable = true)
+    private void arcaneclient$guardBreakingAndPrepareAutoTool(boolean breaking, CallbackInfo ci) {
+        if (FreecamController.isActive()) {
+            ci.cancel();
+            return;
+        }
         AutoToolController.prepareForCrosshair((MinecraftClient) (Object) this, breaking);
+    }
+
+    @Inject(method = "doItemUse", at = @At("HEAD"), cancellable = true)
+    private void arcaneclient$guardFreecamItemUse(CallbackInfo ci) {
+        if (FreecamController.isActive()) ci.cancel();
     }
 }
