@@ -11,11 +11,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientCommonNetworkHandler;
 import net.minecraft.client.Mouse;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.network.packet.Packet;
 import net.minecraft.entity.LivingEntity;
 import org.junit.jupiter.api.Test;
 
@@ -29,6 +31,8 @@ final class RuntimeHookContractTest {
         method(Entity.class, "changeLookDirection", double.class, double.class);
         method(MinecraftClient.class, "doAttack");
         method(MinecraftClient.class, "handleBlockBreaking", boolean.class);
+        method(MinecraftClient.class, "doItemUse");
+        method(ClientCommonNetworkHandler.class, "sendPacket", Packet.class);
         method(Mouse.class, "onMouseScroll", long.class, double.class, double.class);
     }
 
@@ -42,6 +46,7 @@ final class RuntimeHookContractTest {
             JsonArray client = root.getAsJsonArray("client");
             Set<String> names = new HashSet<>();
             client.forEach(element -> names.add(element.getAsString()));
+            assertTrue(names.contains("ClientCommonNetworkHandlerMixin"));
             assertTrue(names.contains("EntityMixin"));
             assertTrue(names.contains("GameRendererMixin"));
             assertTrue(names.contains("LivingEntityMixin"));

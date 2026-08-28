@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 2.3.1+mc1.21.11
+
+- Fixed multiplayer Freecam disconnects caused by camera-origin entity attacks reaching strict servers.
+- Added direct vanilla attack/break/use cancellation plus a fail-closed outbound entity/block/item interaction packet guard; body-origin directional mining packets remain allowed.
+
 ## 2.3.0+mc1.21.11
 
 - Corrected Swing Speed semantics: Arcane now lengthens the hand animation from 7 to 30 ticks, with a slower 12-tick default and migration from the old fast value.

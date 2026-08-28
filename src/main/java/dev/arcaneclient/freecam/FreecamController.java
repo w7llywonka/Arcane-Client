@@ -1,6 +1,7 @@
 package dev.arcaneclient.freecam;
 
 import dev.arcaneclient.ArcaneClient;
+import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.event.client.player.ClientPreAttackCallback;
@@ -52,6 +53,7 @@ public final class FreecamController {
         ClientPlayerEntity player = client.player;
         if (camera != null || player == null || client.world == null) return;
         FreelookController.disable(client);
+        AutoToolController.restore(client);
         playerYaw = player.getYaw();
         playerPitch = player.getPitch();
         previousPerspective = client.options.getPerspective();
