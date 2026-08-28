@@ -5,14 +5,18 @@ import dev.arcaneclient.TraceEngine;
 import dev.arcaneclient.ArcaneKeybinds;
 import dev.arcaneclient.chat.ChatMacroController;
 import dev.arcaneclient.combat.AutoTotemController;
+import dev.arcaneclient.combat.CombatController;
 import dev.arcaneclient.command.ArcaneCommands;
 import dev.arcaneclient.freecam.FreecamController;
+import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.render.EspRenderer;
+import dev.arcaneclient.render.EntityEspRenderer;
 import dev.arcaneclient.render.ItemEspRenderer;
 import dev.arcaneclient.render.StashLabelRenderer;
 import dev.arcaneclient.render.ArcaneHud;
 import dev.arcaneclient.render.TraceRenderer;
 import dev.arcaneclient.render.TunnelEspRenderer;
+import dev.arcaneclient.render.VisualController;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
@@ -43,6 +47,7 @@ implements ClientModInitializer {
         keybinds = new ArcaneKeybinds();
         ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, level) -> {
             FreecamController.disable(client);
+            FreelookController.disable(client);
             engine.onWorldChange(client, level);
         });
         ClientChunkEvents.CHUNK_LOAD.register(engine::onChunkLoad);
@@ -68,6 +73,15 @@ implements ClientModInitializer {
                 FreecamController.toggle(client);
                 ArcaneClient.actionbar(client, "Freecam " + (FreecamController.isActive() ? "on" : "off"));
             }
+            while (keybinds.freelook().wasPressed()) {
+                FreelookController.toggle(client);
+                ArcaneClient.actionbar(client, "Freelook " + (FreelookController.isActive() ? "on" : "off"));
+            }
+            while (keybinds.cleanCapture().wasPressed()) {
+                ArcaneClient.config.cleanCapture = !ArcaneClient.config.cleanCapture;
+                config.save();
+                ArcaneClient.actionbar(client, "Clean Capture " + (ArcaneClient.config.cleanCapture ? "on" : "off"));
+            }
             while (keybinds.esp().wasPressed()) {
                 ArcaneClient.config.esp = !ArcaneClient.config.esp;
                 config.save();
@@ -90,18 +104,24 @@ implements ClientModInitializer {
                 ArcaneClient.actionbar(client, "Item ESP " + (ArcaneClient.config.itemEsp ? "on" : "off"));
             }
             ChatMacroController.tick(client);
+            CombatController.tick(client);
             AutoTotemController.tick(client);
             FreecamController.tick(client);
+            FreelookController.tick(client);
             EspRenderer.tick(client);
+            EntityEspRenderer.tick(client);
             ItemEspRenderer.tick(client);
+            VisualController.tick(client);
             engine.tick(client);
             TunnelEspRenderer.tick();
             StashLabelRenderer.tick(client);
         });
         ArcaneCommands.register();
+        CombatController.register();
         FreecamController.register();
         TraceRenderer.register();
         EspRenderer.register();
+        EntityEspRenderer.register();
         ItemEspRenderer.register();
         TunnelEspRenderer.register();
         StashLabelRenderer.register();

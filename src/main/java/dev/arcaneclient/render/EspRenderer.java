@@ -91,7 +91,7 @@ public final class EspRenderer {
     private static void render(WorldRenderContext context) {
         MinecraftClient client = MinecraftClient.getInstance();
         ArcaneConfig config = ArcaneClient.config();
-        if (ArcaneSettingsScreen.isOpen(client) || (!config.esp && !config.blockEntityDebug) || client.world == null || targets.isEmpty()) {
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client) || (!config.esp && !config.blockEntityDebug) || client.world == null || targets.isEmpty()) {
             return;
         }
         MatrixStack matrices = context.matrices();

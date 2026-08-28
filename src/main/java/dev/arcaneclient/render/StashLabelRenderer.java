@@ -31,7 +31,7 @@ public final class StashLabelRenderer {
     }
 
     public static void tick(MinecraftClient client) {
-        if (ArcaneSettingsScreen.isOpen(client)) return;
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
         if (!ArcaneClient.config().stashAlerts || client.world == null) {
             source = List.of();
             targets = List.of();
@@ -58,7 +58,7 @@ public final class StashLabelRenderer {
             return;
         }
         MinecraftClient client = MinecraftClient.getInstance();
-        if (ArcaneSettingsScreen.isOpen(client)) return;
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
         Vec3d camera = context.worldState().cameraRenderState.pos;
         TextRenderer font = ArcaneFont.renderer(client);
         for (Target target : targets) {

@@ -203,7 +203,7 @@ public final class ArcaneSettingsScreen extends Screen {
 
     @Override
     public void render(DrawContext graphics, int mouseX, int mouseY, float deltaTicks) {
-        ClickGuiTheme theme = theme();
+        ClickGuiColors theme = theme();
         this.hoveredModule = null;
         boolean[] macroDrawn = new boolean[MACRO_COUNT];
 
@@ -231,7 +231,7 @@ public final class ArcaneSettingsScreen extends Screen {
         drawModuleTooltip(graphics, mouseX, mouseY, theme);
     }
 
-    private void drawWindowBody(DrawContext graphics, GuiCategory category, ClickGuiTheme theme) {
+    private void drawWindowBody(DrawContext graphics, GuiCategory category, ClickGuiColors theme) {
         int x = category.x();
         int y = category.y();
         int height = category.lastHeight();
@@ -241,7 +241,7 @@ public final class ArcaneSettingsScreen extends Screen {
         RoundedGui.outline(graphics, x, y, WINDOW_WIDTH, height, 7, 1, theme.outlineSoft(), theme.window());
     }
 
-    private void drawRow(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiTheme theme, boolean[] macroDrawn) {
+    private void drawRow(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
         switch (row.kind()) {
             case HEADER -> drawHeader(graphics, row, mouseX, mouseY, theme);
             case MODULE -> drawModule(graphics, row, mouseX, mouseY, theme);
@@ -254,7 +254,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    private void drawHeader(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiTheme theme) {
+    private void drawHeader(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme) {
         GuiCategory category = row.category();
         int x = row.x();
         int y = row.y();
@@ -279,7 +279,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    private void drawModule(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiTheme theme) {
+    private void drawModule(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme) {
         GuiModule module = row.module();
         if (module == null) {
             return;
@@ -323,7 +323,7 @@ public final class ArcaneSettingsScreen extends Screen {
         graphics.drawText(font(), label, labelX, textY, enabled ? theme.text() : theme.muted(), false);
     }
 
-    private void drawDescription(DrawContext graphics, Row row, ClickGuiTheme theme) {
+    private void drawDescription(DrawContext graphics, Row row, ClickGuiColors theme) {
         GuiModule module = row.module();
         if (module == null) {
             return;
@@ -339,7 +339,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    private void drawSetting(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiTheme theme, boolean[] macroDrawn) {
+    private void drawSetting(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
         GuiSetting setting = row.setting();
         if (setting == null) {
             return;
@@ -409,7 +409,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    private void drawKeyPill(DrawContext graphics, int right, int y, int height, KeyBinding mapping, ClickGuiTheme theme, int maxKeyWidth) {
+    private void drawKeyPill(DrawContext graphics, int right, int y, int height, KeyBinding mapping, ClickGuiColors theme, int maxKeyWidth) {
         boolean listening = this.listeningFor == mapping;
         String raw = listening ? "..." : mapping.isUnbound() ? "-" : mapping.getBoundKeyLocalizedText().getString();
         OrderedText key = ArcaneFont.trimmed(font(), raw, maxKeyWidth);
@@ -421,7 +421,7 @@ public final class ArcaneSettingsScreen extends Screen {
         graphics.drawText(font(), key, right - width + (width - keyWidth) / 2, pillY + (12 - lineHeight()) / 2 + 1, listening ? theme.text() : theme.muted(), false);
     }
 
-    private void drawTopBar(DrawContext graphics, ClickGuiTheme theme) {
+    private void drawTopBar(DrawContext graphics, ClickGuiColors theme) {
         int barX = 6;
         int barY = 5;
         int barHeight = 22;
@@ -438,7 +438,9 @@ public final class ArcaneSettingsScreen extends Screen {
 
         if (this.width >= 520) {
             updateFpsLabel();
-            String status = activeModuleCount() + "/" + toggleableModuleCount() + " ACTIVE";
+            String status = this.width >= 700
+                ? activeModuleCount() + " ACTIVE  ·  " + totalModuleCount() + " MODULES"
+                : totalModuleCount() + " MODULES";
             int right = this.width - 14;
             graphics.drawText(font(), ArcaneFont.text(this.fpsLabel), right - ArcaneFont.width(font(), this.fpsLabel), textY, theme.muted(), false);
             right -= ArcaneFont.width(font(), this.fpsLabel) + 12;
@@ -446,7 +448,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    private void drawBottomBar(DrawContext graphics, ClickGuiTheme theme) {
+    private void drawBottomBar(DrawContext graphics, ClickGuiColors theme) {
         int y = this.height - BOTTOM_BAR_HEIGHT;
         int textY = y + (BOTTOM_BAR_HEIGHT - lineHeight()) / 2;
         String hint = this.listeningFor != null
@@ -466,7 +468,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    private void drawModuleTooltip(DrawContext graphics, int mouseX, int mouseY, ClickGuiTheme theme) {
+    private void drawModuleTooltip(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme) {
         GuiModule module = this.hoveredModule;
         if (module == null || module.expanded() || this.draggingCategory != null) {
             return;
@@ -517,7 +519,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    private static void drawCheckbox(DrawContext graphics, int x, int y, boolean checked, ClickGuiTheme theme) {
+    private static void drawCheckbox(DrawContext graphics, int x, int y, boolean checked, ClickGuiColors theme) {
         fillRounded(graphics, x, y, 9, 9, checked ? theme.accent() : theme.window());
         outlineRounded(graphics, x, y, 9, 9, checked ? theme.accentBright() : theme.outline());
         if (!checked) {
@@ -531,7 +533,7 @@ public final class ArcaneSettingsScreen extends Screen {
         graphics.fill(x + 6, y + 2, x + 7, y + 5, mark);
     }
 
-    private static void drawSwatch(DrawContext graphics, int x, int y, int width, int color, ClickGuiTheme theme) {
+    private static void drawSwatch(DrawContext graphics, int x, int y, int width, int color, ClickGuiColors theme) {
         fillRounded(graphics, x, y, width, 9, color | 0xFF000000);
         outlineRounded(graphics, x, y, width, 9, theme.outline());
     }
@@ -777,15 +779,9 @@ public final class ArcaneSettingsScreen extends Screen {
         return active;
     }
 
-    private int toggleableModuleCount() {
+    private int totalModuleCount() {
         int count = 0;
-        for (GuiCategory category : this.categories) {
-            for (GuiModule module : category.modules()) {
-                if (module.toggleable()) {
-                    count++;
-                }
-            }
-        }
+        for (GuiCategory category : this.categories) count += category.modules().size();
         return count;
     }
 
@@ -835,8 +831,8 @@ public final class ArcaneSettingsScreen extends Screen {
         return (this.width - searchWidth) / 2;
     }
 
-    private ClickGuiTheme theme() {
-        return ClickGuiTheme.fromConfig(this.config.uiTheme);
+    private ClickGuiColors theme() {
+        return ClickGuiColors.resolve(this.config);
     }
 
     private TextRenderer font() {

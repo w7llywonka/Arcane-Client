@@ -38,7 +38,7 @@ public final class TunnelEspRenderer {
     }
 
     public static void tick() {
-        if (ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance())) return;
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance())) return;
         List<TunnelSegment> current = ArcaneClient.engine().tunnels();
         if (current == source) {
             return;
@@ -53,7 +53,7 @@ public final class TunnelEspRenderer {
     }
 
     private static void render(WorldRenderContext context) {
-        if (ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance())) return;
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance())) return;
         ArcaneConfig config = ArcaneClient.config();
         MatrixStack matrices = context.matrices();
         if (!config.tunnelEsp || targets.isEmpty() || matrices == null) {

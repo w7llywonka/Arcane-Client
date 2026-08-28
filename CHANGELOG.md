@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Expanded Arcane to an exact runtime-validated 40-module catalog across Base Finding, ESP, Combat, Render, Utility, and Client.
+- Added Player, Mob, Projectile, Crystal, Entity Tracer, and Hole ESP with configurable ranges, names, and colors.
+- Added Auto Sprint, Auto Eat, Health Alert, Armor Alert, Hit Sound, Swing Speed, and a Combat HUD alongside Auto Totem.
+- Rebuilt Freecam with smooth acceleration/drag, persisted scroll-wheel speed control, and body-origin directional mining constrained to real reach.
+- Added anchored third-person Freelook, held Zoom, Fullbright, No Hurt Cam, Clean Capture, Streamer Mode, and sound-notification volume.
+- Added exact RGB customization for the Click GUI accent, panel, and text colors.
 - Reworked the Click GUI around transparent top controls, collision-safe labels, tighter collapsed windows, and six first-class evidence-channel modules.
 - Made the nearby-chunk radar size its cells to the active font so two-digit scores cannot overlap.
 

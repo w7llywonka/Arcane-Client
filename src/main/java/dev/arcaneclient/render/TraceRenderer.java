@@ -35,7 +35,7 @@ public final class TraceRenderer {
 
     private static void render(WorldRenderContext context) {
         ArcaneConfig config = ArcaneClient.config();
-        if (ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance()) || !config.enabled || !config.overlay) {
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance()) || !config.enabled || !config.overlay) {
             return;
         }
         List<TraceEngine.ChunkMarker> markers = ArcaneClient.engine().markers();

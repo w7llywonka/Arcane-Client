@@ -2,15 +2,15 @@
 
 [![Build](https://github.com/eiiorejierge/Arcane-Client/actions/workflows/build.yml/badge.svg)](https://github.com/eiiorejierge/Arcane-Client/actions/workflows/build.yml)
 
-Arcane Client is a client-side Fabric utility suite for Minecraft 1.21.11. This 2.2 source release combines the strongest parts of the archived 1.6 and 1.8 builds: evidence-based chunk discovery, the newer packet and entity filters, storage/item/tunnel visualization, player utilities, chat macros, and a redesigned Click GUI.
+Arcane Client is a 40-module client-side Fabric utility suite for Minecraft 1.21.11. It retains the combined archived 1.6/1.8 discovery engine while adding a complete combat, entity ESP, camera, media, notification, and custom-interface layer.
 
 ## Highlights
 
 - **Discovery engine:** incremental loaded-chunk scanning, evidence scoring, sensitivity control, deep-Y focus, configurable farm/machine/player-block/light/entity signals, packet activity, rescans, and per-dimension history.
-- **Visual intelligence:** chunk tiles, radar HUD, current-chunk intel, storage ESP, item ESP with category colors, tunnel ESP, tracers, stash labels/alerts, and diagnostics.
-- **Player tools:** freecam and Auto Totem.
-- **Social tools:** four editable, rebindable chat macros.
-- **Arcane Click GUI:** a base-finding module menu in the Krypton mould — one draggable window per category, left click to toggle, right click for nested settings, middle click to rebind, per-module descriptions, sliders, colour swatches, search, live FPS/profile status, and three persistent themes shared with the HUD.
+- **ESP:** storage, items, tunnels, players, mobs, projectiles, crystals, entity tracers, safe holes, chunk tiles, and diagnostics.
+- **Combat:** Auto Totem, Auto Sprint, Auto Eat, health/armor alerts, Hit Sound, Swing Speed, and a configurable combat HUD.
+- **Camera and media:** smooth Freecam with wheel speed and body-reach directional mining, anchored third-person Freelook, Zoom, Fullbright, No Hurt Cam, Clean Capture, and Streamer Mode.
+- **Arcane Click GUI:** exactly 40 validated modules, searchable draggable categories, collision-safe labels, arbitrary RGB accent/panel/text colors, notification volume, persistent settings, and the Sora interface font.
 - **Clean source:** readable Yarn-named Java, typed collections, warning-free compilation, client-only mixins, Gradle wrapper, sources JAR, and GitHub Actions CI.
 
 Use Arcane Client only where the server rules and applicable terms permit it.
@@ -43,17 +43,28 @@ Press **Right Shift** to open the module menu. Each category is its own window: 
 | Drag a title bar | Move that category window |
 | Click a title bar | Collapse or expand that category |
 
-Modules are grouped for base finding first:
+The exact 40 modules are grouped by purpose, with the new combat, ESP, render, and client controls presented first:
 
 | Category | Modules |
 | --- | --- |
+| Combat | Auto Totem, Auto Sprint, Auto Eat, Health Alert, Armor Alert, Hit Sound, Swing Speed, Combat HUD |
+| ESP | Storage ESP, Item ESP, Tunnel ESP, Chunk Tiles, ESP Debug, Player ESP, Mob ESP, Projectile ESP, Crystal ESP, Entity Tracers, Hole ESP |
+| Render | Base Radar, Freecam, Freelook, Fullbright, No Hurt Cam, Zoom, Clean Capture |
+| Client | Performance, Interface, Sound Notifications, Streamer Mode |
+| Utility | Chat Macros |
 | Base Finding | Chunk Finder, Growth Signals, Build Traces, Machine Signals, Live Changes, Light Signals, Entity Signals, Stash Finder, Chunk Intel |
-| ESP | Storage ESP, Item ESP, Tunnel ESP, Chunk Tiles, ESP Debug |
-| Render | Base Radar, Freecam |
-| Utility | Auto Totem, Chat Macros |
-| Client | Performance, Interface |
 
-Chunk Finder carries the scan budget and sensitivity controls. The six evidence channels are first-class modules beside it, so growth, build, machine, live-change, light, and entity evidence can be switched independently without opening a nested settings list. Search filters every category by module name, description, or setting name.
+Chunk Finder carries the scan budget and sensitivity controls. The original scanner internals remain unchanged; the new work is isolated to combat, ESP, camera, media, notifications, and interface customization. Search filters every category by module name, description, or setting name.
+
+## Freecam and Freelook
+
+Freecam accelerates and decelerates instead of jumping between per-tick positions. Scroll up while active to increase speed and scroll down to decrease it; the selected level is persisted. Directional mining deliberately starts at the stationary player's eye position and uses the player's real interaction range, while the detached camera supplies the direction. Looking down therefore mines beneath the player's body without sending impossible remote-reach actions.
+
+Freelook is a separate third-person orbit camera. It stays anchored to the moving character, lets the mouse rotate the camera entity, leaves player movement enabled, and never copies the orbit rotation into the player's head. Freecam and Freelook automatically disable one another.
+
+## Interface customization
+
+The Interface module supports preset themes or exact 0–255 RGB channels for accent, panel, and text colors. Sound Notifications has a master volume. Clean Capture suppresses every Arcane HUD/world overlay for media, while Streamer Mode redacts coordinates and player names from Arcane overlays.
 
 ## Text sharpness
 
@@ -90,6 +101,9 @@ While the Click GUI is open, 3D overlays and the HUD pause and background scanni
 | Toggle base scanner | B |
 | Toggle chunk tiles | N |
 | Toggle freecam | F6 |
+| Toggle freelook | Unbound |
+| Hold zoom | C |
+| Toggle Clean Capture | Unbound |
 | Toggle storage ESP | F7 |
 | Toggle Auto Totem | F8 |
 | Toggle tunnel ESP | F9 |

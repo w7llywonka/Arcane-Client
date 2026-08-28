@@ -7,7 +7,9 @@
     "FontManagerAccessor",
     "GameRendererMixin",
     "KeyboardInputMixin",
-    "MinecraftClientAccessor"
+    "LivingEntityMixin",
+    "MinecraftClientAccessor",
+    "MouseMixin"
   ],
   "injectors": {
     "defaultRequire": 1
