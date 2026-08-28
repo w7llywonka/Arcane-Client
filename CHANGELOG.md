@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Rebuilt the Click GUI as a base-finding module menu: one draggable window per category, left click to toggle, right click for nested settings, middle click to rebind.
+- Added per-module descriptions, shown inline when a module is open and as a hover tooltip when it is not.
+- Added a typed setting model behind the GUI: checkboxes, sliders, colour swatches, value cyclers, key binds, and live counters.
+- Exposed scan radius, scan speed, and rescan delay as Chunk Finder sliders; they were previously command-only.
+- Regrouped modules into Base Finding, ESP, Render, Utility, and Client, and folded the standalone keybind panel into each module's own bind row.
+- Added optional [Caxton](https://modrinth.com/mod/caxton) support: when it is installed, the interface renders Inter as multi-channel signed distance fields, which stay crisp at any size.
+- Fixed Arcane silently losing its font when Caxton is installed. Interface text is now selected by a style on the text instead of a private text renderer, which Caxton casts unconditionally to Minecraft's own implementation.
+- Fixed blocky Click GUI and HUD text: the font is now baked at six resolutions and the one matching the player's GUI scale is selected, so glyphs map one texel per physical pixel instead of being resampled by an unfiltered glyph atlas.
+- Reworked the palette around the forest/mint system used by the product site, and made the radar and chunk-intel HUD read their colours from the same themes as the GUI.
+
 ## 2.2.0+mc1.21.11
 
 - Restored the evidence-based scanner reconstructed from the supplied 1.8 and 1.6 clients, including configurable cultivation, placed-block, machine, block-entity, light, live-activity, and entity signals.
