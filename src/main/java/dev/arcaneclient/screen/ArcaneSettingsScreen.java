@@ -29,13 +29,13 @@ import org.jspecify.annotations.Nullable;
  */
 @Environment(EnvType.CLIENT)
 public final class ArcaneSettingsScreen extends Screen {
-    private static final int WINDOW_WIDTH = 146;
+    private static final int WINDOW_WIDTH = 154;
     private static final int HEADER_HEIGHT = 19;
     private static final int MODULE_HEIGHT = 15;
     private static final int NEST_INSET = 8;
     private static final int NEST_PAD = 3;
-    private static final int BODY_PAD = 3;
-    private static final int TOP_BAR_HEIGHT = 30;
+    private static final int BODY_PAD = 1;
+    private static final int TOP_BAR_HEIGHT = 27;
     private static final int BOTTOM_BAR_HEIGHT = 20;
     private static final int GAP = 7;
     private static final int MACRO_COUNT = 4;
@@ -84,7 +84,7 @@ public final class ArcaneSettingsScreen extends Screen {
         layoutWindows();
 
         int searchWidth = searchWidth();
-        this.searchInput = new TextFieldWidget(font(), searchX(searchWidth), 9, searchWidth, 13, Text.literal("Search modules"));
+        this.searchInput = new TextFieldWidget(font(), searchX(searchWidth), 11, searchWidth, 11, Text.literal("Search modules"));
         this.searchInput.setDrawsBackground(false);
         this.searchInput.setTextShadow(false);
         this.searchInput.setMaxLength(48);
@@ -235,7 +235,9 @@ public final class ArcaneSettingsScreen extends Screen {
         int x = category.x();
         int y = category.y();
         int height = category.lastHeight();
-        RoundedGui.fill(graphics, x + 2, y + 3, WINDOW_WIDTH, height, 7, 0x48000000);
+        if (category.open()) {
+            RoundedGui.fill(graphics, x + 2, y + 3, WINDOW_WIDTH, height, 7, 0x48000000);
+        }
         RoundedGui.outline(graphics, x, y, WINDOW_WIDTH, height, 7, 1, theme.outlineSoft(), theme.window());
     }
 
@@ -299,8 +301,6 @@ public final class ArcaneSettingsScreen extends Screen {
         }
 
         int textY = y + (MODULE_HEIGHT - lineHeight()) / 2;
-        graphics.drawText(font(), ArcaneFont.text(module.name()), x + 14, textY, enabled ? theme.text() : theme.muted(), false);
-
         int right = x + WINDOW_WIDTH - 8;
         if (module.hasSettings()) {
             int caretColor = module.expanded() ? theme.accentBright() : enabled ? theme.text() : theme.faint();
@@ -312,9 +312,15 @@ public final class ArcaneSettingsScreen extends Screen {
             right -= 12;
         }
         String value = module.valueLabel();
+        int labelRight = right - 3;
         if (value != null) {
-            graphics.drawText(font(), ArcaneFont.text(value), right - ArcaneFont.width(font(), value), textY, theme.accentBright(), false);
+            int valueX = right - ArcaneFont.width(font(), value);
+            graphics.drawText(font(), ArcaneFont.text(value), valueX, textY, theme.accentBright(), false);
+            labelRight = valueX - 5;
         }
+        int labelX = x + 14;
+        OrderedText label = ArcaneFont.trimmed(font(), module.name(), UiGeometry.labelWidth(labelX, labelRight));
+        graphics.drawText(font(), label, labelX, textY, enabled ? theme.text() : theme.muted(), false);
     }
 
     private void drawDescription(DrawContext graphics, Row row, ClickGuiTheme theme) {
@@ -418,11 +424,7 @@ public final class ArcaneSettingsScreen extends Screen {
     private void drawTopBar(DrawContext graphics, ClickGuiTheme theme) {
         int barX = 6;
         int barY = 5;
-        int barWidth = this.width - 12;
         int barHeight = 22;
-        RoundedGui.fill(graphics, barX + 1, barY + 2, barWidth, barHeight, 8, 0x48000000);
-        RoundedGui.outline(graphics, barX, barY, barWidth, barHeight, 8, 1, theme.outline(), theme.bar());
-
         int textY = barY + (barHeight - lineHeight()) / 2;
         RoundedGui.fill(graphics, barX + 8, textY - 1, 3, lineHeight() + 3, 2, theme.accent());
         graphics.drawText(font(), ArcaneFont.text("ARCANE"), barX + 16, textY, theme.text(), false);
