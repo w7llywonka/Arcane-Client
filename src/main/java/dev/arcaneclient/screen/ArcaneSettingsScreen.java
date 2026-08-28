@@ -2,17 +2,14 @@ package dev.arcaneclient.screen;
 
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
-import dev.arcaneclient.ArcaneKeybinds;
-import dev.arcaneclient.esp.ItemEspCategory;
-import dev.arcaneclient.freecam.FreecamController;
-import dev.arcaneclient.render.EspRenderer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
+import java.util.Map;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.Click;
 import net.minecraft.client.gui.DrawContext;
@@ -21,413 +18,525 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
+import org.jspecify.annotations.Nullable;
 
+/**
+ * The Arcane Click GUI: one draggable window per category, a module row per feature, and nested
+ * settings that open on right click. Everything on screen is a view over {@link ArcaneConfig}; the
+ * scan, render, and input systems are untouched by this class.
+ */
 @Environment(EnvType.CLIENT)
 public final class ArcaneSettingsScreen extends Screen {
-    private static final int PANEL_WIDTH = 136;
-    private static final int HEADER_HEIGHT = 21;
-    private static final int ROW_HEIGHT = 16;
-    private static final int SETTING_HEIGHT = 15;
-    private static final int SLIDER_HEIGHT = 25;
-    private static final int MACRO_ROW_HEIGHT = 18;
+    private static final int WINDOW_WIDTH = 146;
+    private static final int HEADER_HEIGHT = 19;
+    private static final int MODULE_HEIGHT = 15;
+    private static final int NEST_INSET = 8;
+    private static final int NEST_PAD = 3;
+    private static final int BODY_PAD = 3;
     private static final int TOP_BAR_HEIGHT = 30;
+    private static final int BOTTOM_BAR_HEIGHT = 20;
     private static final int GAP = 7;
-    private static final int PANEL_RADIUS = 7;
-    private static final int CARD_RADIUS = 5;
-    private static final Theme[] THEMES = Theme.values();
-    private static final ItemEspCategory[] ITEM_CATEGORIES = ItemEspCategory.values();
+    private static final int MACRO_COUNT = 4;
+    private static final int MACRO_FIELD_WIDTH = 68;
+    private static final int BIND_KEY_WIDTH = 38;
+    private static final int MACRO_KEY_WIDTH = 28;
 
     private final Screen parent;
     private final ArcaneConfig config;
-    private final boolean scannerWasEnabled;
-    private final Panel finderPanel = new Panel();
-    private final Panel renderPanel = new Panel();
-    private final Panel playerPanel = new Panel();
-    private final Panel bindsPanel = new Panel();
-    private final Panel chatPanel = new Panel();
+    private final List<GuiCategory> categories;
     private final List<TextFieldWidget> macroInputs = new ArrayList<>();
-    private final List<ToggleRow> finderSettings;
-    private final List<VisualRow> visualRows;
-    private final List<ToggleRow> playerRows;
-    private final List<ArcaneKeybinds.Entry> bindingRows;
-    private final ToggleRow storageTracerRow;
-    private final ToggleRow itemTracerRow;
+    private final Map<WrapKey, List<String>> wrapCache = new HashMap<>();
+    private final boolean scannerWasEnabled;
 
-    private List<VisualRow> filteredVisualRows;
-    private List<ToggleRow> filteredPlayerRows;
-    private List<ArcaneKeybinds.Entry> filteredBindingRows;
     private TextRenderer uiFont;
-
     private TextFieldWidget searchInput;
     private String searchText = "";
-    private String normalizedQuery = "";
-    private boolean macroInputsVisible;
-    private String performanceLabel = "";
-    private String compactFpsLabel = "";
-    private long nextPerformanceLabelUpdateNanos;
-    private boolean finderExpanded;
-    private boolean chatExpanded;
-    private VisualModule expandedVisual;
-    private boolean draggingSensitivity;
-    private Panel draggingPanel;
-    private int panelDragOffsetX;
-    private int panelDragOffsetY;
-    private boolean panelMoved;
-    private KeyBinding listeningFor;
+    private String query = "";
+    private String fpsLabel = "";
+    private long nextFpsUpdateNanos;
+
+    private @Nullable GuiCategory draggingCategory;
+    private int dragOffsetX;
+    private int dragOffsetY;
+    private boolean dragMoved;
+    private GuiSetting.@Nullable Slider draggingSlider;
+    private int sliderTrackX;
+    private int sliderTrackWidth;
+    private @Nullable KeyBinding listeningFor;
+    private @Nullable GuiModule hoveredModule;
 
     public ArcaneSettingsScreen(Screen parent) {
         super(Text.literal("Arcane Client"));
         this.parent = parent;
         this.config = ArcaneClient.config();
         this.scannerWasEnabled = this.config.enabled;
-        this.finderSettings = List.of(
-            new ToggleRow("Deep focus", () -> this.config.deepFocus, value -> this.config.deepFocus = value),
-            new ToggleRow("Farms", () -> this.config.farmSignals, value -> this.config.farmSignals = value),
-            new ToggleRow("Machines", () -> this.config.machineSignals, value -> this.config.machineSignals = value),
-            new ToggleRow("Player blocks", () -> this.config.playerBlockSignals, value -> this.config.playerBlockSignals = value),
-            new ToggleRow("Live activity", () -> this.config.packetSignals, value -> this.config.packetSignals = value),
-            new ToggleRow("Light leaks", () -> this.config.lightSignals, value -> this.config.lightSignals = value),
-            new ToggleRow("Entities", () -> this.config.entitySignals, value -> this.config.entitySignals = value)
-        );
-        this.visualRows = List.of(
-            new VisualRow(VisualModule.CHUNK_TILES, "Chunk tiles", () -> this.config.overlay, value -> this.config.overlay = value),
-            new VisualRow(VisualModule.CHUNK_RADAR, "Radar HUD", () -> this.config.hud, value -> this.config.hud = value),
-            new VisualRow(VisualModule.CHUNK_ANALYSIS, "Chunk intel", () -> this.config.chunkAnalysis, value -> this.config.chunkAnalysis = value),
-            new VisualRow(VisualModule.STORAGE_ESP, "Storage ESP", () -> this.config.esp, value -> this.config.esp = value),
-            new VisualRow(VisualModule.ITEM_ESP, "Item ESP", () -> this.config.itemEsp, value -> this.config.itemEsp = value),
-            new VisualRow(VisualModule.TUNNEL_ESP, "Tunnel ESP", () -> this.config.tunnelEsp, value -> {
-                this.config.tunnelEsp = value;
-                ArcaneClient.engine().tunnelSettingsChanged(this.client);
-            }),
-            new VisualRow(VisualModule.STASH_ALERTS, "Stash alerts", () -> this.config.stashAlerts, value -> this.config.stashAlerts = value),
-            new VisualRow(VisualModule.BLOCK_ENTITY_DEBUG, "ESP diagnostics", () -> this.config.blockEntityDebug, value -> this.config.blockEntityDebug = value)
-        );
-        this.playerRows = List.of(
-            new ToggleRow("Auto Totem", () -> this.config.autoTotem, value -> this.config.autoTotem = value),
-            new ToggleRow("Freecam", FreecamController::isActive, value -> {
-                if (value != FreecamController.isActive()) FreecamController.toggle(this.client);
-            })
-        );
-        this.bindingRows = ArcaneClient.keybinds().editable();
-        this.storageTracerRow = new ToggleRow("Tracers", () -> this.config.storageTracers, value -> this.config.storageTracers = value);
-        this.itemTracerRow = new ToggleRow("Tracers", () -> this.config.itemTracers, value -> this.config.itemTracers = value);
-        this.filteredVisualRows = this.visualRows;
-        this.filteredPlayerRows = this.playerRows;
-        this.filteredBindingRows = this.bindingRows;
+        this.categories = ModuleCatalog.build(this.config, MinecraftClient.getInstance());
     }
 
     @Override
     protected void init() {
-        layoutPanels();
+        // A resize can change the GUI scale, which changes which font variant is sharpest.
+        ArcaneFont.invalidate();
+        this.uiFont = null;
+        this.wrapCache.clear();
+        layoutWindows();
+
         int searchWidth = searchWidth();
-        this.searchInput = new TextFieldWidget(font(), searchX(searchWidth), 9, searchWidth, 14, Text.literal("Search modules"));
+        this.searchInput = new TextFieldWidget(font(), searchX(searchWidth), 9, searchWidth, 13, Text.literal("Search modules"));
         this.searchInput.setDrawsBackground(false);
         this.searchInput.setTextShadow(false);
         this.searchInput.setMaxLength(48);
-        this.searchInput.setPlaceholder(Text.literal("Search modules..."));
+        this.searchInput.setPlaceholder(ArcaneFont.text("Search modules..."));
+        styleField(this.searchInput);
         this.searchInput.setText(this.searchText);
         this.searchInput.setChangedListener(this::updateFilter);
         updateFilter(this.searchText);
         this.addDrawableChild(this.searchInput);
 
         this.macroInputs.clear();
-        for (int index = 0; index < 4; index++) {
-            int slot = index;
-            TextFieldWidget input = new TextFieldWidget(font(), 0, 0, 72, 12, Text.literal("Chat macro " + (index + 1)));
+        for (int slot = 0; slot < MACRO_COUNT; slot++) {
+            int index = slot;
+            TextFieldWidget input = new TextFieldWidget(font(), 0, 0, MACRO_FIELD_WIDTH, 12, Text.literal("Chat macro " + (slot + 1)));
             input.setDrawsBackground(false);
             input.setTextShadow(false);
             input.setMaxLength(256);
-            input.setText(this.config.chatMacro(index));
-            input.setPlaceholder(Text.literal("message"));
-            input.setChangedListener(value -> this.config.setChatMacro(slot, value));
+            input.setText(this.config.chatMacro(slot));
+            input.setPlaceholder(ArcaneFont.text("message"));
+            styleField(input);
+            input.setChangedListener(value -> this.config.setChatMacro(index, value));
             input.setVisible(false);
             this.macroInputs.add(this.addDrawableChild(input));
         }
     }
 
-    @Override
-    public void render(DrawContext graphics, int mouseX, int mouseY, float deltaTicks) {
-        Theme theme = theme();
-        graphics.fill(0, 0, this.width, this.height, theme.backdrop);
-        drawTopBar(graphics, mouseX, mouseY, theme);
-        clampPanels();
-        drawFinder(graphics, mouseX, mouseY, theme);
-        drawRender(graphics, mouseX, mouseY, theme);
-        drawPlayer(graphics, mouseX, mouseY, theme);
-        drawBinds(graphics, mouseX, mouseY, theme);
-        drawChat(graphics, mouseX, mouseY, theme);
-        drawBottomBar(graphics, theme);
-        super.render(graphics, mouseX, mouseY, deltaTicks);
+    // -----------------------------------------------------------------------------------------
+    // Layout
+    // -----------------------------------------------------------------------------------------
+
+    private void layoutWindows() {
+        int total = this.categories.size();
+        int columns = Math.clamp((this.width - GAP) / (WINDOW_WIDTH + GAP), 1, total);
+        int rowWidth = columns * WINDOW_WIDTH + (columns - 1) * GAP;
+        int start = Math.max(2, (this.width - rowWidth) / 2);
+        int top = TOP_BAR_HEIGHT + GAP;
+
+        for (int index = 0; index < Math.min(columns, total); index++) {
+            GuiCategory category = this.categories.get(index);
+            category.moveTo(start + index * (WINDOW_WIDTH + GAP), top);
+            category.setOpen(true);
+        }
+
+        // Anything that will not fit across the screen is parked as a collapsed title the user can
+        // open or drag out, rather than being stacked on top of an already open window.
+        int parkedY = this.height - BOTTOM_BAR_HEIGHT - GAP - HEADER_HEIGHT;
+        for (int index = columns; index < total; index++) {
+            GuiCategory category = this.categories.get(index);
+            int slot = index - columns;
+            category.moveTo(start + (slot % columns) * (WINDOW_WIDTH + GAP), parkedY - (slot / columns) * (HEADER_HEIGHT + 4));
+            category.setOpen(false);
+        }
     }
 
-    private void drawTopBar(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
+    /** Positions every row of one window, top to bottom, and records the window's total height. */
+    private List<Row> layout(GuiCategory category) {
+        List<Row> rows = new ArrayList<>();
+        int x = category.x();
+        int y = category.y();
+        rows.add(new Row(RowKind.HEADER, category, null, null, x, y, HEADER_HEIGHT));
+
+        int height = HEADER_HEIGHT;
+        if (category.open()) {
+            int rowY = y + HEADER_HEIGHT;
+            for (GuiModule module : category.visible()) {
+                rows.add(new Row(RowKind.MODULE, category, module, null, x, rowY, MODULE_HEIGHT));
+                rowY += MODULE_HEIGHT;
+                if (!module.expanded() || !module.hasSettings()) {
+                    continue;
+                }
+                int descriptionHeight = descriptionHeight(module);
+                rows.add(new Row(RowKind.DESCRIPTION, category, module, null, x, rowY, descriptionHeight));
+                rowY += descriptionHeight;
+                for (GuiSetting setting : module.settings()) {
+                    rows.add(new Row(RowKind.SETTING, category, module, setting, x, rowY, setting.height()));
+                    rowY += setting.height();
+                }
+                rows.add(new Row(RowKind.NEST_FOOT, category, module, null, x, rowY, NEST_PAD));
+                rowY += NEST_PAD;
+            }
+            height = rowY - y + BODY_PAD;
+        }
+        category.setLastHeight(height);
+        return rows;
+    }
+
+    private int descriptionHeight(GuiModule module) {
+        return 5 + wrap(module.description(), WINDOW_WIDTH - NEST_INSET - 16).size() * proseHeight() + 4;
+    }
+
+    private List<String> wrap(String text, int maxWidth) {
+        return this.wrapCache.computeIfAbsent(new WrapKey(text, maxWidth), key -> wrapLines(key.text(), key.maxWidth()));
+    }
+
+    private List<String> wrapLines(String text, int maxWidth) {
+        List<String> lines = new ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (String word : text.split(" ")) {
+            String candidate = line.isEmpty() ? word : line + " " + word;
+            if (!line.isEmpty() && ArcaneFont.width(font(), candidate) > maxWidth) {
+                lines.add(line.toString());
+                line = new StringBuilder(word);
+            } else {
+                line = new StringBuilder(candidate);
+            }
+        }
+        if (!line.isEmpty()) {
+            lines.add(line.toString());
+        }
+        return List.copyOf(lines);
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Rendering
+    // -----------------------------------------------------------------------------------------
+
+    @Override
+    public void render(DrawContext graphics, int mouseX, int mouseY, float deltaTicks) {
+        ClickGuiTheme theme = theme();
+        this.hoveredModule = null;
+        boolean[] macroDrawn = new boolean[MACRO_COUNT];
+
+        graphics.fill(0, 0, this.width, this.height, theme.backdrop());
+
+        for (GuiCategory category : this.categories) {
+            layout(category);
+            clamp(category);
+            List<Row> rows = layout(category);
+            drawWindowBody(graphics, category, theme);
+            for (Row row : rows) {
+                drawRow(graphics, row, mouseX, mouseY, theme, macroDrawn);
+            }
+        }
+
+        for (int slot = 0; slot < MACRO_COUNT; slot++) {
+            if (!macroDrawn[slot]) {
+                hideMacroInput(slot);
+            }
+        }
+
+        drawTopBar(graphics, theme);
+        drawBottomBar(graphics, theme);
+        super.render(graphics, mouseX, mouseY, deltaTicks);
+        drawModuleTooltip(graphics, mouseX, mouseY, theme);
+    }
+
+    private void drawWindowBody(DrawContext graphics, GuiCategory category, ClickGuiTheme theme) {
+        int x = category.x();
+        int y = category.y();
+        int height = category.lastHeight();
+        RoundedGui.fill(graphics, x + 2, y + 3, WINDOW_WIDTH, height, 7, 0x48000000);
+        RoundedGui.outline(graphics, x, y, WINDOW_WIDTH, height, 7, 1, theme.outlineSoft(), theme.window());
+    }
+
+    private void drawRow(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiTheme theme, boolean[] macroDrawn) {
+        switch (row.kind()) {
+            case HEADER -> drawHeader(graphics, row, mouseX, mouseY, theme);
+            case MODULE -> drawModule(graphics, row, mouseX, mouseY, theme);
+            case DESCRIPTION -> drawDescription(graphics, row, theme);
+            case SETTING -> drawSetting(graphics, row, mouseX, mouseY, theme, macroDrawn);
+            case NEST_FOOT -> {
+                graphics.fill(row.x() + 1, row.y(), row.x() + WINDOW_WIDTH - 1, row.y() + row.height(), theme.nest());
+                graphics.fill(row.x() + 1, row.y(), row.x() + 3, row.y() + row.height(), theme.accentDim());
+            }
+        }
+    }
+
+    private void drawHeader(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiTheme theme) {
+        GuiCategory category = row.category();
+        int x = row.x();
+        int y = row.y();
+        RoundedGui.fill(graphics, x + 3, y + 2, WINDOW_WIDTH - 6, HEADER_HEIGHT - 3, 5, theme.header());
+        if (row.contains(mouseX, mouseY)) {
+            RoundedGui.fill(graphics, x + 3, y + 2, WINDOW_WIDTH - 6, HEADER_HEIGHT - 3, 5, 0x14FFFFFF);
+        }
+        graphics.fill(x + 1, y + HEADER_HEIGHT - 1, x + WINDOW_WIDTH - 1, y + HEADER_HEIGHT, category.open() ? theme.accentDim() : theme.outline());
+        RoundedGui.fill(graphics, x + 8, y + 6, 3, 7, 2, theme.accent());
+
+        int textY = y + (HEADER_HEIGHT - lineHeight()) / 2;
+        graphics.drawText(font(), ArcaneFont.text(category.name()), x + 16, textY, theme.text(), false);
+
+        if (category.toggleableCount() > 0) {
+            String badge = category.enabledCount() + "/" + category.toggleableCount();
+            graphics.drawText(font(), ArcaneFont.text(badge), x + WINDOW_WIDTH - 22 - ArcaneFont.width(font(), badge), textY, theme.faint(), false);
+        }
+        if (category.open()) {
+            drawCaretDown(graphics, x + WINDOW_WIDTH - 15, y + 9, theme.muted());
+        } else {
+            drawCaretRight(graphics, x + WINDOW_WIDTH - 14, y + 8, theme.muted());
+        }
+    }
+
+    private void drawModule(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiTheme theme) {
+        GuiModule module = row.module();
+        if (module == null) {
+            return;
+        }
+        int x = row.x();
+        int y = row.y();
+        boolean hovered = row.contains(mouseX, mouseY);
+        boolean enabled = module.enabled();
+        if (hovered) {
+            this.hoveredModule = module;
+        }
+
+        int background = enabled
+            ? (hovered ? theme.activeHover() : theme.active())
+            : (hovered ? theme.hover() : theme.row());
+        RoundedGui.fill(graphics, x + 4, y + 1, WINDOW_WIDTH - 8, MODULE_HEIGHT - 2, 5, background);
+        if (enabled) {
+            RoundedGui.fill(graphics, x + 8, y + 5, 3, 5, 2, theme.accent());
+        }
+
+        int textY = y + (MODULE_HEIGHT - lineHeight()) / 2;
+        graphics.drawText(font(), ArcaneFont.text(module.name()), x + 14, textY, enabled ? theme.text() : theme.muted(), false);
+
+        int right = x + WINDOW_WIDTH - 8;
+        if (module.hasSettings()) {
+            int caretColor = module.expanded() ? theme.accentBright() : enabled ? theme.text() : theme.faint();
+            if (module.expanded()) {
+                drawCaretDown(graphics, right - 5, y + 7, caretColor);
+            } else {
+                drawCaretRight(graphics, right - 4, y + 6, caretColor);
+            }
+            right -= 12;
+        }
+        String value = module.valueLabel();
+        if (value != null) {
+            graphics.drawText(font(), ArcaneFont.text(value), right - ArcaneFont.width(font(), value), textY, theme.accentBright(), false);
+        }
+    }
+
+    private void drawDescription(DrawContext graphics, Row row, ClickGuiTheme theme) {
+        GuiModule module = row.module();
+        if (module == null) {
+            return;
+        }
+        int x = row.x();
+        int y = row.y();
+        graphics.fill(x + 1, y, x + WINDOW_WIDTH - 1, y + row.height(), theme.nest());
+        graphics.fill(x + 1, y, x + 3, y + row.height(), theme.accentDim());
+        int lineY = y + 5;
+        for (String line : wrap(module.description(), WINDOW_WIDTH - NEST_INSET - 16)) {
+            graphics.drawText(font(), ArcaneFont.text(line), x + NEST_INSET + 5, lineY, theme.faint(), false);
+            lineY += proseHeight();
+        }
+    }
+
+    private void drawSetting(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiTheme theme, boolean[] macroDrawn) {
+        GuiSetting setting = row.setting();
+        if (setting == null) {
+            return;
+        }
+        int x = row.x();
+        int y = row.y();
+        int height = row.height();
+        boolean hovered = row.contains(mouseX, mouseY);
+
+        graphics.fill(x + 1, y, x + WINDOW_WIDTH - 1, y + height, theme.nest());
+        graphics.fill(x + 1, y, x + 3, y + height, theme.accentDim());
+        if (hovered && !(setting instanceof GuiSetting.Info)) {
+            graphics.fill(x + NEST_INSET, y, x + WINDOW_WIDTH - 1, y + height, theme.hover());
+        }
+
+        int labelX = x + NEST_INSET + 5;
+        int right = x + WINDOW_WIDTH - 8;
+        int textY = y + (setting instanceof GuiSetting.Slider ? 3 : (height - lineHeight()) / 2);
+        graphics.drawText(font(), ArcaneFont.text(setting.label()), labelX, textY, theme.muted(), false);
+
+        switch (setting) {
+            case GuiSetting.Toggle toggle -> drawCheckbox(graphics, right - 9, y + (height - 9) / 2, toggle.value(), theme);
+            case GuiSetting.ToggleSwatch toggle -> {
+                drawSwatch(graphics, right - 33, y + (height - 9) / 2, 14, toggle.color(), theme);
+                drawCheckbox(graphics, right - 9, y + (height - 9) / 2, toggle.value(), theme);
+            }
+            case GuiSetting.Slider slider -> {
+                String display = slider.display();
+                graphics.drawText(font(), ArcaneFont.text(display), right - ArcaneFont.width(font(), display), textY, theme.text(), false);
+                int trackX = sliderTrackX(x);
+                int trackWidth = sliderTrackWidth();
+                int trackY = y + height - 9;
+                fillRounded(graphics, trackX, trackY, trackWidth, 3, theme.outline());
+                int filled = Math.round(trackWidth * slider.fraction());
+                if (filled > 0) {
+                    fillRounded(graphics, trackX, trackY, filled, 3, theme.accent());
+                }
+                fillRounded(graphics, trackX + Math.clamp(filled - 2, 0, trackWidth - 4), trackY - 2, 4, 7, theme.accentBright());
+            }
+            case GuiSetting.Swatch swatch -> drawSwatch(graphics, right - 22, y + (height - 9) / 2, 22, swatch.color(), theme);
+            case GuiSetting.Cycle cycle -> {
+                String value = cycle.value();
+                int valueWidth = ArcaneFont.width(font(), value);
+                graphics.drawText(font(), ArcaneFont.text(">"), right - 4, textY, theme.faint(), false);
+                graphics.drawText(font(), ArcaneFont.text(value), right - 8 - valueWidth, textY, theme.accentBright(), false);
+                graphics.drawText(font(), ArcaneFont.text("<"), right - 12 - valueWidth - ArcaneFont.width(font(), "<"), textY, theme.faint(), false);
+            }
+            case GuiSetting.Bind bind -> drawKeyPill(graphics, right, y, height, bind.mapping(), theme, BIND_KEY_WIDTH);
+            case GuiSetting.Info info -> {
+                String value = info.value();
+                graphics.drawText(font(), ArcaneFont.text(value), right - ArcaneFont.width(font(), value), textY, theme.accentBright(), false);
+            }
+            case GuiSetting.Message message -> {
+                int fieldX = macroFieldX(x);
+                fillRounded(graphics, fieldX - 3, y + 3, MACRO_FIELD_WIDTH + 6, 14, theme.window());
+                outlineRounded(graphics, fieldX - 3, y + 3, MACRO_FIELD_WIDTH + 6, 14, theme.outline());
+                TextFieldWidget input = this.macroInputs.get(message.slot());
+                input.setX(fieldX);
+                input.setY(y + 6);
+                input.setVisible(true);
+                macroDrawn[message.slot()] = true;
+                KeyBinding mapping = message.mapping();
+                if (mapping != null) {
+                    drawKeyPill(graphics, right, y, height, mapping, theme, MACRO_KEY_WIDTH);
+                }
+            }
+        }
+    }
+
+    private void drawKeyPill(DrawContext graphics, int right, int y, int height, KeyBinding mapping, ClickGuiTheme theme, int maxKeyWidth) {
+        boolean listening = this.listeningFor == mapping;
+        String raw = listening ? "..." : mapping.isUnbound() ? "-" : mapping.getBoundKeyLocalizedText().getString();
+        OrderedText key = ArcaneFont.trimmed(font(), raw, maxKeyWidth);
+        int keyWidth = font().getWidth(key);
+        int width = Math.max(20, keyWidth + 8);
+        int pillY = y + (height - 12) / 2;
+        fillRounded(graphics, right - width, pillY, width, 12, listening ? theme.accentDim() : theme.window());
+        outlineRounded(graphics, right - width, pillY, width, 12, listening ? theme.accent() : theme.outline());
+        graphics.drawText(font(), key, right - width + (width - keyWidth) / 2, pillY + (12 - lineHeight()) / 2 + 1, listening ? theme.text() : theme.muted(), false);
+    }
+
+    private void drawTopBar(DrawContext graphics, ClickGuiTheme theme) {
         int barX = 6;
         int barY = 5;
         int barWidth = this.width - 12;
         int barHeight = 22;
         RoundedGui.fill(graphics, barX + 1, barY + 2, barWidth, barHeight, 8, 0x48000000);
-        RoundedGui.outline(graphics, barX, barY, barWidth, barHeight, 8, 1, theme.border, theme.topBar);
-        RoundedGui.fill(graphics, barX + 8, barY + barHeight - 3, 38, 2, 1, theme.accent);
-        graphics.drawText(font(), "ARCANE", barX + 8, barY + 7, theme.text, false);
-        int clientX = barX + 10 + font().getWidth("ARCANE");
-        graphics.drawText(font(), "CLIENT", clientX, barY + 7, theme.accent, false);
-        if (this.width >= 480) {
-            updatePerformanceLabel();
-            String status = this.width >= 640 ? this.performanceLabel : this.compactFpsLabel;
-            graphics.drawText(font(), status, clientX + font().getWidth("CLIENT") + 12, barY + 7, theme.muted, false);
-        }
+        RoundedGui.outline(graphics, barX, barY, barWidth, barHeight, 8, 1, theme.outline(), theme.bar());
+
+        int textY = barY + (barHeight - lineHeight()) / 2;
+        RoundedGui.fill(graphics, barX + 8, textY - 1, 3, lineHeight() + 3, 2, theme.accent());
+        graphics.drawText(font(), ArcaneFont.text("ARCANE"), barX + 16, textY, theme.text(), false);
+        int clientX = barX + 18 + ArcaneFont.width(font(), "ARCANE");
+        graphics.drawText(font(), ArcaneFont.text("CLIENT"), clientX, textY, theme.accent(), false);
 
         int searchWidth = searchWidth();
         int searchX = searchX(searchWidth);
-        int searchBorder = this.searchInput != null && this.searchInput.isFocused() ? theme.accent : theme.border;
-        RoundedGui.outline(graphics, searchX - 5, barY + 3, searchWidth + 10, 17, 7, 1, searchBorder, theme.setting);
+        boolean focused = this.searchInput != null && this.searchInput.isFocused();
+        RoundedGui.outline(graphics, searchX - 5, barY + 3, searchWidth + 10, 17, 7, 1, focused ? theme.accent() : theme.outline(), theme.window());
 
-        int themeX = themeButtonX();
-        boolean hovered = inside(mouseX, mouseY, themeX, barY + 3, 78, 17);
-        RoundedGui.outline(graphics, themeX, barY + 3, 78, 17, 7, 1, hovered ? theme.accent : theme.border, hovered ? theme.hover : theme.setting);
-        graphics.drawCenteredTextWithShadow(font(), theme.label + "  >", themeX + 39, barY + 7, theme.text);
+        if (this.width >= 520) {
+            updateFpsLabel();
+            String status = activeModuleCount() + "/" + toggleableModuleCount() + " ACTIVE";
+            int right = this.width - 14;
+            graphics.drawText(font(), ArcaneFont.text(this.fpsLabel), right - ArcaneFont.width(font(), this.fpsLabel), textY, theme.muted(), false);
+            right -= ArcaneFont.width(font(), this.fpsLabel) + 12;
+            graphics.drawText(font(), ArcaneFont.text(status), right - ArcaneFont.width(font(), status), textY, theme.accentBright(), false);
+        }
     }
 
-    private void drawBottomBar(DrawContext graphics, Theme theme) {
-        int y = this.height - 20;
-        String help = this.listeningFor == null
-            ? (this.width >= 440 ? "LMB toggle   RMB configure   Drag headers" : "LMB toggle   RMB settings")
-            : (this.width >= 440 ? "Press a key or mouse button   Esc clears" : "Press input   Esc clears");
-        int helpWidth = font().getWidth(help) + 14;
-        RoundedGui.fill(graphics, 7, y + 2, helpWidth, 16, 7, 0x38000000);
-        RoundedGui.outline(graphics, 6, y, helpWidth, 16, 7, 1, theme.border, theme.topBar);
-        graphics.drawText(font(), help, 13, y + 4, this.listeningFor == null ? theme.muted : theme.accent, false);
-        if (!query().isEmpty()) {
-            String result = visibleModuleCount() + " results";
-            int resultWidth = font().getWidth(result) + 14;
+    private void drawBottomBar(DrawContext graphics, ClickGuiTheme theme) {
+        int y = this.height - BOTTOM_BAR_HEIGHT;
+        int textY = y + (BOTTOM_BAR_HEIGHT - lineHeight()) / 2;
+        String hint = this.listeningFor != null
+            ? (this.width >= 460 ? "Press a key or mouse button   Esc unbinds" : "Press input   Esc unbinds")
+            : (this.width >= 500 ? "LMB toggle   RMB settings   MMB bind   Drag titles" : "LMB toggle   RMB settings");
+        int hintWidth = ArcaneFont.width(font(), hint) + 14;
+        RoundedGui.fill(graphics, 7, y + 2, hintWidth, 16, 7, 0x38000000);
+        RoundedGui.outline(graphics, 6, y, hintWidth, 16, 7, 1, theme.outline(), theme.bar());
+        graphics.drawText(font(), ArcaneFont.text(hint), 13, textY, this.listeningFor != null ? theme.accent() : theme.muted(), false);
+
+        if (!this.query.isEmpty() && this.width >= 360) {
+            String results = visibleModuleCount() + " results";
+            int resultWidth = ArcaneFont.width(font(), results) + 14;
             int resultX = this.width - resultWidth - 6;
-            RoundedGui.outline(graphics, resultX, y, resultWidth, 16, 7, 1, theme.border, theme.topBar);
-            graphics.drawText(font(), result, resultX + 7, y + 4, theme.secondary, false);
+            RoundedGui.outline(graphics, resultX, y, resultWidth, 16, 7, 1, theme.outline(), theme.bar());
+            graphics.drawText(font(), ArcaneFont.text(results), resultX + 7, textY, theme.accentBright(), false);
         }
     }
 
-    private void drawFinder(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
-        boolean visible = matches("Base scanner");
-        int settingsHeight = this.finderExpanded ? SLIDER_HEIGHT + finderSettings().size() * SETTING_HEIGHT : 0;
-        int height = HEADER_HEIGHT + (this.finderPanel.open && visible ? ROW_HEIGHT + settingsHeight : 0);
-        drawPanel(graphics, this.finderPanel, height, "DISCOVERY", visible ? (this.config.enabled ? "1/1" : "0/1") : "0/0", mouseX, mouseY, theme);
-        if (!this.finderPanel.open || !visible) return;
+    private void drawModuleTooltip(DrawContext graphics, int mouseX, int mouseY, ClickGuiTheme theme) {
+        GuiModule module = this.hoveredModule;
+        if (module == null || module.expanded() || this.draggingCategory != null) {
+            return;
+        }
+        List<String> lines = wrap(module.description(), 150);
+        int width = ArcaneFont.width(font(), module.name());
+        for (String line : lines) {
+            width = Math.max(width, ArcaneFont.width(font(), line));
+        }
+        width += 14;
+        int height = 13 + lines.size() * proseHeight() + 8;
+        int x = Math.min(mouseX + 12, this.width - width - 4);
+        int y = Math.min(mouseY + 12, this.height - height - BOTTOM_BAR_HEIGHT - 4);
 
-        int rowY = this.finderPanel.y + HEADER_HEIGHT;
-        drawModuleRow(graphics, this.finderPanel.x, rowY, "Base scanner", this.config.enabled, true, this.finderExpanded, mouseX, mouseY, theme);
-        if (!this.finderExpanded) return;
-        int sliderY = rowY + ROW_HEIGHT;
-        drawSensitivity(graphics, this.finderPanel.x, sliderY, mouseX, mouseY, theme);
-        int settingY = sliderY + SLIDER_HEIGHT;
-        for (ToggleRow setting : finderSettings()) {
-            drawSettingToggle(graphics, this.finderPanel.x, settingY, setting, mouseX, mouseY, theme);
-            settingY += SETTING_HEIGHT;
+        fillRounded(graphics, x + 2, y + 2, width, height, 0x60000000);
+        fillRounded(graphics, x, y, width, height, theme.bar());
+        outlineRounded(graphics, x, y, width, height, theme.outline());
+        graphics.fill(x + 1, y + 1, x + 3, y + height - 1, theme.accent());
+        graphics.drawText(font(), ArcaneFont.text(module.name()), x + 8, y + 6, theme.text(), false);
+        int lineY = y + 9 + lineHeight();
+        for (String line : lines) {
+            graphics.drawText(font(), ArcaneFont.text(line), x + 8, lineY, theme.faint(), false);
+            lineY += proseHeight();
         }
     }
 
-    private void drawRender(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
-        List<VisualRow> rows = visibleVisualRows();
-        int contentHeight = rows.size() * ROW_HEIGHT;
-        if (this.expandedVisual != null && containsVisualModule(rows, this.expandedVisual)) {
-            contentHeight += visualSettingsHeight(this.expandedVisual);
-        }
-        int height = HEADER_HEIGHT + (this.renderPanel.open ? contentHeight : 0);
-        drawPanel(graphics, this.renderPanel, height, "VISUAL", activeVisualCount(rows) + "/" + rows.size(), mouseX, mouseY, theme);
-        if (!this.renderPanel.open) return;
-        int rowY = this.renderPanel.y + HEADER_HEIGHT;
-        for (VisualRow row : rows) {
-            boolean expanded = row.module() == this.expandedVisual;
-            drawModuleRow(graphics, this.renderPanel.x, rowY, row.label(), row.value().getAsBoolean(), row.hasSettings(), expanded, mouseX, mouseY, theme);
-            rowY += ROW_HEIGHT;
-            if (expanded) {
-                drawVisualSettings(graphics, row.module(), this.renderPanel.x, rowY, mouseX, mouseY, theme);
-                rowY += visualSettingsHeight(row.module());
-            }
+    // -----------------------------------------------------------------------------------------
+    // Primitives
+    // -----------------------------------------------------------------------------------------
+
+    private static void fillRounded(DrawContext graphics, int x, int y, int width, int height, int color) {
+        RoundedGui.fill(graphics, x, y, width, height, 5, color);
+    }
+
+    private static void outlineRounded(DrawContext graphics, int x, int y, int width, int height, int color) {
+        RoundedGui.outlineOnly(graphics, x, y, width, height, 5, color);
+    }
+
+    private static void drawCaretRight(DrawContext graphics, int x, int y, int color) {
+        for (int step = 0; step < 3; step++) {
+            graphics.fill(x + step, y + step, x + step + 1, y + 5 - step, color);
         }
     }
 
-    private void drawPlayer(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
-        List<ToggleRow> rows = visiblePlayerRows();
-        boolean profileVisible = performanceProfileVisible();
-        int rowCount = rows.size() + (profileVisible ? 1 : 0);
-        int height = HEADER_HEIGHT + (this.playerPanel.open ? rowCount * ROW_HEIGHT : 0);
-        drawPanel(graphics, this.playerPanel, height, "PLAYER", activeToggleCount(rows) + "/" + rows.size(), mouseX, mouseY, theme);
-        if (!this.playerPanel.open) return;
-        int rowY = this.playerPanel.y + HEADER_HEIGHT;
-        for (ToggleRow row : rows) {
-            drawModuleRow(graphics, this.playerPanel.x, rowY, row.label(), row.value().getAsBoolean(), false, false, mouseX, mouseY, theme);
-            rowY += ROW_HEIGHT;
-        }
-        if (profileVisible) {
-            drawPerformanceRow(graphics, this.playerPanel.x, rowY, mouseX, mouseY, theme);
+    private static void drawCaretDown(DrawContext graphics, int x, int y, int color) {
+        for (int step = 0; step < 3; step++) {
+            graphics.fill(x + step, y + step, x + 5 - step, y + step + 1, color);
         }
     }
 
-    private void drawPerformanceRow(DrawContext graphics, int x, int y, int mouseX, int mouseY, Theme theme) {
-        drawRowBackground(graphics, x, y, ROW_HEIGHT, mouseX, mouseY, theme);
-        RoundedGui.fill(graphics, x + 9, y + 6, 4, 4, 2, theme.accent);
-        graphics.drawText(font(), "Performance", x + 16, y + 4, theme.text, false);
-        String label = this.config.performanceProfile().label();
-        graphics.drawText(font(), label, x + PANEL_WIDTH - 8 - font().getWidth(label), y + 4, theme.secondary, false);
-    }
-
-    private void drawBinds(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
-        List<ArcaneKeybinds.Entry> entries = visibleBindings();
-        int height = HEADER_HEIGHT + (this.bindsPanel.open ? entries.size() * ROW_HEIGHT : 0);
-        drawPanel(graphics, this.bindsPanel, height, "KEYBINDS", Integer.toString(entries.size()), mouseX, mouseY, theme);
-        if (!this.bindsPanel.open) return;
-        int rowY = this.bindsPanel.y + HEADER_HEIGHT;
-        for (ArcaneKeybinds.Entry entry : entries) {
-            drawRowBackground(graphics, this.bindsPanel.x, rowY, ROW_HEIGHT, mouseX, mouseY, theme);
-            graphics.drawText(font(), entry.label(), this.bindsPanel.x + 10, rowY + 4, theme.text, false);
-            String key = this.listeningFor == entry.mapping() ? "..." : entry.mapping().getBoundKeyLocalizedText().getString();
-            key = font().trimToWidth(key, 46);
-            int color = this.listeningFor == entry.mapping() ? theme.accent : theme.muted;
-            graphics.drawText(font(), key, this.bindsPanel.x + PANEL_WIDTH - 8 - font().getWidth(key), rowY + 4, color, false);
-            rowY += ROW_HEIGHT;
+    private static void drawCheckbox(DrawContext graphics, int x, int y, boolean checked, ClickGuiTheme theme) {
+        fillRounded(graphics, x, y, 9, 9, checked ? theme.accent() : theme.window());
+        outlineRounded(graphics, x, y, 9, 9, checked ? theme.accentBright() : theme.outline());
+        if (!checked) {
+            return;
         }
+        int mark = theme.bar() | 0xFF000000;
+        graphics.fill(x + 2, y + 4, x + 3, y + 7, mark);
+        graphics.fill(x + 3, y + 5, x + 4, y + 8, mark);
+        graphics.fill(x + 4, y + 4, x + 5, y + 7, mark);
+        graphics.fill(x + 5, y + 3, x + 6, y + 6, mark);
+        graphics.fill(x + 6, y + 2, x + 7, y + 5, mark);
     }
 
-    private void drawChat(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
-        boolean visible = matches("Chat macros");
-        setMacroInputsVisible(this.chatPanel.open && this.chatExpanded && visible);
-        int settingsHeight = this.chatExpanded ? MACRO_ROW_HEIGHT * 4 : 0;
-        int height = HEADER_HEIGHT + (this.chatPanel.open && visible ? ROW_HEIGHT + settingsHeight : 0);
-        drawPanel(graphics, this.chatPanel, height, "SOCIAL", visible ? (this.config.chatMacros ? "1/1" : "0/1") : "0/0", mouseX, mouseY, theme);
-        if (!this.chatPanel.open || !visible) return;
-
-        int moduleY = this.chatPanel.y + HEADER_HEIGHT;
-        drawModuleRow(graphics, this.chatPanel.x, moduleY, "Chat macros", this.config.chatMacros, true, this.chatExpanded, mouseX, mouseY, theme);
-        if (!this.chatExpanded) return;
-
-        int rowY = moduleY + ROW_HEIGHT;
-        for (int index = 0; index < 4; index++) {
-            RoundedGui.fill(graphics, this.chatPanel.x + 5, rowY + 1, PANEL_WIDTH - 10, MACRO_ROW_HEIGHT - 2, 4, theme.setting);
-            RoundedGui.fill(graphics, this.chatPanel.x + 9, rowY + 5, 2, 8, 1, theme.secondary);
-            graphics.drawText(font(), "M" + (index + 1), this.chatPanel.x + 14, rowY + 5, theme.muted, false);
-            int inputX = this.chatPanel.x + 27;
-            RoundedGui.outline(graphics, inputX - 2, rowY + 2, 76, 14, 5, 1, theme.border, theme.row);
-            TextFieldWidget input = this.macroInputs.get(index);
-            input.setX(inputX);
-            input.setY(rowY + 3);
-            input.setVisible(true);
-
-            KeyBinding mapping = ArcaneClient.keybinds().chatMacros().get(index);
-            String key = this.listeningFor == mapping ? "..." : mapping.getBoundKeyLocalizedText().getString();
-            key = font().trimToWidth(key, 24);
-            if (inside(mouseX, mouseY, this.chatPanel.x + 105, rowY, 31, MACRO_ROW_HEIGHT)) {
-                RoundedGui.fill(graphics, this.chatPanel.x + 105, rowY + 1, 29, MACRO_ROW_HEIGHT - 2, 4, theme.hover);
-            }
-            int keyColor = this.listeningFor == mapping ? theme.accent : theme.muted;
-            graphics.drawText(font(), key, this.chatPanel.x + PANEL_WIDTH - 8 - font().getWidth(key), rowY + 5, keyColor, false);
-            rowY += MACRO_ROW_HEIGHT;
-        }
+    private static void drawSwatch(DrawContext graphics, int x, int y, int width, int color, ClickGuiTheme theme) {
+        fillRounded(graphics, x, y, width, 9, color | 0xFF000000);
+        outlineRounded(graphics, x, y, width, 9, theme.outline());
     }
 
-    private void drawPanel(DrawContext graphics, Panel panel, int height, String title, String badge, int mouseX, int mouseY, Theme theme) {
-        panel.lastHeight = height;
-        RoundedGui.fill(graphics, panel.x + 2, panel.y + 3, PANEL_WIDTH, height, PANEL_RADIUS, 0x40000000);
-        RoundedGui.outline(graphics, panel.x, panel.y, PANEL_WIDTH, height, PANEL_RADIUS, 1, theme.border, theme.panel);
-        RoundedGui.fill(graphics, panel.x + 3, panel.y + 3, PANEL_WIDTH - 6, HEADER_HEIGHT - 4, CARD_RADIUS, theme.header);
-        RoundedGui.fill(graphics, panel.x + 10, panel.y + 2, 32, 2, 1, theme.accent);
-        if (inside(mouseX, mouseY, panel.x, panel.y, PANEL_WIDTH, HEADER_HEIGHT)) {
-            RoundedGui.fill(graphics, panel.x + 3, panel.y + 3, PANEL_WIDTH - 6, HEADER_HEIGHT - 4, CARD_RADIUS, 0x18FFFFFF);
-        }
-        graphics.drawText(font(), title, panel.x + 10, panel.y + 6, theme.text, false);
-        int toggleX = panel.x + PANEL_WIDTH - 14;
-        graphics.drawText(font(), panel.open ? "−" : "+", toggleX, panel.y + 6, theme.muted, false);
-        if (badge != null && !badge.isEmpty()) {
-            int badgeX = toggleX - 7 - font().getWidth(badge);
-            graphics.drawText(font(), badge, badgeX, panel.y + 6, theme.secondary, false);
-        }
-    }
-
-    private void drawModuleRow(DrawContext graphics, int x, int y, String label, boolean enabled, boolean hasSettings, boolean expanded, int mouseX, int mouseY, Theme theme) {
-        drawRowBackground(graphics, x, y, ROW_HEIGHT, mouseX, mouseY, theme);
-        RoundedGui.fill(graphics, x + 9, y + 6, 4, 4, 2, enabled ? theme.accent : theme.border);
-        graphics.drawText(font(), label, x + 16, y + 4, enabled ? theme.text : theme.muted, false);
-        if (hasSettings) graphics.drawText(font(), expanded ? "⌄" : "›", x + PANEL_WIDTH - 37, y + 4, theme.muted, false);
-        drawSwitch(graphics, x + PANEL_WIDTH - 25, y + 4, enabled, theme);
-    }
-
-    private void drawSettingToggle(DrawContext graphics, int x, int y, ToggleRow row, int mouseX, int mouseY, Theme theme) {
-        int color = inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT) ? theme.hover : theme.setting;
-        RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SETTING_HEIGHT - 2, 4, color);
-        graphics.drawText(font(), row.label(), x + 12, y + 3, theme.muted, false);
-        drawSwitch(graphics, x + PANEL_WIDTH - 24, y + 3, row.value().getAsBoolean(), theme);
-    }
-
-    private void drawSensitivity(DrawContext graphics, int x, int y, int mouseX, int mouseY, Theme theme) {
-        int color = inside(mouseX, mouseY, x, y, PANEL_WIDTH, SLIDER_HEIGHT) || this.draggingSensitivity ? theme.hover : theme.setting;
-        RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SLIDER_HEIGHT - 2, 4, color);
-        graphics.drawText(font(), "Sensitivity", x + 12, y + 3, theme.muted, false);
-        String value = this.config.sensitivity() + "%";
-        graphics.drawText(font(), value, x + PANEL_WIDTH - 9 - font().getWidth(value), y + 3, theme.text, false);
-        int barX = x + 12;
-        int barY = y + 17;
-        int barWidth = PANEL_WIDTH - 24;
-        RoundedGui.fill(graphics, barX, barY, barWidth, 3, 2, theme.border);
-        int progress = Math.round(barWidth * this.config.sensitivity() / 100.0f);
-        RoundedGui.fill(graphics, barX, barY, progress, 3, 2, theme.accent);
-        RoundedGui.fill(graphics, barX + Math.max(0, progress - 2), barY - 2, 5, 7, 3, theme.text);
-    }
-
-    private void drawVisualSettings(DrawContext graphics, VisualModule module, int x, int y, int mouseX, int mouseY, Theme theme) {
-        switch (module) {
-            case STORAGE_ESP -> drawSettingToggle(graphics, x, y, this.storageTracerRow, mouseX, mouseY, theme);
-            case ITEM_ESP -> {
-                drawSettingToggle(graphics, x, y, this.itemTracerRow, mouseX, mouseY, theme);
-                int settingY = y + SETTING_HEIGHT;
-                for (ItemEspCategory category : ITEM_CATEGORIES) {
-                    drawItemSetting(graphics, x, settingY, category, mouseX, mouseY, theme);
-                    settingY += SETTING_HEIGHT;
-                }
-            }
-            case TUNNEL_ESP -> {
-                drawColorSetting(graphics, x, y, "1 x 2 tunnels", this.config.tunnelTwoByOneColor, mouseX, mouseY, theme);
-                drawColorSetting(graphics, x, y + SETTING_HEIGHT, "3 x 3 tunnels", this.config.tunnelThreeByThreeColor, mouseX, mouseY, theme);
-            }
-            case BLOCK_ENTITY_DEBUG -> {
-                RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SETTING_HEIGHT - 2, 4, theme.setting);
-                graphics.drawText(font(), "Visible targets", x + 12, y + 3, theme.muted, false);
-                String count = Integer.toString(EspRenderer.targetCount());
-                graphics.drawText(font(), count, x + PANEL_WIDTH - 9 - font().getWidth(count), y + 3, theme.secondary, false);
-            }
-            default -> {
-            }
-        }
-    }
-
-    private void drawItemSetting(DrawContext graphics, int x, int y, ItemEspCategory category, int mouseX, int mouseY, Theme theme) {
-        int color = inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT) ? theme.hover : theme.setting;
-        RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SETTING_HEIGHT - 2, 4, color);
-        graphics.drawText(font(), category.label(), x + 12, y + 3, theme.muted, false);
-        drawSwatch(graphics, x + PANEL_WIDTH - 43, y + 3, this.config.itemEspColor(category), theme);
-        drawSwitch(graphics, x + PANEL_WIDTH - 24, y + 3, this.config.itemEspEnabled(category), theme);
-    }
-
-    private void drawColorSetting(DrawContext graphics, int x, int y, String label, int color, int mouseX, int mouseY, Theme theme) {
-        int background = inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT) ? theme.hover : theme.setting;
-        RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SETTING_HEIGHT - 2, 4, background);
-        graphics.drawText(font(), label, x + 12, y + 3, theme.muted, false);
-        drawSwatch(graphics, x + PANEL_WIDTH - 19, y + 3, color, theme);
-    }
-
-    private void drawRowBackground(DrawContext graphics, int x, int y, int height, int mouseX, int mouseY, Theme theme) {
-        int color = inside(mouseX, mouseY, x, y, PANEL_WIDTH, height) ? theme.hover : theme.row;
-        RoundedGui.fill(graphics, x + 4, y + 1, PANEL_WIDTH - 8, height - 2, CARD_RADIUS, color);
-    }
-
-    private static void drawSwitch(DrawContext graphics, int x, int y, boolean enabled, Theme theme) {
-        RoundedGui.fill(graphics, x, y, 18, 8, 4, enabled ? theme.accent : theme.border);
-        int knobX = enabled ? x + 10 : x + 1;
-        RoundedGui.fill(graphics, knobX, y + 1, 7, 6, 3, enabled ? theme.text : theme.muted);
-    }
-
-    private static void drawSwatch(DrawContext graphics, int x, int y, int color, Theme theme) {
-        RoundedGui.outline(graphics, x, y, 10, 10, 4, 1, theme.border, color);
-    }
+    // -----------------------------------------------------------------------------------------
+    // Input
+    // -----------------------------------------------------------------------------------------
 
     @Override
     public boolean mouseClicked(Click click, boolean doubled) {
@@ -435,168 +544,130 @@ public final class ArcaneSettingsScreen extends Screen {
             setBinding(InputUtil.Type.MOUSE.createFromCode(click.button()));
             return true;
         }
-        int button = click.button();
-        if (button != 0 && button != 1) return super.mouseClicked(click, doubled);
 
         int mouseX = (int) click.x();
         int mouseY = (int) click.y();
-        if (button == 0 && inside(mouseX, mouseY, themeButtonX(), 8, 78, 17)) {
-            this.config.uiTheme = (this.config.uiTheme + 1) % THEMES.length;
-            return true;
+        int button = click.button();
+        if (button < 0 || button > 2) {
+            return super.mouseClicked(click, doubled);
         }
 
-        Panel header = headerAt(mouseX, mouseY);
-        if (header != null && button == 0) {
-            this.draggingPanel = header;
-            this.panelDragOffsetX = mouseX - header.x;
-            this.panelDragOffsetY = mouseY - header.y;
-            this.panelMoved = false;
-            return true;
+        for (int index = this.categories.size() - 1; index >= 0; index--) {
+            GuiCategory category = this.categories.get(index);
+            for (Row row : layout(category)) {
+                if (!row.contains(mouseX, mouseY)) {
+                    continue;
+                }
+                Boolean delegated = handleRowClick(row, click, doubled, mouseX, mouseY, button);
+                if (delegated != null) {
+                    return delegated;
+                }
+            }
         }
-        if (handleFinderClick(mouseX, mouseY, button)
-            || handleRenderClick(mouseX, mouseY, button)
-            || handlePlayerClick(mouseX, mouseY, button)
-            || handleChatClick(mouseX, mouseY, button)) return true;
-        if (button == 0 && handleBindClick(mouseX, mouseY)) return true;
         return super.mouseClicked(click, doubled);
     }
 
-    private boolean handleFinderClick(int mouseX, int mouseY, int button) {
-        if (!this.finderPanel.open || !matches("Base scanner")) return false;
-        int moduleY = this.finderPanel.y + HEADER_HEIGHT;
-        if (inside(mouseX, mouseY, this.finderPanel.x, moduleY, PANEL_WIDTH, ROW_HEIGHT)) {
-            if (button == 1) this.finderExpanded = !this.finderExpanded;
-            else this.config.enabled = !this.config.enabled;
-            return true;
-        }
-        if (!this.finderExpanded || button != 0) return false;
-
-        int sliderY = moduleY + ROW_HEIGHT;
-        if (inside(mouseX, mouseY, this.finderPanel.x, sliderY, PANEL_WIDTH, SLIDER_HEIGHT)) {
-            this.draggingSensitivity = true;
-            updateSensitivity(mouseX);
-            return true;
-        }
-        int settingsY = sliderY + SLIDER_HEIGHT;
-        List<ToggleRow> settings = finderSettings();
-        int index = rowIndex(mouseY, settingsY, settings.size(), SETTING_HEIGHT);
-        if (index >= 0 && inside(mouseX, mouseY, this.finderPanel.x, settingsY, PANEL_WIDTH, settings.size() * SETTING_HEIGHT)) {
-            settings.get(index).toggle();
-            return true;
-        }
-        return false;
-    }
-
-    private boolean handleRenderClick(int mouseX, int mouseY, int button) {
-        if (!this.renderPanel.open) return false;
-        int rowY = this.renderPanel.y + HEADER_HEIGHT;
-        for (VisualRow row : visibleVisualRows()) {
-            if (inside(mouseX, mouseY, this.renderPanel.x, rowY, PANEL_WIDTH, ROW_HEIGHT)) {
-                if (button == 1 && row.hasSettings()) {
-                    this.expandedVisual = this.expandedVisual == row.module() ? null : row.module();
-                } else if (button == 0) row.toggle();
+    /** Returns the click result, or {@code null} when the row ignores this button and drawing continues. */
+    private @Nullable Boolean handleRowClick(Row row, Click click, boolean doubled, int mouseX, int mouseY, int button) {
+        switch (row.kind()) {
+            case HEADER -> {
+                if (button != 0) {
+                    return true;
+                }
+                this.draggingCategory = row.category();
+                this.dragOffsetX = mouseX - row.category().x();
+                this.dragOffsetY = mouseY - row.category().y();
+                this.dragMoved = false;
                 return true;
             }
-            rowY += ROW_HEIGHT;
-            if (row.module() != this.expandedVisual) continue;
-            int height = visualSettingsHeight(row.module());
-            if (inside(mouseX, mouseY, this.renderPanel.x, rowY, PANEL_WIDTH, height)) {
-                return handleVisualSettingClick(row.module(), mouseX, mouseY, rowY, button);
-            }
-            rowY += height;
-        }
-        return false;
-    }
-
-    private boolean handleVisualSettingClick(VisualModule module, int mouseX, int mouseY, int settingsY, int button) {
-        if (button != 0) return true;
-        switch (module) {
-            case STORAGE_ESP -> this.config.storageTracers = !this.config.storageTracers;
-            case ITEM_ESP -> {
-                int index = rowIndex(mouseY, settingsY, ITEM_CATEGORIES.length + 1, SETTING_HEIGHT);
-                if (index == 0) this.config.itemTracers = !this.config.itemTracers;
-                else if (index > 0) {
-                    ItemEspCategory category = ITEM_CATEGORIES[index - 1];
-                    int swatchX = this.renderPanel.x + PANEL_WIDTH - 43;
-                    if (inside(mouseX, mouseY, swatchX, settingsY + index * SETTING_HEIGHT + 3, 12, 12)) {
-                        this.config.setItemEspColor(category, ColorPalette.next(this.config.itemEspColor(category)));
-                    } else this.config.setItemEspEnabled(category, !this.config.itemEspEnabled(category));
+            case MODULE -> {
+                GuiModule module = row.module();
+                if (module == null) {
+                    return true;
                 }
+                setFocused(null);
+                if (button == 2) {
+                    startListening(firstBind(module));
+                    return true;
+                }
+                if (button == 1 || !module.toggleable()) {
+                    if (module.hasSettings()) {
+                        module.setExpanded(!module.expanded());
+                    }
+                    return true;
+                }
+                module.toggle();
+                return true;
             }
-            case TUNNEL_ESP -> {
-                int index = rowIndex(mouseY, settingsY, 2, SETTING_HEIGHT);
-                if (index == 0) this.config.tunnelTwoByOneColor = ColorPalette.next(this.config.tunnelTwoByOneColor);
-                else if (index == 1) this.config.tunnelThreeByThreeColor = ColorPalette.next(this.config.tunnelThreeByThreeColor);
+            case DESCRIPTION, NEST_FOOT -> {
+                return true;
             }
-            default -> {
+            case SETTING -> {
+                return handleSettingClick(row, click, doubled, mouseX, mouseY, button);
             }
         }
         return true;
     }
 
-    private boolean handlePlayerClick(int mouseX, int mouseY, int button) {
-        if (!this.playerPanel.open || button != 0) return false;
-        int rowY = this.playerPanel.y + HEADER_HEIGHT;
-        List<ToggleRow> rows = visiblePlayerRows();
-        int index = rowIndex(mouseY, rowY, rows.size(), ROW_HEIGHT);
-        if (index >= 0 && inside(mouseX, mouseY, this.playerPanel.x, rowY, PANEL_WIDTH, rows.size() * ROW_HEIGHT)) {
-            rows.get(index).toggle();
+    private @Nullable Boolean handleSettingClick(Row row, Click click, boolean doubled, int mouseX, int mouseY, int button) {
+        GuiSetting setting = row.setting();
+        if (setting == null) {
             return true;
         }
-        int profileY = rowY + rows.size() * ROW_HEIGHT;
-        if (performanceProfileVisible() && inside(mouseX, mouseY, this.playerPanel.x, profileY, PANEL_WIDTH, ROW_HEIGHT)) {
-            this.config.cyclePerformanceProfile();
-            this.nextPerformanceLabelUpdateNanos = 0L;
-            ArcaneClient.engine().settingsChanged(this.client);
+        if (setting instanceof GuiSetting.Message message) {
+            int fieldX = macroFieldX(row.x());
+            if (mouseX >= fieldX - 3 && mouseX < fieldX + MACRO_FIELD_WIDTH + 3) {
+                return super.mouseClicked(click, doubled);
+            }
+            if (button == 0 && message.mapping() != null && mouseX >= row.x() + WINDOW_WIDTH - 48) {
+                startListening(message.mapping());
+            }
             return true;
         }
-        return false;
-    }
-
-    private boolean handleBindClick(int mouseX, int mouseY) {
-        if (!this.bindsPanel.open) return false;
-        int rowY = this.bindsPanel.y + HEADER_HEIGHT;
-        List<ArcaneKeybinds.Entry> entries = visibleBindings();
-        int index = rowIndex(mouseY, rowY, entries.size(), ROW_HEIGHT);
-        if (index >= 0 && inside(mouseX, mouseY, this.bindsPanel.x, rowY, PANEL_WIDTH, entries.size() * ROW_HEIGHT)) {
-            this.listeningFor = entries.get(index).mapping();
+        if (button != 0) {
             return true;
         }
-        return false;
-    }
-
-    private boolean handleChatClick(int mouseX, int mouseY, int button) {
-        if (!this.chatPanel.open || !matches("Chat macros")) return false;
-        int moduleY = this.chatPanel.y + HEADER_HEIGHT;
-        if (inside(mouseX, mouseY, this.chatPanel.x, moduleY, PANEL_WIDTH, ROW_HEIGHT)) {
-            if (button == 1) this.chatExpanded = !this.chatExpanded;
-            else this.config.chatMacros = !this.config.chatMacros;
-            return true;
+        setFocused(null);
+        switch (setting) {
+            case GuiSetting.Toggle toggle -> toggle.toggle();
+            case GuiSetting.ToggleSwatch toggle -> {
+                if (mouseX >= row.x() + WINDOW_WIDTH - 41 && mouseX < row.x() + WINDOW_WIDTH - 27) {
+                    toggle.cycleColor();
+                } else {
+                    toggle.toggle();
+                }
+            }
+            case GuiSetting.Slider slider -> {
+                if (mouseY >= row.y() + row.height() - 13) {
+                    this.draggingSlider = slider;
+                    this.sliderTrackX = sliderTrackX(row.x());
+                    this.sliderTrackWidth = sliderTrackWidth();
+                    updateSlider(mouseX);
+                }
+            }
+            case GuiSetting.Swatch swatch -> swatch.cycleColor();
+            case GuiSetting.Cycle cycle -> cycle.next();
+            case GuiSetting.Bind bind -> startListening(bind.mapping());
+            case GuiSetting.Info ignored -> {
+            }
+            case GuiSetting.Message ignored -> {
+            }
         }
-        if (!this.chatExpanded || button != 0) return false;
-        int settingsY = moduleY + ROW_HEIGHT;
-        int index = rowIndex(mouseY, settingsY, 4, MACRO_ROW_HEIGHT);
-        if (index >= 0 && inside(mouseX, mouseY, this.chatPanel.x + 105, settingsY + index * MACRO_ROW_HEIGHT, 31, MACRO_ROW_HEIGHT)) {
-            this.listeningFor = ArcaneClient.keybinds().chatMacros().get(index);
-            setMacroInputsVisible(false);
-            return true;
-        }
-        return false;
+        return true;
     }
 
     @Override
     public boolean mouseDragged(Click click, double offsetX, double offsetY) {
-        if (this.draggingPanel != null) {
-            int newX = (int) click.x() - this.panelDragOffsetX;
-            int newY = (int) click.y() - this.panelDragOffsetY;
-            this.panelMoved |= Math.abs(newX - this.draggingPanel.x) > 1 || Math.abs(newY - this.draggingPanel.y) > 1;
-            this.draggingPanel.x = newX;
-            this.draggingPanel.y = newY;
-            this.draggingPanel.clamp(this.width, this.height);
+        if (this.draggingCategory != null) {
+            int newX = (int) click.x() - this.dragOffsetX;
+            int newY = (int) click.y() - this.dragOffsetY;
+            this.dragMoved |= Math.abs(newX - this.draggingCategory.x()) > 1 || Math.abs(newY - this.draggingCategory.y()) > 1;
+            this.draggingCategory.moveTo(newX, newY);
+            clamp(this.draggingCategory);
             return true;
         }
-        if (this.draggingSensitivity) {
-            updateSensitivity((int) click.x());
+        if (this.draggingSlider != null) {
+            updateSlider((int) click.x());
             return true;
         }
         return super.mouseDragged(click, offsetX, offsetY);
@@ -604,13 +675,15 @@ public final class ArcaneSettingsScreen extends Screen {
 
     @Override
     public boolean mouseReleased(Click click) {
-        if (this.draggingPanel != null) {
-            if (!this.panelMoved) this.draggingPanel.open = !this.draggingPanel.open;
-            this.draggingPanel = null;
+        if (this.draggingCategory != null) {
+            if (!this.dragMoved) {
+                this.draggingCategory.toggleOpen();
+            }
+            this.draggingCategory = null;
             return true;
         }
-        if (this.draggingSensitivity) {
-            this.draggingSensitivity = false;
+        if (this.draggingSlider != null) {
+            this.draggingSlider = null;
             return true;
         }
         return super.mouseReleased(click);
@@ -619,8 +692,11 @@ public final class ArcaneSettingsScreen extends Screen {
     @Override
     public boolean keyPressed(KeyInput input) {
         if (this.listeningFor != null) {
-            if (input.key() == 256 || input.key() == 261 || input.key() == 259) setBinding(InputUtil.UNKNOWN_KEY);
-            else setBinding(InputUtil.fromKeyCode(input));
+            if (input.key() == 256 || input.key() == 261 || input.key() == 259) {
+                setBinding(InputUtil.UNKNOWN_KEY);
+            } else {
+                setBinding(InputUtil.fromKeyCode(input));
+            }
             return true;
         }
         if (input.key() == 256 && this.searchInput != null && this.searchInput.isFocused() && !this.searchText.isEmpty()) {
@@ -631,263 +707,158 @@ public final class ArcaneSettingsScreen extends Screen {
         return super.keyPressed(input);
     }
 
+    private void startListening(@Nullable KeyBinding mapping) {
+        if (mapping == null) {
+            return;
+        }
+        this.listeningFor = mapping;
+        for (int slot = 0; slot < MACRO_COUNT; slot++) {
+            this.macroInputs.get(slot).setFocused(false);
+        }
+    }
+
     private void setBinding(InputUtil.Key key) {
+        if (this.listeningFor == null) {
+            return;
+        }
         this.listeningFor.setBoundKey(key);
         this.listeningFor = null;
         KeyBinding.updateKeysByCode();
         this.client.options.write();
     }
 
-    private void updateSensitivity(int mouseX) {
-        int barX = this.finderPanel.x + 12;
-        int barWidth = PANEL_WIDTH - 24;
-        this.config.setSensitivity(Math.round(100.0f * (mouseX - barX) / barWidth));
-    }
-
-    private void setMacroInputsVisible(boolean visible) {
-        if (this.macroInputsVisible == visible) return;
-        this.macroInputsVisible = visible;
-        for (TextFieldWidget input : this.macroInputs) {
-            input.setVisible(visible);
-            if (!visible) input.setFocused(false);
-        }
-    }
-
-    private TextRenderer font() {
-        if (this.uiFont == null) {
-            this.uiFont = ArcaneFont.renderer(this.client);
-        }
-        return this.uiFont;
-    }
-
-    private List<ToggleRow> finderSettings() {
-        return this.finderSettings;
-    }
-
-    private List<VisualRow> visualRows() {
-        return this.visualRows;
-    }
-
-    private List<ToggleRow> playerRows() {
-        return this.playerRows;
-    }
-
-    private List<VisualRow> visibleVisualRows() {
-        return this.filteredVisualRows;
-    }
-
-    private List<ToggleRow> visiblePlayerRows() {
-        return this.filteredPlayerRows;
-    }
-
-    private List<ArcaneKeybinds.Entry> visibleBindings() {
-        return this.filteredBindingRows;
-    }
-
-    private void updateFilter(String value) {
-        this.searchText = value;
-        this.normalizedQuery = value.trim().toLowerCase(Locale.ROOT);
-        if (this.normalizedQuery.isEmpty()) {
-            this.filteredVisualRows = this.visualRows;
-            this.filteredPlayerRows = this.playerRows;
-            this.filteredBindingRows = this.bindingRows;
+    private void updateSlider(int mouseX) {
+        if (this.draggingSlider == null || this.sliderTrackWidth <= 0) {
             return;
         }
-
-        ArrayList<VisualRow> visuals = new ArrayList<>();
-        for (VisualRow row : this.visualRows) {
-            if (matches(row.label())) visuals.add(row);
-        }
-        this.filteredVisualRows = List.copyOf(visuals);
-
-        ArrayList<ToggleRow> players = new ArrayList<>();
-        for (ToggleRow row : this.playerRows) {
-            if (matches(row.label())) players.add(row);
-        }
-        this.filteredPlayerRows = List.copyOf(players);
-
-        ArrayList<ArcaneKeybinds.Entry> bindings = new ArrayList<>();
-        for (ArcaneKeybinds.Entry entry : this.bindingRows) {
-            if (matches(entry.label())) bindings.add(entry);
-        }
-        this.filteredBindingRows = List.copyOf(bindings);
+        this.draggingSlider.setFraction((float) (mouseX - this.sliderTrackX) / this.sliderTrackWidth);
     }
 
-    private boolean matches(String label) {
-        return this.normalizedQuery.isEmpty() || label.toLowerCase(Locale.ROOT).contains(this.normalizedQuery);
-    }
-
-    private String query() {
-        return this.normalizedQuery;
-    }
-
-    private int visibleModuleCount() {
-        return (matches("Base scanner") ? 1 : 0)
-            + visibleVisualRows().size()
-            + visiblePlayerRows().size()
-            + (matches("Chat macros") ? 1 : 0)
-            + (performanceProfileVisible() ? 1 : 0);
-    }
-
-    private boolean performanceProfileVisible() {
-        return matches("Performance profile High FPS Balanced Quality");
-    }
-
-    private void updatePerformanceLabel() {
-        long now = System.nanoTime();
-        if (now < this.nextPerformanceLabelUpdateNanos && !this.performanceLabel.isEmpty()) return;
-        this.compactFpsLabel = this.client.getCurrentFps() + " FPS";
-        this.performanceLabel = activeModuleCount() + " ACTIVE   " + this.compactFpsLabel + "   "
-            + this.config.performanceProfile().label();
-        this.nextPerformanceLabelUpdateNanos = now + 250_000_000L;
-    }
-    private int activeModuleCount() {
-        int active = 0;
-        if (this.config.enabled) active++;
-        if (this.config.overlay) active++;
-        if (this.config.hud) active++;
-        if (this.config.chunkAnalysis) active++;
-        if (this.config.esp) active++;
-        if (this.config.itemEsp) active++;
-        if (this.config.tunnelEsp) active++;
-        if (this.config.stashAlerts) active++;
-        if (this.config.blockEntityDebug) active++;
-        if (this.config.autoTotem) active++;
-        if (FreecamController.isActive()) active++;
-        if (this.config.chatMacros) active++;
-        return active;
-    }
-
-    private static int activeVisualCount(List<VisualRow> rows) {
-        int active = 0;
-        for (VisualRow row : rows) {
-            if (row.value().getAsBoolean()) active++;
-        }
-        return active;
-    }
-
-    private static int activeToggleCount(List<ToggleRow> rows) {
-        int active = 0;
-        for (ToggleRow row : rows) {
-            if (row.value().getAsBoolean()) active++;
-        }
-        return active;
-    }
-
-    private static boolean containsVisualModule(List<VisualRow> rows, VisualModule module) {
-        for (VisualRow row : rows) {
-            if (row.module() == module) return true;
-        }
-        return false;
-    }
-
-    private static int visualSettingsHeight(VisualModule module) {
-        return switch (module) {
-            case STORAGE_ESP, BLOCK_ENTITY_DEBUG -> SETTING_HEIGHT;
-            case ITEM_ESP -> SETTING_HEIGHT * (ITEM_CATEGORIES.length + 1);
-            case TUNNEL_ESP -> SETTING_HEIGHT * 2;
-            default -> 0;
-        };
-    }
-
-    private Panel headerAt(int mouseX, int mouseY) {
-        for (Panel panel : new Panel[]{this.chatPanel, this.bindsPanel, this.playerPanel, this.renderPanel, this.finderPanel}) {
-            if (inside(mouseX, mouseY, panel.x, panel.y, PANEL_WIDTH, HEADER_HEIGHT)) return panel;
+    private static @Nullable KeyBinding firstBind(GuiModule module) {
+        for (GuiSetting setting : module.settings()) {
+            if (setting instanceof GuiSetting.Bind bind) {
+                return bind.mapping();
+            }
         }
         return null;
     }
 
-    private void layoutPanels() {
-        int top = TOP_BAR_HEIGHT + 8;
-        int requiredFive = PANEL_WIDTH * 5 + GAP * 6;
-        int requiredFour = PANEL_WIDTH * 4 + GAP * 5;
-        int requiredThree = PANEL_WIDTH * 3 + GAP * 4;
-        int requiredTwo = PANEL_WIDTH * 2 + GAP * 3;
+    // -----------------------------------------------------------------------------------------
+    // Search and status
+    // -----------------------------------------------------------------------------------------
 
-        if (this.width >= requiredFive) {
-            int start = (this.width - (PANEL_WIDTH * 5 + GAP * 4)) / 2;
-            place(this.finderPanel, start, top);
-            place(this.renderPanel, start + (PANEL_WIDTH + GAP), top);
-            place(this.playerPanel, start + (PANEL_WIDTH + GAP) * 2, top);
-            place(this.bindsPanel, start + (PANEL_WIDTH + GAP) * 3, top);
-            place(this.chatPanel, start + (PANEL_WIDTH + GAP) * 4, top);
-        } else if (this.width >= requiredFour) {
-            int start = (this.width - (PANEL_WIDTH * 4 + GAP * 3)) / 2;
-            place(this.finderPanel, start, top);
-            place(this.renderPanel, start + (PANEL_WIDTH + GAP), top);
-            place(this.playerPanel, start + (PANEL_WIDTH + GAP) * 2, top);
-            place(this.bindsPanel, start + (PANEL_WIDTH + GAP) * 3, top);
-            place(this.chatPanel, start, top + 78);
-        } else if (this.width >= requiredThree) {
-            int start = (this.width - (PANEL_WIDTH * 3 + GAP * 2)) / 2;
-            place(this.finderPanel, start, top);
-            place(this.renderPanel, start + (PANEL_WIDTH + GAP), top);
-            place(this.playerPanel, start + (PANEL_WIDTH + GAP) * 2, top);
-            place(this.bindsPanel, start, top + 46);
-            this.bindsPanel.open = false;
-            place(this.chatPanel, start + (PANEL_WIDTH + GAP) * 2, top + 78);
-        } else if (this.width >= requiredTwo) {
-            int start = (this.width - (PANEL_WIDTH * 2 + GAP)) / 2;
-            place(this.finderPanel, start, top);
-            place(this.renderPanel, start + PANEL_WIDTH + GAP, top);
-            place(this.playerPanel, start, top + 46);
-            place(this.chatPanel, start, top + 128);
-            place(this.bindsPanel, start + PANEL_WIDTH + GAP, this.height - 22 - HEADER_HEIGHT);
-            this.bindsPanel.open = false;
-        } else {
-            int x = Math.max(0, (this.width - PANEL_WIDTH) / 2);
-            place(this.finderPanel, x, top);
-            place(this.renderPanel, x, top + 26);
-            place(this.playerPanel, x, top + 52);
-            place(this.bindsPanel, x, top + 78);
-            place(this.chatPanel, x, top + 104);
-            this.finderPanel.open = false;
-            this.renderPanel.open = false;
-            this.playerPanel.open = false;
-            this.bindsPanel.open = false;
-            this.chatPanel.open = false;
+    private void updateFilter(String value) {
+        this.searchText = value;
+        this.query = value.trim().toLowerCase(Locale.ROOT);
+        for (GuiCategory category : this.categories) {
+            category.filter(this.query);
         }
     }
 
-    private static void place(Panel panel, int x, int y) {
-        panel.x = x;
-        panel.y = y;
+    private int visibleModuleCount() {
+        int count = 0;
+        for (GuiCategory category : this.categories) {
+            count += category.visible().size();
+        }
+        return count;
+    }
+
+    private int activeModuleCount() {
+        int active = 0;
+        for (GuiCategory category : this.categories) {
+            for (GuiModule module : category.modules()) {
+                if (module.enabled()) {
+                    active++;
+                }
+            }
+        }
+        return active;
+    }
+
+    private int toggleableModuleCount() {
+        int count = 0;
+        for (GuiCategory category : this.categories) {
+            for (GuiModule module : category.modules()) {
+                if (module.toggleable()) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private void updateFpsLabel() {
+        long now = System.nanoTime();
+        if (now < this.nextFpsUpdateNanos && !this.fpsLabel.isEmpty()) {
+            return;
+        }
+        this.fpsLabel = this.client.getCurrentFps() + " FPS";
+        this.nextFpsUpdateNanos = now + 250_000_000L;
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // Geometry helpers
+    // -----------------------------------------------------------------------------------------
+
+    private static int sliderTrackX(int windowX) {
+        return windowX + NEST_INSET + 5;
+    }
+
+    private static int sliderTrackWidth() {
+        return WINDOW_WIDTH - NEST_INSET - 18;
+    }
+
+    private static int macroFieldX(int windowX) {
+        return windowX + NEST_INSET + 17;
+    }
+
+    private void hideMacroInput(int slot) {
+        TextFieldWidget input = this.macroInputs.get(slot);
+        if (!input.visible) {
+            return;
+        }
+        input.setVisible(false);
+        input.setFocused(false);
+    }
+
+    private void clamp(GuiCategory category) {
+        category.clamp(this.width, WINDOW_WIDTH, HEADER_HEIGHT, TOP_BAR_HEIGHT + 4, this.height - BOTTOM_BAR_HEIGHT - 4);
     }
 
     private int searchWidth() {
-        return Math.clamp(this.width - 360, 96, 180);
+        return Math.clamp(this.width - 400, 104, 180);
     }
 
     private int searchX(int searchWidth) {
         return (this.width - searchWidth) / 2;
     }
 
-    private int themeButtonX() {
-        return this.width - 86;
+    private ClickGuiTheme theme() {
+        return ClickGuiTheme.fromConfig(this.config.uiTheme);
     }
 
-    private void clampPanels() {
-        this.finderPanel.clamp(this.width, this.height);
-        this.renderPanel.clamp(this.width, this.height);
-        this.playerPanel.clamp(this.width, this.height);
-        this.bindsPanel.clamp(this.width, this.height);
-        this.chatPanel.clamp(this.width, this.height);
+    private TextRenderer font() {
+        if (this.uiFont == null) {
+            this.uiFont = ArcaneFont.renderer(this.client == null ? MinecraftClient.getInstance() : this.client);
+        }
+        return this.uiFont;
     }
 
-    private Theme theme() {
-        return THEMES[Math.floorMod(this.config.uiTheme, THEMES.length)];
+    /** Text fields draw plain strings, so they need the style applied through a formatter. */
+    private void styleField(TextFieldWidget input) {
+        input.addFormatter((value, offset) -> ArcaneFont.text(value).asOrderedText());
     }
 
-    private static int rowIndex(int mouseY, int startY, int count, int rowHeight) {
-        int index = (mouseY - startY) / rowHeight;
-        return mouseY >= startY && index >= 0 && index < count ? index : -1;
+    private int lineHeight() {
+        return font().fontHeight;
     }
 
-    private static boolean inside(int mouseX, int mouseY, int x, int y, int width, int height) {
-        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
+    /** Leading for wrapped prose, which needs a little more air than a single-line label. */
+    private int proseHeight() {
+        return font().fontHeight + 1;
     }
 
-    public static boolean isOpen(net.minecraft.client.MinecraftClient client) {
+    public static boolean isOpen(MinecraftClient client) {
         return client.currentScreen instanceof ArcaneSettingsScreen;
     }
 
@@ -900,7 +871,9 @@ public final class ArcaneSettingsScreen extends Screen {
     public void removed() {
         this.config.save();
         this.client.options.write();
-        if (!this.scannerWasEnabled && this.config.enabled) ArcaneClient.engine().queueNearby(this.client);
+        if (!this.scannerWasEnabled && this.config.enabled) {
+            ArcaneClient.engine().queueNearby(this.client);
+        }
         ArcaneClient.engine().settingsChanged(this.client);
     }
 
@@ -910,78 +883,30 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     @Environment(EnvType.CLIENT)
-    private static final class Panel {
-        private int x;
-        private int y;
-        private boolean open = true;
-        private int lastHeight = HEADER_HEIGHT;
-
-        private void clamp(int screenWidth, int screenHeight) {
-            this.x = Math.clamp(this.x, 0, Math.max(0, screenWidth - PANEL_WIDTH));
-            this.y = Math.clamp(this.y, TOP_BAR_HEIGHT + 4, Math.max(TOP_BAR_HEIGHT + 4, screenHeight - this.lastHeight - 22));
-        }
+    private record WrapKey(String text, int maxWidth) {
     }
 
     @Environment(EnvType.CLIENT)
-    private record ToggleRow(String label, BooleanSupplier value, Consumer<Boolean> setter) {
-        private void toggle() {
-            this.setter.accept(!this.value.getAsBoolean());
-        }
+    private enum RowKind {
+        HEADER,
+        MODULE,
+        DESCRIPTION,
+        SETTING,
+        NEST_FOOT
     }
 
     @Environment(EnvType.CLIENT)
-    private enum VisualModule {
-        CHUNK_TILES(false),
-        CHUNK_RADAR(false),
-        CHUNK_ANALYSIS(false),
-        STORAGE_ESP(true),
-        ITEM_ESP(true),
-        TUNNEL_ESP(true),
-        STASH_ALERTS(false),
-        BLOCK_ENTITY_DEBUG(true);
-
-        private final boolean hasSettings;
-
-        VisualModule(boolean hasSettings) {
-            this.hasSettings = hasSettings;
-        }
-    }
-
-    @Environment(EnvType.CLIENT)
-    private record VisualRow(VisualModule module, String label, BooleanSupplier value, Consumer<Boolean> setter) {
-        private boolean hasSettings() {
-            return this.module.hasSettings;
-        }
-
-        private void toggle() {
-            this.setter.accept(!this.value.getAsBoolean());
-        }
-    }
-
-    @Environment(EnvType.CLIENT)
-    private enum Theme {
-        ARCANE("ARCANE", 0xFF9A8CFF, 0xFFC3BCFF),
-        FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF),
-        ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1);
-
-        private final String label;
-        private final int accent;
-        private final int secondary;
-        private final int backdrop = 0x78000000;
-        private final int topBar = 0xE8101114;
-        private final int panel = 0xF0121317;
-        private final int header = 0xF017181D;
-        private final int row = 0xEC1B1C22;
-        private final int setting = 0xEC202127;
-        private final int hover = 0xF02A2C34;
-        private final int border = 0xFF3A3C45;
-        private final int text = 0xFFF4F4F5;
-        private final int muted = 0xFFA1A1AA;
-
-        Theme(String label, int accent, int secondary) {
-            this.label = label;
-            this.accent = accent;
-            this.secondary = secondary;
+    private record Row(
+        RowKind kind,
+        GuiCategory category,
+        @Nullable GuiModule module,
+        @Nullable GuiSetting setting,
+        int x,
+        int y,
+        int height
+    ) {
+        private boolean contains(int mouseX, int mouseY) {
+            return mouseX >= this.x && mouseX < this.x + WINDOW_WIDTH && mouseY >= this.y && mouseY < this.y + this.height;
         }
     }
 }
