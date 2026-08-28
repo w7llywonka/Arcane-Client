@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
   <title id="title">Arcane Client</title>
-  <path d="M12 52 31.7 12" fill="none" stroke="#4F8DFF" stroke-width="6" stroke-linecap="round"/>
-  <path d="M31.7 12 52 52" fill="none" stroke="#8A63FF" stroke-width="6" stroke-linecap="round"/>
-  <path d="M20 38h24" fill="none" stroke="#F3F4F8" stroke-width="6" stroke-linecap="round"/>
+  <path d="M12 52 31.7 12" fill="none" stroke="#5CC982" stroke-width="6" stroke-linecap="round"/>
+  <path d="M31.7 12 52 52" fill="none" stroke="#A7D96F" stroke-width="6" stroke-linecap="round"/>
+  <path d="M20 38h24" fill="none" stroke="#EDF7F0" stroke-width="6" stroke-linecap="round"/>
 </svg>

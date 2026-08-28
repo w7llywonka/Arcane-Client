@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Arcane Client is a Fabric 1.21.11 growth scanner built around deliberate crop and plant patterns.">
-  <meta name="theme-color" content="#0a0e14">
-  <title>Arcane Client — Growth Scanner</title>
+  <meta name="description" content="Arcane Client tracks growth activity from selected crops and plants to surface possible base locations.">
+  <meta name="theme-color" content="#08110d">
+  <title>Arcane Client — Growth-Based Base Finder</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -55,7 +55,7 @@
         <a href="#faq">FAQ</a>
       </div>
 
-      <a class="nav-action" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
+      <a class="nav-action" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
 
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
         <span></span>
@@ -69,7 +69,7 @@
       <a href="#features">Features</a>
       <a href="#pricing">Pricing</a>
       <a href="#faq">FAQ</a>
-      <a class="mobile-menu-action" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
+      <a class="mobile-menu-action" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
     </div>
   </nav>
 
@@ -84,15 +84,15 @@
 
       <div class="hero-copy">
         <h1 id="hero-title">
-          <span class="hero-word" style="--word-delay: 120ms">The</span>
-          <span class="hero-word" style="--word-delay: 190ms">smarter</span><br>
-          <span class="hero-word hero-accent" style="--word-delay: 260ms">growth</span>
-          <span class="hero-word" style="--word-delay: 330ms">scanner.</span>
+          <span class="hero-word hero-accent" style="--word-delay: 120ms">Growth</span>
+          <span class="hero-word" style="--word-delay: 190ms">leads</span><br>
+          <span class="hero-word" style="--word-delay: 260ms">to</span>
+          <span class="hero-word" style="--word-delay: 330ms">bases.</span>
         </h1>
-        <p>Reads deliberate crop and plant layouts in loaded chunks. Storage and light never affect the score.</p>
+        <p>Tracks changes from selected crops, saplings, sugar cane, cactus, and other growth states to surface possible base locations. Storage and light never affect a lead.</p>
         <div class="hero-actions">
           <a class="pill pill-primary pill-glint" href="#pricing">View plans</a>
-          <a class="pill pill-secondary" href="https://discord.com/" target="_blank" rel="noreferrer">Join Discord</a>
+          <a class="pill pill-secondary" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
         </div>
         <div class="hero-meta" role="group" aria-label="Client compatibility">
           <span>Fabric 1.21.11</span>
@@ -119,9 +119,9 @@
                 <path d="M12 21v-9m0 1C8 13 5 10 5 6c4 0 7 2 7 7Zm0 3c3 0 6-2 7-6-4 0-7 2-7 6Z"/>
               </svg>
             </div>
-            <h3>Growth-only scoring</h3>
-            <p>Organized crop plots, synchronized stages, farmland support, vertical farms, and repeated harvest activity.</p>
-            <span class="card-note">Storage and light ignored</span>
+            <h3>Tracked growth signals</h3>
+            <p>Monitors selected crops, saplings, sugar cane, cactus, stage changes, and repeated harvest activity across loaded chunks.</p>
+            <span class="card-note">Growth activity only</span>
           </article>
 
           <article class="feature-card reveal" style="--reveal-delay: 80ms">
@@ -149,8 +149,8 @@
               </svg>
             </div>
             <h3>Clear evidence</h3>
-            <p>Chunk tiles, radar, labels, alerts, and a current-chunk readout keep the reason behind every score visible.</p>
-            <span class="card-note">No mystery score</span>
+            <p>Chunk tiles, radar, labels, alerts, and a current-chunk readout show which tracked changes created each possible base lead.</p>
+            <span class="card-note">Every lead explained</span>
           </article>
         </div>
       </div>
@@ -161,8 +161,8 @@
         <div class="setup-grid">
           <article class="setup-main surface-card reveal">
             <span class="section-kicker">Easy to set up</span>
-            <h2>Drop it in.<br>Start scanning.</h2>
-            <p class="setup-intro">Arcane is a client-side Fabric mod. No installer maze and no extra storage service.</p>
+            <h2>Drop it in.<br>Start tracking.</h2>
+            <p class="setup-intro">Arcane is a client-side Fabric mod that tracks growth activity in loaded chunks. No installer maze and no extra storage service.</p>
 
             <ol class="setup-steps">
               <li>
@@ -221,7 +221,7 @@
           <article class="demo-card reveal" style="--reveal-delay: 0ms">
             <div class="demo-window">
               <header>
-                <span><i></i> Growth Scanner</span>
+                <span><i></i> Growth Tracker</span>
                 <small>Sample</small>
               </header>
               <div class="mini-map" aria-hidden="true">
@@ -234,8 +234,8 @@
             </div>
             <footer>
               <div>
-                <h3>Growth Scanner</h3>
-                <p>Loaded-chunk growth map</p>
+                <h3>Growth Tracker</h3>
+                <p>Loaded-chunk growth activity</p>
               </div>
               <span>01</span>
             </footer>
@@ -250,16 +250,16 @@
               <div class="intel-panel">
                 <div class="intel-score"><span>Current chunk</span><strong>78</strong></div>
                 <dl>
-                  <div><dt>Crop blocks</dt><dd>24</dd></div>
-                  <div><dt>Dominant stage</dt><dd>18</dd></div>
-                  <div><dt>Farmland support</dt><dd>15</dd></div>
+                  <div><dt>Tracked states</dt><dd>24</dd></div>
+                  <div><dt>Stage changes</dt><dd>18</dd></div>
+                  <div><dt>Growth events</dt><dd>15</dd></div>
                 </dl>
               </div>
             </div>
             <footer>
               <div>
                 <h3>Chunk Intel</h3>
-                <p>The evidence behind the score</p>
+                <p>The signals behind the lead</p>
               </div>
               <span>02</span>
             </footer>
@@ -275,7 +275,7 @@
                 <div><span>Storage ESP</span><i class="toggle on"></i></div>
                 <div><span>Item ESP</span><i class="toggle on"></i></div>
                 <div><span>Tunnel ESP</span><i class="toggle"></i></div>
-                <p>Never changes suspicion score.</p>
+                <p>Never creates a base lead.</p>
               </div>
             </div>
             <footer>
@@ -295,7 +295,7 @@
         <header class="section-heading reveal">
           <span class="section-kicker">Simple access</span>
           <h2 id="pricing-title">Choose your <em>plan.</em></h2>
-          <p>Every included tool is listed. Premium scanning is still in development.</p>
+          <p>Every included tool is listed. Premium growth tracking is still in development.</p>
         </header>
 
         <div class="plan-grid">
@@ -307,15 +307,15 @@
             <div class="plan-price"><sup>$</sup>5</div>
             <p>The complete Arcane 2.2 client available today.</p>
             <ul>
-              <li><span class="check" aria-hidden="true"></span>Growth scanner</li>
+              <li><span class="check" aria-hidden="true"></span>Growth-based base finder</li>
               <li><span class="check" aria-hidden="true"></span>Chunk map, radar, and intel</li>
-              <li><span class="check" aria-hidden="true"></span>Growth labels and alerts</li>
+              <li><span class="check" aria-hidden="true"></span>Base leads and growth alerts</li>
               <li><span class="check" aria-hidden="true"></span>Storage, Item, and Tunnel ESP</li>
               <li><span class="check" aria-hidden="true"></span>Freecam and Auto Totem</li>
               <li><span class="check" aria-hidden="true"></span>Chat macros and performance profiles</li>
               <li><span class="check" aria-hidden="true"></span>All client updates</li>
             </ul>
-            <a class="plan-action plan-action-secondary" href="https://discord.com/" target="_blank" rel="noreferrer">Ask about Base</a>
+            <a class="plan-action plan-action-secondary" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Ask about Base</a>
           </article>
 
           <article class="plan-card plan-card-featured reveal" style="--reveal-delay: 80ms">
@@ -325,18 +325,18 @@
               <small>Preview tier</small>
             </header>
             <div class="plan-price"><sup>$</sup>10</div>
-            <p>The Arcane toolset plus access to the future Premium scanner.</p>
+            <p>The Arcane toolset plus access to the future Premium growth tracker.</p>
             <ul>
-              <li><span class="check" aria-hidden="true"></span>Growth scanner</li>
+              <li><span class="check" aria-hidden="true"></span>Growth-based base finder</li>
               <li><span class="check" aria-hidden="true"></span>Chunk map, radar, and intel</li>
-              <li><span class="check" aria-hidden="true"></span>Growth labels and alerts</li>
+              <li><span class="check" aria-hidden="true"></span>Base leads and growth alerts</li>
               <li><span class="check" aria-hidden="true"></span>Storage, Item, and Tunnel ESP</li>
               <li><span class="check" aria-hidden="true"></span>Freecam and Auto Totem</li>
               <li><span class="check" aria-hidden="true"></span>Chat macros and performance profiles</li>
-              <li><span class="check" aria-hidden="true"></span>Premium scanner when released</li>
+              <li><span class="check" aria-hidden="true"></span>Premium growth tracker when released</li>
               <li><span class="check" aria-hidden="true"></span>All client updates</li>
             </ul>
-            <a class="plan-action plan-action-primary" href="https://discord.com/" target="_blank" rel="noreferrer">Join Premium waitlist</a>
+            <a class="plan-action plan-action-primary" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Premium waitlist</a>
           </article>
         </div>
       </div>
@@ -367,7 +367,7 @@
           </div>
         </div>
 
-        <a class="discord-callout reveal" href="https://discord.com/" target="_blank" rel="noreferrer">
+        <a class="discord-callout reveal" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">
           <span class="discord-mark" aria-hidden="true">A</span>
           <span>
             <strong>Arcane updates, support, and the Premium waitlist.</strong>
@@ -387,16 +387,16 @@
 
         <div class="faq-list">
           <details class="faq-item reveal" open>
-            <summary>What makes a chunk score higher?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Deliberate growth patterns: organized crop rows, synchronized stages, mature concentrations, sapling layouts, vertical farms, imported growth clusters, and repeated harvest activity.</p>
+            <summary>What creates a possible base lead?<span class="faq-plus" aria-hidden="true"></span></summary>
+            <p>Activity from selected growth states—including crops, saplings, sugar cane, and cactus—can create a lead. Repeated stage changes and harvest activity strengthen it.</p>
           </details>
           <details class="faq-item reveal">
             <summary>Do storage blocks or light affect the score?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>No. Storage, block entities, machines, placed-block density, interactions, and light have zero suspicion weight. The core discovery model is growth-only.</p>
+            <p>No. Storage, block entities, machines, placed-block density, interactions, and light have zero base-finding weight. The finder uses tracked growth activity.</p>
           </details>
           <details class="faq-item reveal">
             <summary>What do the ESP tools do?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Storage, Item, and Tunnel ESP are independent visual tools. They can help you inspect an area, but they never make a chunk suspicious.</p>
+            <p>Storage, Item, and Tunnel ESP are independent visual tools. They can help you inspect an area, but they never create or strengthen a base lead.</p>
           </details>
           <details class="faq-item reveal">
             <summary>Which Minecraft version is supported?<span class="faq-plus" aria-hidden="true"></span></summary>
@@ -408,7 +408,7 @@
           </details>
           <details class="faq-item reveal">
             <summary>What is different about Premium?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Premium is the future scanner tier and is still in development. The current Base client already includes the scanner, intel views, visual ESP tools, and player utilities listed above.</p>
+            <p>Premium is the future growth-tracking tier and is still in development. The current Base client already includes the growth-based base finder, intel views, visual ESP tools, and player utilities listed above.</p>
           </details>
         </div>
       </div>
@@ -423,7 +423,7 @@
             <img src="assets/arcane-mark.svg" width="46" height="32" alt="">
             <span>Arcane Client</span>
           </a>
-          <p>Growth evidence, clearly presented.</p>
+          <p>Growth activity. Better base leads.</p>
         </div>
         <div>
           <h2>Navigation</h2>
@@ -434,7 +434,7 @@
         </div>
         <div>
           <h2>Project</h2>
-          <a href="https://discord.com/" target="_blank" rel="noreferrer">Discord</a>
+          <a href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Discord</a>
           <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
           <a href="#hiss">Hiss Addon</a>
         </div>

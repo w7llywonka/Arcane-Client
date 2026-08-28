@@ -1,16 +1,16 @@
 :root {
-  --page: #0a0e14;
-  --surface: #121a26;
-  --surface-light: #1b2534;
-  --surface-strong: #202d3f;
-  --text: #eaf1f8;
-  --muted: #93a9c2;
-  --primary: #96b4d6;
-  --primary-light: #c4d9f0;
-  --primary-dark: #6e93be;
-  --purple: #8a7cf0;
-  --rule: rgba(234, 241, 248, 0.08);
-  --rule-strong: rgba(234, 241, 248, 0.13);
+  --page: #08110d;
+  --surface: #101b15;
+  --surface-light: #17261d;
+  --surface-strong: #1d3024;
+  --text: #edf7f0;
+  --muted: #93ad9b;
+  --primary: #78c796;
+  --primary-light: #ade0bd;
+  --primary-dark: #4d9d69;
+  --purple: #a5d66f;
+  --rule: rgba(237, 247, 240, 0.08);
+  --rule-strong: rgba(237, 247, 240, 0.13);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --shadow: 0 20px 38px rgba(0, 0, 0, 0.28);
 }
@@ -69,7 +69,7 @@ svg {
 }
 
 ::selection {
-  color: #071018;
+  color: #07120b;
   background: var(--primary-light);
 }
 
@@ -181,15 +181,13 @@ svg {
   animation: nav-enter 600ms var(--ease-out) forwards;
   transition:
     background-color 300ms ease,
-    box-shadow 300ms ease,
-    backdrop-filter 300ms ease;
+    box-shadow 300ms ease;
 }
 
 .site-nav.scrolled,
 .site-nav.menu-active {
-  background: rgba(10, 14, 20, 0.92);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16), inset 0 -1px rgba(234, 241, 248, 0.05);
-  backdrop-filter: blur(24px);
+  background: rgba(8, 17, 13, 0.92);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16), inset 0 -1px rgba(237, 247, 240, 0.05);
 }
 
 .nav-shell {
@@ -240,7 +238,7 @@ svg {
   justify-content: center;
   padding: 8px 20px;
   border-radius: 999px;
-  color: #071018;
+  color: #07120b;
   background: var(--primary);
   font-size: 14px;
   font-weight: 600;
@@ -298,9 +296,8 @@ svg {
   left: 0;
   padding: 14px 24px 24px;
   border-bottom: 1px solid var(--rule);
-  background: rgba(10, 14, 20, 0.98);
+  background: rgba(8, 17, 13, 0.98);
   box-shadow: 0 24px 40px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(24px);
 }
 
 .mobile-menu a {
@@ -316,7 +313,7 @@ svg {
   justify-content: center;
   margin-top: 10px;
   border-radius: 999px;
-  color: #071018;
+  color: #07120b;
   background: var(--primary);
   font-weight: 600;
 }
@@ -344,42 +341,36 @@ svg {
   top: -360px;
   width: 220px;
   height: 1380px;
+  border: 1px solid rgba(120, 199, 150, 0.035);
   border-radius: 999px;
-  background: rgba(150, 180, 214, 0.055);
-  filter: blur(45px);
-  will-change: transform;
+  background: rgba(120, 199, 150, 0.028);
 }
 
 .beam-wide {
   width: 520px;
-  background: rgba(150, 180, 214, 0.045);
-  filter: blur(78px);
+  background: rgba(120, 199, 150, 0.022);
 }
 
 .beam-thin {
-  background: rgba(138, 124, 240, 0.045);
+  background: rgba(165, 214, 111, 0.022);
 }
 
 .beam-left {
   left: -180px;
   transform: rotate(-42deg);
-  animation: beam-left-drift 7s ease-in-out infinite alternate;
 }
 
 .beam-left.beam-thin {
   left: 80px;
-  animation-delay: -2s;
 }
 
 .beam-right {
   right: -180px;
   transform: rotate(42deg);
-  animation: beam-right-drift 7s ease-in-out infinite alternate;
 }
 
 .beam-right.beam-thin {
   right: 80px;
-  animation-delay: -2s;
 }
 
 .hero-copy {
@@ -457,7 +448,7 @@ svg {
 }
 
 .pill-primary {
-  color: #071018;
+  color: #07120b;
   background: var(--primary);
 }
 
@@ -497,7 +488,7 @@ svg {
   justify-content: center;
   gap: 11px;
   margin-top: 28px;
-  color: #8ca1b7;
+  color: #91ab99;
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -603,8 +594,8 @@ svg {
 }
 
 .feature-card:hover {
-  background: #162130;
-  transform: translateY(-4px) scale(1.015);
+  background: #142219;
+  transform: translateY(-4px);
 }
 
 .card-orbit {
@@ -614,8 +605,8 @@ svg {
   width: 170px;
   height: 170px;
   border-radius: 50%;
+  border: 1px solid rgba(120, 199, 150, 0.12);
   background: var(--primary);
-  filter: blur(60px);
   opacity: 0;
   transition: opacity 500ms ease;
 }
@@ -625,7 +616,7 @@ svg {
 }
 
 .feature-card:hover .card-orbit {
-  opacity: 0.16;
+  opacity: 0.06;
 }
 
 .feature-icon {
@@ -637,7 +628,7 @@ svg {
   place-items: center;
   margin-bottom: 22px;
   border-radius: 12px;
-  color: #09121b;
+  color: #08140d;
   background: var(--primary);
 }
 
@@ -739,7 +730,7 @@ svg {
   right: -8px;
   left: 47px;
   height: 1px;
-  background: rgba(150, 180, 214, 0.24);
+  background: rgba(120, 199, 150, 0.24);
   content: "";
 }
 
@@ -751,7 +742,7 @@ svg {
   height: 38px;
   place-items: center;
   border-radius: 50%;
-  color: #071018;
+  color: #07120b;
   background: var(--primary);
   font-size: 10px;
   font-weight: 700;
@@ -822,7 +813,7 @@ svg {
   gap: 8px;
   padding: 7px 9px;
   border-radius: 8px;
-  color: #c8d5e2;
+  color: #c8dacd;
   background: var(--surface-light);
   font-size: 10px;
 }
@@ -847,7 +838,7 @@ svg {
 }
 
 .launcher-white {
-  background: #eaf1f8;
+  background: #edf7f0;
 }
 
 .demo-grid {
@@ -867,13 +858,13 @@ svg {
 
 .demo-card:hover {
   background: var(--surface-light);
-  transform: translateY(-4px) scale(1.012);
+  transform: translateY(-4px);
 }
 
 .demo-window {
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  background: #0d131c;
+  background: #0c1510;
 }
 
 .demo-window > header {
@@ -883,7 +874,7 @@ svg {
   justify-content: space-between;
   padding-inline: 13px;
   border-bottom: 1px solid var(--rule);
-  color: #afc2d5;
+  color: #b2cbbb;
   font-size: 8px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -908,7 +899,7 @@ svg {
 }
 
 .demo-window > header small {
-  color: #62788f;
+  color: #617767;
   font-size: 7px;
 }
 
@@ -924,15 +915,15 @@ svg {
 .mini-map > span {
   display: grid;
   place-items: center;
-  border-right: 1px solid rgba(150, 180, 214, 0.09);
-  border-bottom: 1px solid rgba(150, 180, 214, 0.09);
-  color: #72879d;
-  background: rgba(150, 180, 214, 0.025);
+  border-right: 1px solid rgba(120, 199, 150, 0.09);
+  border-bottom: 1px solid rgba(120, 199, 150, 0.09);
+  color: #718a79;
+  background: rgba(120, 199, 150, 0.025);
   font-size: 8px;
 }
 
 .mini-map > span.hot {
-  color: #0a0e14;
+  color: #08110d;
   background: var(--primary);
   font-weight: 700;
 }
@@ -943,8 +934,8 @@ svg {
   bottom: 0;
   left: 14%;
   width: 1px;
-  background: rgba(196, 217, 240, 0.7);
-  box-shadow: 0 0 15px rgba(150, 180, 214, 0.65);
+  background: rgba(173, 224, 189, 0.7);
+  box-shadow: 0 0 15px rgba(120, 199, 150, 0.65);
   animation: scan-sweep 3.2s linear infinite;
 }
 
@@ -1015,13 +1006,13 @@ svg {
   min-height: 25px;
   align-items: center;
   justify-content: space-between;
-  color: #b8c7d7;
+  color: #b8cabd;
   font-size: 9px;
 }
 
 .esp-panel > p {
   margin: 3px 0 0;
-  color: #64798f;
+  color: #637a68;
   font-size: 7px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1032,7 +1023,7 @@ svg {
   width: 25px;
   height: 14px;
   border-radius: 999px;
-  background: #2a3544;
+  background: #26372c;
 }
 
 .toggle::after {
@@ -1042,12 +1033,12 @@ svg {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #6f8194;
+  background: #6d8273;
   content: "";
 }
 
 .toggle.on {
-  background: rgba(150, 180, 214, 0.3);
+  background: rgba(120, 199, 150, 0.3);
 }
 
 .toggle.on::after {
@@ -1076,7 +1067,7 @@ svg {
 }
 
 .demo-card > footer > span {
-  color: #42566c;
+  color: #415c49;
   font-size: 11px;
   font-weight: 600;
 }
@@ -1104,17 +1095,17 @@ svg {
 }
 
 .plan-card:hover {
-  background: #162130;
+  background: #142219;
   transform: translateY(-3px);
 }
 
 .plan-card-featured {
-  background: #151f2d;
+  background: #142219;
   box-shadow: var(--shadow);
 }
 
 .plan-card-featured:hover {
-  background: #192638;
+  background: #18291f;
 }
 
 .plan-badge {
@@ -1126,7 +1117,7 @@ svg {
   align-items: center;
   padding: 4px 15px;
   border-radius: 999px;
-  color: #071018;
+  color: #07120b;
   background: var(--primary);
   font-size: 10px;
   font-weight: 600;
@@ -1186,7 +1177,7 @@ svg {
 .plan-card li {
   display: flex;
   gap: 10px;
-  color: #c0cfdd;
+  color: #c2d4c7;
   font-size: 11px;
   line-height: 1.45;
 }
@@ -1229,7 +1220,7 @@ svg {
 }
 
 .plan-action-primary {
-  color: #071018;
+  color: #07120b;
   background: var(--primary);
 }
 
@@ -1283,7 +1274,7 @@ svg {
 
 .hiss-orbit {
   position: absolute;
-  border: 1px solid rgba(150, 180, 214, 0.12);
+  border: 1px solid rgba(120, 199, 150, 0.12);
   border-radius: 50%;
 }
 
@@ -1295,7 +1286,7 @@ svg {
 .hiss-orbit-two {
   width: 220px;
   height: 220px;
-  border-color: rgba(138, 124, 240, 0.13);
+  border-color: rgba(165, 214, 111, 0.13);
 }
 
 .hiss-copy {
@@ -1325,7 +1316,7 @@ svg {
   margin-top: 26px;
   padding: 10px 18px;
   border-radius: 999px;
-  color: #071018;
+  color: #07120b;
   background: var(--primary);
   font-size: 12px;
   font-weight: 600;
@@ -1369,7 +1360,7 @@ svg {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 12px;
-  color: #071018;
+  color: #07120b;
   background: var(--primary);
   font-size: 18px;
   font-weight: 700;
@@ -1531,7 +1522,7 @@ svg {
   margin-top: 54px;
   padding-top: 28px;
   border-top: 1px solid var(--rule);
-  color: #8296aa;
+  color: #839b8a;
   font-size: 10px;
 }
 
@@ -1594,26 +1585,6 @@ svg {
   }
 }
 
-@keyframes beam-left-drift {
-  from {
-    transform: translateX(-30px) rotate(-42deg);
-  }
-
-  to {
-    transform: translateX(70px) rotate(-42deg);
-  }
-}
-
-@keyframes beam-right-drift {
-  from {
-    transform: translateX(30px) rotate(42deg);
-  }
-
-  to {
-    transform: translateX(-70px) rotate(42deg);
-  }
-}
-
 @keyframes scan-sweep {
   from {
     left: -2%;
@@ -1638,17 +1609,16 @@ svg {
 @keyframes hiss-cover {
   0%,
   78% {
+    opacity: 1;
     visibility: visible;
-    clip-path: inset(0 0 0 0);
   }
 
   100% {
+    opacity: 0;
     visibility: hidden;
-    clip-path: inset(0 0 100% 0);
     pointer-events: none;
   }
 }
-
 @keyframes hiss-copy {
   0%,
   12% {

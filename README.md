@@ -83,7 +83,7 @@ The primary command is `/arcane`; `/dtrace` remains as a compatibility alias for
 
 ## Product website
 
-The responsive Arcane Client product site lives in [website/](website/). It is a build-free static page with a Krypton-inspired navy visual system, centered hero, setup bento, interface samples, explicit Base/Premium plans, a session-aware Hiss intro, and an FAQ. See [website/README.md](website/README.md) for local preview instructions.
+The responsive Arcane Client product site lives in [website/](website/). It is a build-free static page with a Krypton-inspired dark forest/mint visual system, centered hero, setup bento, interface samples, explicit Base/Premium plans, a session-aware Hiss intro, and an FAQ. See [website/README.md](website/README.md) for local preview instructions.
 
 ## Build from source
 

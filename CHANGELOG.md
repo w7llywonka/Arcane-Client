@@ -3,7 +3,7 @@
 ## 2.2.0+mc1.21.11
 
 - Added the Hiss Addon website intro: a lightweight snake slither shown once per session with an optional replay.
-- Rebuilt the product site with a Krypton-inspired navy visual system, setup bento, interface samples, explicit plan cards, Hiss showcase, and FAQ.
+- Rebuilt the product site with a Krypton-inspired dark forest/mint visual system, optimized motion, setup bento, interface samples, explicit plan cards, Hiss showcase, and FAQ.
 
 - Replaced broad base suspicion with a growth-only discovery model.
 - Set storage, block-entity, machine, placed-block, entity, interaction, and light category caps to zero.
