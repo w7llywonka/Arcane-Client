@@ -43,8 +43,7 @@ public final class ArcaneCommands {
                 .then(command("autototem", ArcaneCommands::autoTotem))
                 .then(command("macros", ArcaneCommands::chatMacros))
                 .then(command("tracers", ArcaneCommands::tracers))
-                .then(command("growthalerts", ArcaneCommands::growthAlerts))
-                .then(command("stashalerts", ArcaneCommands::growthAlerts))
+                .then(command("stashalerts", ArcaneCommands::stashAlerts))
                 .then(command("analysis", ArcaneCommands::analysis))
                 .then(command("settings", ignored -> settings()))
                 .then(command("profile", ArcaneCommands::profile))
@@ -80,7 +79,7 @@ public final class ArcaneCommands {
     private static int status(FabricClientCommandSource source) {
         ArcaneConfig config = ArcaneClient.config();
         TraceEngine engine = ArcaneClient.engine();
-        ArcaneCommands.feedback(source, "Arcane Client " + (config.enabled ? "on" : "off") + ", sensitivity " + config.sensitivity() + "%, radius " + config.scanRadius + ", speed " + config.chunksPerTick + ", profile " + config.performanceProfile().label() + ", item/tunnel/totem " + ArcaneCommands.state(config.itemEsp) + "/" + ArcaneCommands.state(config.tunnelEsp) + "/" + ArcaneCommands.state(config.autoTotem) + ", macros " + ArcaneCommands.state(config.chatMacros) + ", flagged " + engine.flaggedCount() + ", queued " + engine.queueSize());
+        ArcaneCommands.feedback(source, "Arcane Client " + (config.enabled ? "on" : "off") + ", sensitivity " + config.sensitivity() + "%, radius " + config.scanRadius + ", speed " + config.chunksPerTick + ", deep focus " + (config.deepFocus ? "on" : "off") + ", profile " + config.performanceProfile().label() + ", item/tunnel/totem " + ArcaneCommands.state(config.itemEsp) + "/" + ArcaneCommands.state(config.tunnelEsp) + "/" + ArcaneCommands.state(config.autoTotem) + ", macros " + ArcaneCommands.state(config.chatMacros) + ", flagged " + engine.flaggedCount() + ", queued " + engine.queueSize());
         return 1;
     }
 
@@ -175,11 +174,11 @@ public final class ArcaneCommands {
         return 1;
     }
 
-    private static int growthAlerts(FabricClientCommandSource source) {
+    private static int stashAlerts(FabricClientCommandSource source) {
         ArcaneConfig config = ArcaneClient.config();
-        config.growthAlerts = !config.growthAlerts;
+        config.stashAlerts = !config.stashAlerts;
         config.save();
-        ArcaneCommands.feedback(source, "Growth alerts " + (config.growthAlerts ? "enabled" : "disabled"));
+        ArcaneCommands.feedback(source, "Stash alerts " + (config.stashAlerts ? "enabled" : "disabled"));
         return 1;
     }
 

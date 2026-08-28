@@ -7,7 +7,7 @@ import dev.arcaneclient.model.ChunkTrace;
 import dev.arcaneclient.model.ScanResult;
 import dev.arcaneclient.model.ScoreSummary;
 import dev.arcaneclient.model.SignalCategory;
-import dev.arcaneclient.model.GrowthSiteHeuristics;
+import dev.arcaneclient.model.StashHeuristics;
 import dev.arcaneclient.model.TunnelSegment;
 import dev.arcaneclient.performance.PerformanceProfile;
 import dev.arcaneclient.scan.ChunkScanner;
@@ -40,7 +40,7 @@ public final class TraceEngine {
     private static final int LIVE_DECAY_TICKS = 9600;
     private static final int SCAN_SLICE_BLOCKS = 2048;
     private static final int MAX_SCAN_SLICES_PER_TICK = 128;
-    private static final int MAX_GROWTH_LABELS = 24;
+    private static final int MAX_STASH_LABELS = 24;
     private final ArcaneConfig config;
     private final ChunkScanner scanner = new ChunkScanner();
     private final LinkedHashMap<TraceKey, ChunkTrace> traces = new LinkedHashMap<>();
@@ -48,6 +48,7 @@ public final class TraceEngine {
     private final Set<TraceKey> queued = new HashSet<TraceKey>();
     private final ArrayDeque<ActiveScan> activeScans = new ArrayDeque<>();
     private final Set<TraceKey> activeScanKeys = new HashSet<TraceKey>();
+    private final Map<TraceKey, Integer> scannedChunks = new HashMap<TraceKey, Integer>();
     private final Map<EventKey, Long> eventCooldowns = new HashMap<EventKey, Long>();
     private final Map<TraceKey, List<TunnelSegment>> tunnelSegments = new HashMap<TraceKey, List<TunnelSegment>>();
     private long tick;
@@ -58,7 +59,7 @@ public final class TraceEngine {
     private volatile Map<Long, ChunkMarker> scoreIndexSnapshot = Map.of();
     private volatile int flaggedMarkerCount;
     private volatile List<TunnelSegment> tunnelSnapshot = List.of();
-    private volatile List<GrowthCandidate> growthSnapshot = List.of();
+    private volatile List<StashCandidate> stashSnapshot = List.of();
 
     public TraceEngine(ArcaneConfig config) {
         this.config = config;
@@ -71,13 +72,14 @@ public final class TraceEngine {
         this.queued.clear();
         this.activeScans.clear();
         this.activeScanKeys.clear();
+        this.scannedChunks.clear();
         this.eventCooldowns.clear();
         this.tunnelSegments.clear();
         this.markerSnapshot = List.of();
         this.scoreIndexSnapshot = Map.of();
         this.flaggedMarkerCount = 0;
         this.tunnelSnapshot = List.of();
-        this.growthSnapshot = List.of();
+        this.stashSnapshot = List.of();
         if (newLevel == null) {
             this.session = "menu";
             this.dimension = "unknown";
@@ -101,6 +103,7 @@ public final class TraceEngine {
             this.scanQueue.remove(traceKey);
             this.activeScanKeys.remove(traceKey);
             this.activeScans.removeIf(scan -> scan.key.equals(traceKey));
+            this.scannedChunks.remove(traceKey);
             this.tunnelSegments.remove(traceKey);
         }
     }
@@ -149,13 +152,14 @@ public final class TraceEngine {
         this.queued.clear();
         this.activeScans.clear();
         this.activeScanKeys.clear();
+        this.scannedChunks.clear();
         this.tunnelSegments.clear();
         this.scanner.resetTemporalHistory();
         this.markerSnapshot = List.of();
         this.scoreIndexSnapshot = Map.of();
         this.flaggedMarkerCount = 0;
         this.tunnelSnapshot = List.of();
-        this.growthSnapshot = List.of();
+        this.stashSnapshot = List.of();
     }
 
     public void recordLive(BlockPos pos, SignalCategory category, int strength, String reason) {
@@ -163,7 +167,7 @@ public final class TraceEngine {
     }
 
     public void recordLive(BlockPos pos, SignalCategory category, int strength, String reason, int decayTicks, int cooldownTicks) {
-        if (!this.config.enabled || !this.config.packetSignals || !this.config.allows(category) || this.level == null || strength <= 0) {
+        if (!this.config.enabled || !this.config.packetSignals || this.level == null || strength <= 0) {
             return;
         }
         BlockPosition blockPosition = new BlockPosition(pos.getX(), pos.getY(), pos.getZ());
@@ -174,6 +178,12 @@ public final class TraceEngine {
         }
         ScanResult result = ScanResult.builder().addLive(category, blockPosition, reason, strength, this.tick, decayTicks).build();
         this.merge(this.key(blockPosition.chunkX(), blockPosition.chunkZ()), result);
+    }
+
+    public void mergeStatic(int chunkX, int chunkZ, ScanResult result) {
+        if (this.config.enabled && this.level != null) {
+            this.merge(this.key(chunkX, chunkZ), result);
+        }
     }
 
     public long currentTick() {
@@ -188,6 +198,10 @@ public final class TraceEngine {
         return this.flaggedMarkerCount;
     }
 
+    public boolean hasScanBaseline(int chunkX, int chunkZ, int observerSectionY) {
+        return this.level != null && this.scannedChunks.getOrDefault(this.key(chunkX, chunkZ), Integer.MIN_VALUE) == observerSectionY;
+    }
+
     public List<ChunkMarker> markers() {
         return this.markerSnapshot;
     }
@@ -196,8 +210,8 @@ public final class TraceEngine {
         return this.tunnelSnapshot;
     }
 
-    public List<GrowthCandidate> growthCandidates() {
-        return this.growthSnapshot;
+    public List<StashCandidate> stashCandidates() {
+        return this.stashSnapshot;
     }
 
     public void settingsChanged(MinecraftClient client) {
@@ -300,6 +314,7 @@ public final class TraceEngine {
                 active.job.step(2048);
                 if (active.job.isComplete()) {
                     this.activeScanKeys.remove(active.key);
+                    this.scannedChunks.put(active.key, active.job.observerSectionY());
                     if (this.config.tunnelEsp) {
                         List<TunnelSegment> found = active.job.tunnels();
                         if (found.isEmpty()) {
@@ -308,7 +323,7 @@ public final class TraceEngine {
                             this.tunnelSegments.put(active.key, found);
                         }
                     }
-                    this.mergeSnapshot(active.key, active.job.result());
+                    this.merge(active.key, active.job.result());
                 } else {
                     this.activeScans.addLast(active);
                 }
@@ -331,24 +346,9 @@ public final class TraceEngine {
             return;
         }
         this.traces.computeIfAbsent(traceKey, ignored -> new ChunkTrace()).merge(result);
-        this.pruneTraces();
-    }
-
-    private void mergeSnapshot(TraceKey traceKey, ScanResult result) {
-        ChunkTrace trace = this.traces.get(traceKey);
-        if (trace == null && result.evidence().isEmpty()) {
-            return;
-        }
-        this.traces.computeIfAbsent(traceKey, ignored -> new ChunkTrace()).mergeSnapshot(result);
-        this.pruneTraces();
-    }
-
-    private void pruneTraces() {
-        while (this.traces.size() > MAX_REMEMBERED_CHUNKS) {
+        while (this.traces.size() > 12000) {
             Iterator<TraceKey> iterator = this.traces.keySet().iterator();
-            if (!iterator.hasNext()) {
-                return;
-            }
+            if (!iterator.hasNext()) continue;
             iterator.next();
             iterator.remove();
         }
@@ -357,9 +357,9 @@ public final class TraceEngine {
     private void refreshMarkers(MinecraftClient client) {
         if (!this.config.enabled || client.player == null) {
             this.markerSnapshot = List.of();
-            this.scoreIndexSnapshot = Map.of();
+                this.scoreIndexSnapshot = Map.of();
             this.flaggedMarkerCount = 0;
-            this.growthSnapshot = List.of();
+            this.stashSnapshot = List.of();
             return;
         }
         ChunkPos center = client.player.getChunkPos();
@@ -386,21 +386,21 @@ public final class TraceEngine {
         this.scoreIndexSnapshot = Map.copyOf(scoreIndex);
         int markerLimit = this.config.performanceProfile().markerTargetLimit();
         this.markerSnapshot = List.copyOf(markers.subList(0, Math.min(markerLimit, markers.size())));
-        this.refreshGrowthSnapshot(scored, scoreIndex);
+        this.refreshStashSnapshot(scored, scoreIndex);
     }
 
-    private void refreshGrowthSnapshot(List<ChunkMarker> scored, Map<Long, ChunkMarker> byChunk) {
-        ArrayList<GrowthCandidate> candidates = new ArrayList<>();
+    private void refreshStashSnapshot(List<ChunkMarker> scored, Map<Long, ChunkMarker> byChunk) {
+        ArrayList<StashCandidate> candidates = new ArrayList<>();
         for (ChunkMarker marker : scored) {
-            boolean direct = GrowthSiteHeuristics.direct(marker.score, marker.categoryBreakdown);
+            boolean direct = StashHeuristics.direct(marker.score, marker.deepAnchor, marker.categoryBreakdown);
             boolean clustered = !direct
-                && GrowthSiteHeuristics.clusterMember(marker.score, marker.categoryBreakdown)
+                && StashHeuristics.clusterMember(marker.score, marker.deepAnchor, marker.categoryBreakdown)
                 && hasStrongNeighbor(marker, byChunk);
             if ((!direct && !clustered) || nearExistingLabel(marker, candidates)) continue;
-            candidates.add(new GrowthCandidate(marker.chunkX, marker.chunkZ, marker.score));
-            if (candidates.size() >= MAX_GROWTH_LABELS) break;
+            candidates.add(new StashCandidate(marker.chunkX, marker.chunkZ, marker.score));
+            if (candidates.size() >= MAX_STASH_LABELS) break;
         }
-        this.growthSnapshot = List.copyOf(candidates);
+        this.stashSnapshot = List.copyOf(candidates);
     }
 
     private static boolean hasStrongNeighbor(ChunkMarker marker, Map<Long, ChunkMarker> byChunk) {
@@ -408,10 +408,12 @@ public final class TraceEngine {
             for (int dx = -2; dx <= 2; dx++) {
                 if (dx == 0 && dz == 0) continue;
                 ChunkMarker neighbor = byChunk.get(chunkKey(marker.chunkX + dx, marker.chunkZ + dz));
-                if (neighbor != null && GrowthSiteHeuristics.clusterPair(
+                if (neighbor != null && StashHeuristics.clusterPair(
                     marker.score,
+                    marker.deepAnchor,
                     marker.categoryBreakdown,
                     neighbor.score,
+                    neighbor.deepAnchor,
                     neighbor.categoryBreakdown
                 )) return true;
             }
@@ -419,8 +421,8 @@ public final class TraceEngine {
         return false;
     }
 
-    private static boolean nearExistingLabel(ChunkMarker marker, List<GrowthCandidate> candidates) {
-        for (GrowthCandidate candidate : candidates) {
+    private static boolean nearExistingLabel(ChunkMarker marker, List<StashCandidate> candidates) {
+        for (StashCandidate candidate : candidates) {
             if (Math.abs(marker.chunkX - candidate.chunkX) <= 2 && Math.abs(marker.chunkZ - candidate.chunkZ) <= 2) {
                 return true;
             }
@@ -455,9 +457,10 @@ public final class TraceEngine {
     }
 
     private ChunkMarker marker(TraceKey traceKey, ChunkTrace trace) {
-        ScoreSummary summary = trace.summarizeAt(this.tick, this.config::allows, this.config.packetSignals);
+        ScoreSummary summary = trace.summarizeAt(this.tick, this.config::allows, this.config.packetSignals, this.config.deepFocus);
         List<String> reasons = summary.reasons().subList(0, Math.min(4, summary.reasons().size()));
-        return new ChunkMarker(traceKey.x, traceKey.z, summary.score(), reasons, summary.categoryBreakdown());
+        boolean deepAnchor = trace.hasActiveEvidenceAtOrBelow(this.tick, this.config::allows, this.config.packetSignals, 48);
+        return new ChunkMarker(traceKey.x, traceKey.z, summary.score(), deepAnchor, reasons, summary.categoryBreakdown());
     }
 
     private boolean withinScanRadius(MinecraftClient client, TraceKey traceKey) {
@@ -491,7 +494,7 @@ public final class TraceEngine {
     }
 
     @Environment(value=EnvType.CLIENT)
-    public record ChunkMarker(int chunkX, int chunkZ, int score, List<String> reasons, Map<SignalCategory, Integer> categoryBreakdown) {
+    public record ChunkMarker(int chunkX, int chunkZ, int score, boolean deepAnchor, List<String> reasons, Map<SignalCategory, Integer> categoryBreakdown) {
         public ChunkMarker {
             reasons = List.copyOf(reasons);
             categoryBreakdown = Map.copyOf(new EnumMap<SignalCategory, Integer>(categoryBreakdown));
@@ -503,6 +506,6 @@ public final class TraceEngine {
     }
 
     @Environment(value=EnvType.CLIENT)
-    public record GrowthCandidate(int chunkX, int chunkZ, int score) {
+    public record StashCandidate(int chunkX, int chunkZ, int score) {
     }
 }

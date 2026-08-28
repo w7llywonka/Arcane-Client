@@ -2,18 +2,10 @@
 
 ## 2.2.0+mc1.21.11
 
+- Restored the evidence-based scanner reconstructed from the supplied 1.8 and 1.6 clients, including configurable cultivation, placed-block, machine, block-entity, light, live-activity, and entity signals.
+- Restored deep-Y weighting, temporal layout comparison, stash clustering, block-entity classification, transient-entity filtering, and the broader packet observation bridge.
 - Added the Hiss Addon website intro: a lightweight snake slither shown once per session with an optional replay.
 - Rebuilt the product site with a Krypton-inspired dark forest/mint visual system, optimized motion, setup bento, interface samples, explicit plan cards, Hiss showcase, and FAQ.
-
-- Replaced broad base suspicion with a growth-only discovery model.
-- Set storage, block-entity, machine, placed-block, entity, interaction, and light category caps to zero.
-- Added palette-level section skipping so normal scans avoid sections with no growth-relevant block states.
-- Added organized crop, farmland support, synchronized stage, mature crop, sapling, vertical growth, imported biome, and temporal harvest heuristics.
-- Reduced the packet mixin from fifteen broad hooks to two growth-transition hooks.
-- Renamed stash-facing alerts and labels to growth-site alerts while retaining `/arcane stashalerts` as a command alias.
-- Removed obsolete depth weighting, generic temporal layout scans, block-entity scans, light sampling, and entity scans.
-- Added automated guarantees that storage, light, machines, block entities, and entities cannot produce suspicion.
-
 ## 2.1.0+mc1.21.11
 
 - Added a professional smooth Inter UI font under the SIL Open Font License.

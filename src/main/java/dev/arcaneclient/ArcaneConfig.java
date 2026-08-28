@@ -33,11 +33,16 @@ public final class ArcaneConfig {
     public boolean blockEntityDebug = false;
     public boolean itemEsp = false;
     public boolean tunnelEsp = false;
-    public boolean growthAlerts = true;
+    public boolean stashAlerts = true;
     public boolean chunkAnalysis = true;
     public boolean autoTotem = false;
     public boolean chatMacros = true;
     public boolean farmSignals = true;
+    public boolean playerBlockSignals = true;
+    public boolean machineSignals = true;
+    public boolean lightSignals = true;
+    public boolean entitySignals = true;
+    public boolean deepFocus = true;
     public boolean itemEspTotems = true;
     public boolean itemEspCrystals = true;
     public boolean itemEspElytra = true;
@@ -58,7 +63,6 @@ public final class ArcaneConfig {
     public int rescanSeconds = 30;
     public int uiTheme = 0;
     public int performanceProfile = 0;
-    public int scannerModelVersion = 0;
     public String chatMacro1 = "";
     public String chatMacro2 = "";
     public String chatMacro3 = "";
@@ -68,7 +72,6 @@ public final class ArcaneConfig {
         Path path = path();
         if (!Files.isRegularFile(path)) {
             ArcaneConfig config = new ArcaneConfig();
-            config.upgradeScannerModel();
             config.save();
             return config;
         }
@@ -79,7 +82,6 @@ public final class ArcaneConfig {
                 config = new ArcaneConfig();
             }
 
-            boolean upgradedScannerModel = config.upgradeScannerModel();
             boolean upgradedSpeedDefaults = config.chunksPerTick == 1 && config.rescanSeconds == 45;
             if (upgradedSpeedDefaults) {
                 config.chunksPerTick = 3;
@@ -87,20 +89,17 @@ public final class ArcaneConfig {
             }
 
             config.clamp();
-            if (upgradedScannerModel || upgradedSpeedDefaults) {
+            if (upgradedSpeedDefaults) {
                 config.save();
             }
             return config;
         } catch (IOException | RuntimeException exception) {
             ArcaneClient.LOGGER.warn("Could not read {}; using defaults", path, exception);
-            ArcaneConfig fallback = new ArcaneConfig();
-            fallback.upgradeScannerModel();
-            return fallback;
+            return new ArcaneConfig();
         }
     }
 
     public void save() {
-        this.upgradeScannerModel();
         this.clamp();
         Path path = ArcaneConfig.path();
         try {
@@ -119,8 +118,15 @@ public final class ArcaneConfig {
     }
 
     public boolean allows(SignalCategory category) {
-        return this.farmSignals
-            && (category == SignalCategory.NATURAL_GROWTH || category == SignalCategory.CULTIVATION);
+        return switch (category) {
+            default -> throw new MatchException(null, null);
+            case SignalCategory.NATURAL_GROWTH, SignalCategory.CULTIVATION -> this.farmSignals;
+            case SignalCategory.PLACED_BLOCK, SignalCategory.INTERACTION -> this.playerBlockSignals;
+            case SignalCategory.INFRASTRUCTURE, SignalCategory.BLOCK_ENTITY -> this.machineSignals;
+            case SignalCategory.LIGHT_LEAK -> this.lightSignals;
+            case SignalCategory.LIVE_ACTIVITY -> this.packetSignals;
+            case SignalCategory.ENTITY -> this.entitySignals;
+        };
     }
 
     public PerformanceProfile performanceProfile() {
@@ -252,16 +258,6 @@ public final class ArcaneConfig {
                 throw new IndexOutOfBoundsException(index);
             }
         }
-    }
-
-    private boolean upgradeScannerModel() {
-        if (this.scannerModelVersion >= 2) {
-            return false;
-        }
-        this.scannerModelVersion = 2;
-        this.farmSignals = true;
-        this.packetSignals = true;
-        return true;
     }
 
     private void clamp() {

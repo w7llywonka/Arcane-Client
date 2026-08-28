@@ -3,7 +3,7 @@
   "id": "arcaneclient",
   "version": "${version}",
   "name": "Arcane Client",
-  "description": "A focused growth-discovery client with independent ESP, player tools, and a polished high-FPS Click GUI.",
+  "description": "A focused DonutSMP utility client with base-finding intelligence, configurable ESP, player tools, and a polished Click GUI.",
   "authors": [
     "Eric and Codex"
   ],

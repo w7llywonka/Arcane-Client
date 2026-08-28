@@ -5,15 +5,15 @@ import net.fabricmc.api.Environment;
 
 @Environment(value=EnvType.CLIENT)
 public enum SignalCategory {
-    NATURAL_GROWTH(35),
-    CULTIVATION(65),
-    PLACED_BLOCK(0),
-    INTERACTION(0),
-    INFRASTRUCTURE(0),
-    LIGHT_LEAK(0),
-    LIVE_ACTIVITY(0),
-    ENTITY(0),
-    BLOCK_ENTITY(0);
+    NATURAL_GROWTH(6),
+    CULTIVATION(16),
+    PLACED_BLOCK(30),
+    INTERACTION(24),
+    INFRASTRUCTURE(24),
+    LIGHT_LEAK(24),
+    LIVE_ACTIVITY(30),
+    ENTITY(30),
+    BLOCK_ENTITY(30);
 
     private final int cap;
 

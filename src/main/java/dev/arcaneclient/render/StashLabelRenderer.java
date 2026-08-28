@@ -18,32 +18,32 @@ import net.minecraft.world.Heightmap;
 import org.joml.Quaternionfc;
 
 @Environment(value=EnvType.CLIENT)
-public final class GrowthLabelRenderer {
-    private static final String LABEL = "POSSIBLE GROWTH SITE";
-    private static List<TraceEngine.GrowthCandidate> source = List.of();
+public final class StashLabelRenderer {
+    private static final String LABEL = "POSSIBLE STASH FOUND";
+    private static List<TraceEngine.StashCandidate> source = List.of();
     private static List<Target> targets = List.of();
 
-    private GrowthLabelRenderer() {
+    private StashLabelRenderer() {
     }
 
     public static void register() {
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(GrowthLabelRenderer::render);
+        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(StashLabelRenderer::render);
     }
 
     public static void tick(MinecraftClient client) {
         if (ArcaneSettingsScreen.isOpen(client)) return;
-        if (!ArcaneClient.config().growthAlerts || client.world == null) {
+        if (!ArcaneClient.config().stashAlerts || client.world == null) {
             source = List.of();
             targets = List.of();
             return;
         }
-        List<TraceEngine.GrowthCandidate> current = ArcaneClient.engine().growthCandidates();
+        List<TraceEngine.StashCandidate> current = ArcaneClient.engine().stashCandidates();
         if (current == source) {
             return;
         }
         source = current;
         ArrayList<Target> rebuilt = new ArrayList<Target>(current.size());
-        for (TraceEngine.GrowthCandidate candidate : current) {
+        for (TraceEngine.StashCandidate candidate : current) {
             if (client.world.getChunkManager().getWorldChunk(candidate.chunkX(), candidate.chunkZ(), false) == null) continue;
             int x = candidate.chunkX() * 16 + 8;
             int z = candidate.chunkZ() * 16 + 8;
@@ -54,7 +54,7 @@ public final class GrowthLabelRenderer {
     }
 
     private static void render(WorldRenderContext context) {
-        if (!ArcaneClient.config().growthAlerts || targets.isEmpty() || context.matrices() == null) {
+        if (!ArcaneClient.config().stashAlerts || targets.isEmpty() || context.matrices() == null) {
             return;
         }
         MinecraftClient client = MinecraftClient.getInstance();
@@ -68,8 +68,8 @@ public final class GrowthLabelRenderer {
             matrices.multiply((Quaternionfc)context.worldState().cameraRenderState.orientation);
             matrices.scale(-0.025f, -0.025f, 0.025f);
             String score = "CONFIDENCE " + target.score();
-            GrowthLabelRenderer.drawCentered(font, LABEL, 0.0f, matrices, context, -1);
-            GrowthLabelRenderer.drawCentered(font, score, 10.0f, matrices, context, -3092272);
+            StashLabelRenderer.drawCentered(font, LABEL, 0.0f, matrices, context, -1);
+            StashLabelRenderer.drawCentered(font, score, 10.0f, matrices, context, -3092272);
             matrices.pop();
         }
     }
