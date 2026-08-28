@@ -35,27 +35,27 @@ public record ClickGuiColors(
         int accent = opaque(config.uiAccentColor);
         int panel = opaque(config.uiPanelColor);
         int text = opaque(config.uiTextColor);
-        int row = withAlpha(mix(panel, text, 0.055f), 0xEC);
-        int header = withAlpha(mix(panel, text, 0.035f), 0xF0);
-        int nest = withAlpha(mix(panel, text, 0.09f), 0xEC);
-        int outline = mix(panel, text, 0.20f);
+        int row = withAlpha(mix(panel, text, 0.045f), 0xED);
+        int header = withAlpha(mix(panel, text, 0.030f), 0xF1);
+        int nest = withAlpha(mix(panel, text, 0.065f), 0xEF);
+        int outline = withAlpha(mix(panel, accent, 0.24f), 0x5C);
         int muted = mix(panel, text, 0.64f);
-        int active = mix(panel, accent, 0.34f);
+        int active = withAlpha(mix(panel, accent, 0.34f), 0xE6);
         return new ClickGuiColors(
             accent,
             mix(accent, text, 0.34f),
             mix(panel, accent, 0.62f),
             active,
-            mix(active, text, 0.15f),
-            0x78000000,
-            withAlpha(mix(panel, 0xFF000000, 0.12f), 0xE8),
-            withAlpha(panel, 0xF0),
+            withAlpha(mix(active, text, 0.15f), 0xEE),
+            0x82000000,
+            withAlpha(mix(panel, 0xFF000000, 0.16f), 0xF5),
+            withAlpha(panel, 0xF4),
             header,
             row,
-            mix(row, text, 0.09f),
+            withAlpha(mix(row, text, 0.09f), 0xF3),
             nest,
             outline,
-            mix(panel, outline, 0.68f),
+            withAlpha(mix(panel, accent, 0.15f), 0x32),
             text,
             muted,
             mix(panel, muted, 0.66f)

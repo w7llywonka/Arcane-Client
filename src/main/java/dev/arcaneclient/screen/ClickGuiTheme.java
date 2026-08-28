@@ -6,9 +6,9 @@ import net.fabricmc.api.Environment;
 /** Accent palettes drawn over one neutral graphite foundation. */
 @Environment(EnvType.CLIENT)
 public enum ClickGuiTheme {
-    ARCANE("ARCANE", 0xFF9A8CFF, 0xFFC3BCFF, 0xFF6F63C9, 0xFF39345E),
-    FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF, 0xFF4E78BD, 0xFF2D4165),
-    ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xFF633440);
+    ARCANE("ARCANE", 0xFF9A8CFF, 0xFFC3BCFF, 0xFF6F63C9, 0xE639345E),
+    FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
+    ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440);
 
     private static final ClickGuiTheme[] VALUES = values();
 
@@ -17,13 +17,13 @@ public enum ClickGuiTheme {
     private final int accentBright;
     private final int accentDim;
     private final int active;
-    private final int backdrop = 0x78000000;
-    private final int bar = 0xE8101114;
-    private final int window = 0xF0121317;
-    private final int header = 0xF017181D;
-    private final int row = 0xEC1B1C22;
-    private final int nest = 0xEC202127;
-    private final int outline = 0xFF3A3C45;
+    private final int backdrop = 0x82000000;
+    private final int bar = 0xF5080D0B;
+    private final int window = 0xF40C1210;
+    private final int header = 0xF1161D1A;
+    private final int row = 0xED1A211E;
+    private final int nest = 0xEF141B18;
+    private final int outline = 0x5C395047;
     private final int text = 0xFFF4F4F5;
     private final int muted = 0xFFA1A1AA;
     private final int hover;
@@ -37,9 +37,9 @@ public enum ClickGuiTheme {
         this.accentBright = accentBright;
         this.accentDim = accentDim;
         this.active = active;
-        this.hover = shade(this.row, 1.55f);
-        this.activeHover = shade(active, 1.22f);
-        this.outlineSoft = shade(this.outline, 0.68f);
+        this.hover = shade(this.row, 1.34f);
+        this.activeHover = shade(active, 1.15f);
+        this.outlineSoft = withAlpha(shade(this.outline, 0.74f), 0x32);
         this.faint = shade(this.muted, 0.66f);
     }
 
@@ -72,6 +72,10 @@ public enum ClickGuiTheme {
 
     public static int count() {
         return VALUES.length;
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return color & 0x00FFFFFF | (alpha & 0xFF) << 24;
     }
 
     private static int shade(int argb, float factor) {
