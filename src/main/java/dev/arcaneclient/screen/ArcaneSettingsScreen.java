@@ -76,6 +76,9 @@ public final class ArcaneSettingsScreen extends Screen {
 
     @Override
     protected void init() {
+        // A resize can change the GUI scale, which changes which font variant is sharpest.
+        this.uiFont = null;
+        this.wrapCache.clear();
         layoutWindows();
 
         int searchWidth = searchWidth();

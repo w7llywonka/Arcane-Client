@@ -37,6 +37,7 @@ No external client source was copied into Arcane Client. The external projects i
 - Settings are a typed model (checkbox, slider, colour swatch, value cycler, key bind, live counter), so the window layout and the click hit-testing walk exactly the same geometry.
 - Windows can be dragged and collapsed; the row of windows reflows from five columns down to one, and anything that will not fit is parked as a collapsed title above the status bar.
 - Verdant, Arcane, and Ember palettes are shared by the GUI and HUD and persist in `arcane-client.json`. Verdant is the default and matches the product site.
+- Text sharpness is solved inside the mod rather than by asking players for another dependency. `GlyphAtlasTexture` hardcodes `FilterMode.NEAREST` and packs glyphs edge to edge with a 0.01-texel UV inset, so forcing bilinear filtering on the atlas would bleed neighbouring glyphs; matching the bake resolution to the GUI scale avoids resampling altogether. [Caxton](https://modrinth.com/mod/caxton) remains the right answer for players who want every font in the game smooth.
 - `/arcane` is the primary command; `/dtrace` redirects to it for configuration continuity.
 - Original package names, mod ID, resource namespace, config filename, artifact name, and user-visible branding are all replaced.
 - The two input binaries and old placeholder icon remain under `legacy/` and are never bundled into production output.
