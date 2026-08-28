@@ -25,9 +25,11 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
 
     @Override
     public void runTest(ClientGameTestContext context) {
-        context.getInput().resizeWindow(1280, 720);
+        // Keep software-rendered CI cheap while the integrated server generates its spawn chunks.
+        context.getInput().resizeWindow(640, 360);
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
             singleplayer.getClientWorld().waitForChunksRender();
+            context.getInput().resizeWindow(1280, 720);
             context.waitTicks(20);
             prepare(context);
             testFreecam(context);
