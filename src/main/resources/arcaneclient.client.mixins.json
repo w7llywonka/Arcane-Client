@@ -4,6 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ClientCommonNetworkHandlerMixin",
+    "ClientConnectionMixin",
     "ClientPacketListenerMixin",
     "EntityMixin",
     "FontManagerAccessor",
@@ -12,7 +13,8 @@
     "LivingEntityMixin",
     "MinecraftClientAccessor",
     "MinecraftClientMixin",
-    "MouseMixin"
+    "MouseMixin",
+    "WorldRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
