@@ -4,6 +4,7 @@
 
 - Restored the evidence-based scanner reconstructed from the supplied 1.8 and 1.6 clients, including configurable cultivation, placed-block, machine, block-entity, light, live-activity, and entity signals.
 - Restored deep-Y weighting, temporal layout comparison, stash clustering, block-entity classification, transient-entity filtering, and the broader packet observation bridge.
+- Refined the Click GUI and HUD with smaller rounded module cards, a neutral graphite overlay, green-free accent themes, and an OFL-licensed Sora font.
 - Added the Hiss Addon website intro: a lightweight snake slither shown once per session with an optional replay.
 - Rebuilt the product site with a Krypton-inspired dark forest/mint visual system, optimized motion, setup bento, interface samples, explicit plan cards, Hiss showcase, and FAQ.
 ## 2.1.0+mc1.21.11

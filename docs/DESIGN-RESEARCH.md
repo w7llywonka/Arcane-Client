@@ -27,6 +27,10 @@ The 1.8 artifact is a functional superset, so it is the reconstruction baseline.
 - [Fabric example mod](https://github.com/FabricMC/fabric-example-mod), [Yarn](https://maven.fabricmc.net/net/fabricmc/yarn/), [Fabric Loader](https://maven.fabricmc.net/net/fabricmc/fabric-loader/), and [Fabric API](https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/) — authoritative references for the 1.21.11 source layout and pinned build dependencies.
 - [CFR](https://github.com/leibnitz27/cfr) and [Tiny Remapper](https://github.com/FabricMC/tiny-remapper) — reconstruction tools used to turn the CC0 input binaries into readable Yarn-named Java before manual cleanup.
 
+## 2026 renderer review
+
+The August 2026 GitHub releases for 67 Client and Krypton Client were inspected statically without launching either JAR. Their public repositories expose only a README and release binary; the nested client archives use the same compact YACL-style four-column category grid, 20-pixel controls, restrained HUD widgets, and Minecraft font renderer. Arcane adopts the density and low-obstruction principles while retaining original renderer code, assets, rounded geometry, and navigation.
+
 No external client source was copied into Arcane Client. The external projects informed information architecture, presentation, and repository ergonomics only.
 
 ## Arcane product decisions
@@ -34,7 +38,7 @@ No external client source was copied into Arcane Client. The external projects i
 - One searchable Click GUI with five panels: Discovery, Visual, Player, Keybinds, and Social.
 - Left click toggles a module; right click exposes module-specific configuration.
 - Panels can be dragged and collapsed, and the layout adapts from five columns down to one.
-- Arcane, Ember, and Verdant palettes are shared by the GUI and HUD and persist in `arcane-client.json`.
+- Arcane, Frost, and Rose accent palettes share a neutral graphite GUI/HUD foundation and persist in `arcane-client.json`; none introduces a green screen tint.
 - `/arcane` is the primary command; `/dtrace` redirects to it for configuration continuity.
 - Original package names, mod ID, resource namespace, config filename, artifact name, and user-visible branding are all replaced.
 - The two input binaries and old placeholder icon remain under `legacy/` and are never bundled into production output.

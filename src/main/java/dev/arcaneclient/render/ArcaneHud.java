@@ -6,6 +6,7 @@ import dev.arcaneclient.TraceEngine;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.screen.ArcaneFont;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
+import dev.arcaneclient.screen.RoundedGui;
 import java.util.HashMap;
 import java.util.Map;
 import net.fabricmc.api.EnvType;
@@ -23,11 +24,11 @@ public final class ArcaneHud {
     private static final Identifier HUD_ID = ArcaneClient.id("nearby_chunks");
     private static final int RADIUS = 3;
     private static final int GRID_SIZE = 7;
-    private static final int CELL_SIZE = 14;
-    private static final int PANEL_X = 5;
-    private static final int PANEL_Y = 5;
-    private static final int HEADER_HEIGHT = 16;
-    private static final int PADDING = 3;
+    private static final int CELL_SIZE = 11;
+    private static final int PANEL_X = 7;
+    private static final int PANEL_Y = 7;
+    private static final int HEADER_HEIGHT = 17;
+    private static final int PADDING = 4;
 
     private static Map<Long, TraceEngine.ChunkMarker> cachedMarkers = Map.of();
     private static long cachedTickBucket = Long.MIN_VALUE;
@@ -67,16 +68,15 @@ public final class ArcaneHud {
         int panelWidth = gridPixels + PADDING * 2;
         int panelHeight = HEADER_HEIGHT + gridPixels + PADDING;
 
-        graphics.fill(PANEL_X + 3, PANEL_Y + 4, PANEL_X + panelWidth + 3, PANEL_Y + panelHeight + 4, 0x55000000);
-        graphics.fill(PANEL_X, PANEL_Y, PANEL_X + panelWidth, PANEL_Y + panelHeight, 0xEC120F20);
-        graphics.drawStrokedRectangle(PANEL_X, PANEL_Y, panelWidth, panelHeight, 0xFF4B4168);
-        graphics.fill(PANEL_X + 1, PANEL_Y + 1, PANEL_X + panelWidth - 1, PANEL_Y + 3, accent);
+        RoundedGui.fill(graphics, PANEL_X + 2, PANEL_Y + 3, panelWidth, panelHeight, 7, 0x40000000);
+        RoundedGui.outline(graphics, PANEL_X, PANEL_Y, panelWidth, panelHeight, 7, 1, 0xB83A3C45, 0xD90D0E11);
+        RoundedGui.fill(graphics, PANEL_X + 8, PANEL_Y + 2, 28, 2, 1, accent);
 
         String state = config.enabled ? "ON" : "PAUSED";
         String header = "ARCANE  " + state + (FreecamController.isActive() ? "  FC" : "") + (config.esp ? "  ESP" : "");
-        graphics.drawText(font, header, PANEL_X + PADDING, PANEL_Y + 6, config.enabled ? 0xFFF8FAFC : 0xFFFB7185, true);
+        graphics.drawText(font, header, PANEL_X + PADDING, PANEL_Y + 5, config.enabled ? 0xFFF4F4F5 : 0xFFF08AA0, false);
         String flagged = Integer.toString(engine.flaggedCount());
-        graphics.drawText(font, flagged, PANEL_X + panelWidth - PADDING - font.getWidth(flagged), PANEL_Y + 6, secondary, false);
+        graphics.drawText(font, flagged, PANEL_X + panelWidth - PADDING - font.getWidth(flagged), PANEL_Y + 5, secondary, false);
 
         int gridX = PANEL_X + PADDING;
         int gridY = PANEL_Y + HEADER_HEIGHT;
@@ -88,16 +88,17 @@ public final class ArcaneHud {
                 int y = gridY + (dz + RADIUS) * CELL_SIZE;
                 TraceEngine.ChunkMarker marker = markers.get(key(chunkX, chunkZ));
                 int score = marker == null ? 0 : marker.score();
-                graphics.fill(x + 1, y + 1, x + CELL_SIZE - 1, y + CELL_SIZE - 1, score == 0 ? 0x50231D36 : qualityColor(score, config.threshold));
-                if (score > 0) {
-                    int scoreColor = score >= config.threshold && score < 75 ? 0xFF15111F : 0xFFF8FAFC;
-                    graphics.drawCenteredTextWithShadow(font, Integer.toString(Math.min(99, score)), x + CELL_SIZE / 2, y + 3, scoreColor);
-                }
+                int tile = score == 0 ? 0x5A1C1E24 : qualityColor(score, config.threshold);
                 if (dx == 0 && dz == 0) {
-                    graphics.drawStrokedRectangle(x, y, CELL_SIZE, CELL_SIZE, accent);
-                    if (score == 0) {
-                        graphics.drawCenteredTextWithShadow(font, "+", x + CELL_SIZE / 2, y + 3, secondary);
-                    }
+                    RoundedGui.outline(graphics, x, y, CELL_SIZE, CELL_SIZE, 3, 1, accent, tile);
+                } else {
+                    RoundedGui.fill(graphics, x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2, 2, tile);
+                }
+                if (score > 0) {
+                    int scoreColor = score >= config.threshold && score < 75 ? 0xFF16171B : 0xFFF4F4F5;
+                    graphics.drawCenteredTextWithShadow(font, Integer.toString(Math.min(99, score)), x + CELL_SIZE / 2, y + 2, scoreColor);
+                } else if (dx == 0 && dz == 0) {
+                    graphics.drawCenteredTextWithShadow(font, "+", x + CELL_SIZE / 2, y + 2, secondary);
                 }
             }
         }
@@ -110,35 +111,34 @@ public final class ArcaneHud {
         TraceEngine.ChunkMarker marker = engine.snapshotMarkerAt(chunk.x, chunk.z);
         int accent = accent(config.uiTheme);
         int secondary = secondary(config.uiTheme);
-        int panelWidth = 212;
-        int x = graphics.getScaledWindowWidth() - panelWidth - 6;
-        int y = 6;
-        int reasonCount = marker == null ? 0 : Math.min(4, marker.reasons().size());
-        int height = marker == null || marker.score() == 0 ? 47 : 40 + reasonCount * 11;
+        int panelWidth = 184;
+        int x = graphics.getScaledWindowWidth() - panelWidth - 7;
+        int y = 7;
+        int reasonCount = marker == null ? 0 : Math.min(3, marker.reasons().size());
+        int height = marker == null || marker.score() == 0 ? 45 : 37 + reasonCount * 10;
 
-        graphics.fill(x + 3, y + 4, x + panelWidth + 3, y + height + 4, 0x55000000);
-        graphics.fill(x, y, x + panelWidth, y + height, 0xEC120F20);
-        graphics.drawStrokedRectangle(x, y, panelWidth, height, 0xFF4B4168);
-        graphics.fill(x + 1, y + 1, x + 4, y + height - 1, accent);
-        graphics.drawText(font, "CURRENT CHUNK", x + 10, y + 7, 0xFFF8FAFC, true);
-        graphics.drawText(font, chunk.x + ", " + chunk.z, x + 10, y + 20, secondary, false);
+        RoundedGui.fill(graphics, x + 2, y + 3, panelWidth, height, 7, 0x40000000);
+        RoundedGui.outline(graphics, x, y, panelWidth, height, 7, 1, 0xB83A3C45, 0xD90D0E11);
+        RoundedGui.fill(graphics, x + 8, y + 2, 28, 2, 1, accent);
+        graphics.drawText(font, "CURRENT CHUNK", x + 9, y + 6, 0xFFF4F4F5, false);
+        graphics.drawText(font, chunk.x + ", " + chunk.z, x + 9, y + 19, secondary, false);
 
         if (marker == null || marker.score() == 0) {
-            String empty = font.trimToWidth("No activity evidence detected", panelWidth - 20);
-            graphics.drawText(font, empty, x + 10, y + 33, 0xFF94A3B8, false);
+            String empty = font.trimToWidth("No activity evidence", panelWidth - 18);
+            graphics.drawText(font, empty, x + 9, y + 32, 0xFFA1A1AA, false);
             return;
         }
 
         boolean stash = isStashChunk(engine, chunk);
         String score = stash ? "POSSIBLE STASH  " + marker.score() : "SCORE  " + marker.score();
         int scoreX = x + panelWidth - 9 - font.getWidth(score);
-        graphics.drawText(font, score, scoreX, y + 7, stash ? 0xFFFB7185 : accent, true);
+        graphics.drawText(font, score, scoreX, y + 6, stash ? 0xFFF08AA0 : accent, false);
 
-        int lineY = y + 34;
+        int lineY = y + 31;
         for (int index = 0; index < reasonCount; index++) {
             String reason = font.trimToWidth(marker.reasons().get(index), panelWidth - 25);
-            graphics.drawText(font, "> " + reason, x + 10, lineY, 0xFFD8D3E4, false);
-            lineY += 11;
+            graphics.drawText(font, "› " + reason, x + 9, lineY, 0xFFD4D4D8, false);
+            lineY += 10;
         }
     }
 
@@ -167,17 +167,17 @@ public final class ArcaneHud {
 
     private static int accent(int theme) {
         return switch (Math.floorMod(theme, 3)) {
-            case 1 -> 0xFFFB7185;
-            case 2 -> 0xFF34D399;
-            default -> 0xFFA855F7;
+            case 1 -> 0xFF76A9FF;
+            case 2 -> 0xFFF08AA0;
+            default -> 0xFF9A8CFF;
         };
     }
 
     private static int secondary(int theme) {
         return switch (Math.floorMod(theme, 3)) {
-            case 1 -> 0xFFF59E0B;
-            case 2 -> 0xFF2DD4BF;
-            default -> 0xFF22D3EE;
+            case 1 -> 0xFFB8D0FF;
+            case 2 -> 0xFFF6B4C1;
+            default -> 0xFFC3BCFF;
         };
     }
 

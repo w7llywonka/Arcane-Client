@@ -25,14 +25,16 @@ import net.minecraft.text.Text;
 
 @Environment(EnvType.CLIENT)
 public final class ArcaneSettingsScreen extends Screen {
-    private static final int PANEL_WIDTH = 148;
-    private static final int HEADER_HEIGHT = 20;
-    private static final int ROW_HEIGHT = 18;
-    private static final int SETTING_HEIGHT = 16;
-    private static final int SLIDER_HEIGHT = 27;
-    private static final int MACRO_ROW_HEIGHT = 20;
-    private static final int TOP_BAR_HEIGHT = 28;
-    private static final int GAP = 8;
+    private static final int PANEL_WIDTH = 136;
+    private static final int HEADER_HEIGHT = 21;
+    private static final int ROW_HEIGHT = 16;
+    private static final int SETTING_HEIGHT = 15;
+    private static final int SLIDER_HEIGHT = 25;
+    private static final int MACRO_ROW_HEIGHT = 18;
+    private static final int TOP_BAR_HEIGHT = 30;
+    private static final int GAP = 7;
+    private static final int PANEL_RADIUS = 7;
+    private static final int CARD_RADIUS = 5;
     private static final Theme[] THEMES = Theme.values();
     private static final ItemEspCategory[] ITEM_CATEGORIES = ItemEspCategory.values();
 
@@ -119,7 +121,7 @@ public final class ArcaneSettingsScreen extends Screen {
     protected void init() {
         layoutPanels();
         int searchWidth = searchWidth();
-        this.searchInput = new TextFieldWidget(font(), searchX(searchWidth), 7, searchWidth, 15, Text.literal("Search modules"));
+        this.searchInput = new TextFieldWidget(font(), searchX(searchWidth), 9, searchWidth, 14, Text.literal("Search modules"));
         this.searchInput.setDrawsBackground(false);
         this.searchInput.setTextShadow(false);
         this.searchInput.setMaxLength(48);
@@ -132,7 +134,7 @@ public final class ArcaneSettingsScreen extends Screen {
         this.macroInputs.clear();
         for (int index = 0; index < 4; index++) {
             int slot = index;
-            TextFieldWidget input = new TextFieldWidget(font(), 0, 0, 84, 14, Text.literal("Chat macro " + (index + 1)));
+            TextFieldWidget input = new TextFieldWidget(font(), 0, 0, 72, 12, Text.literal("Chat macro " + (index + 1)));
             input.setDrawsBackground(false);
             input.setTextShadow(false);
             input.setMaxLength(256);
@@ -147,7 +149,6 @@ public final class ArcaneSettingsScreen extends Screen {
     @Override
     public void render(DrawContext graphics, int mouseX, int mouseY, float deltaTicks) {
         Theme theme = theme();
-        this.renderInGameBackground(graphics);
         graphics.fill(0, 0, this.width, this.height, theme.backdrop);
         drawTopBar(graphics, mouseX, mouseY, theme);
         clampPanels();
@@ -161,41 +162,48 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private void drawTopBar(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
-        graphics.fill(0, 0, this.width, TOP_BAR_HEIGHT, theme.topBar);
-        graphics.fill(0, TOP_BAR_HEIGHT - 2, this.width / 2, TOP_BAR_HEIGHT, theme.accent);
-        graphics.fill(this.width / 2, TOP_BAR_HEIGHT - 2, this.width, TOP_BAR_HEIGHT, theme.secondary);
-        graphics.drawText(font(), "ARCANE", 8, 9, theme.text, true);
-        int clientX = 10 + font().getWidth("ARCANE");
-        graphics.drawText(font(), "CLIENT", clientX, 9, theme.accent, true);
-        if (this.width >= 360) {
+        int barX = 6;
+        int barY = 5;
+        int barWidth = this.width - 12;
+        int barHeight = 22;
+        RoundedGui.fill(graphics, barX + 1, barY + 2, barWidth, barHeight, 8, 0x48000000);
+        RoundedGui.outline(graphics, barX, barY, barWidth, barHeight, 8, 1, theme.border, theme.topBar);
+        RoundedGui.fill(graphics, barX + 8, barY + barHeight - 3, 38, 2, 1, theme.accent);
+        graphics.drawText(font(), "ARCANE", barX + 8, barY + 7, theme.text, false);
+        int clientX = barX + 10 + font().getWidth("ARCANE");
+        graphics.drawText(font(), "CLIENT", clientX, barY + 7, theme.accent, false);
+        if (this.width >= 480) {
             updatePerformanceLabel();
-            String status = this.width >= 560 ? this.performanceLabel : this.compactFpsLabel;
-            graphics.drawText(font(), status, clientX + font().getWidth("CLIENT") + 12, 9, theme.muted, false);
+            String status = this.width >= 640 ? this.performanceLabel : this.compactFpsLabel;
+            graphics.drawText(font(), status, clientX + font().getWidth("CLIENT") + 12, barY + 7, theme.muted, false);
         }
 
         int searchWidth = searchWidth();
         int searchX = searchX(searchWidth);
         int searchBorder = this.searchInput != null && this.searchInput.isFocused() ? theme.accent : theme.border;
-        fillSoftRect(graphics, searchX - 5, 5, searchWidth + 10, 18, searchBorder);
-        fillSoftRect(graphics, searchX - 4, 6, searchWidth + 8, 16, theme.setting);
+        RoundedGui.outline(graphics, searchX - 5, barY + 3, searchWidth + 10, 17, 7, 1, searchBorder, theme.setting);
 
         int themeX = themeButtonX();
-        boolean hovered = inside(mouseX, mouseY, themeX, 5, 84, 18);
-        fillSoftRect(graphics, themeX, 5, 84, 18, hovered ? theme.accent : theme.border);
-        fillSoftRect(graphics, themeX + 1, 6, 82, 16, hovered ? theme.hover : theme.setting);
-        graphics.drawCenteredTextWithShadow(font(), theme.label + "  >", themeX + 42, 9, theme.text);
+        boolean hovered = inside(mouseX, mouseY, themeX, barY + 3, 78, 17);
+        RoundedGui.outline(graphics, themeX, barY + 3, 78, 17, 7, 1, hovered ? theme.accent : theme.border, hovered ? theme.hover : theme.setting);
+        graphics.drawCenteredTextWithShadow(font(), theme.label + "  >", themeX + 39, barY + 7, theme.text);
     }
 
     private void drawBottomBar(DrawContext graphics, Theme theme) {
-        int y = this.height - 18;
-        graphics.fill(0, y, this.width, this.height, theme.topBar);
+        int y = this.height - 20;
         String help = this.listeningFor == null
-            ? "LMB toggle   RMB configure   Drag headers to arrange"
-            : "Press a key or mouse button   Esc clears";
-        graphics.drawText(font(), help, 7, y + 5, this.listeningFor == null ? theme.muted : theme.accent, false);
+            ? (this.width >= 440 ? "LMB toggle   RMB configure   Drag headers" : "LMB toggle   RMB settings")
+            : (this.width >= 440 ? "Press a key or mouse button   Esc clears" : "Press input   Esc clears");
+        int helpWidth = font().getWidth(help) + 14;
+        RoundedGui.fill(graphics, 7, y + 2, helpWidth, 16, 7, 0x38000000);
+        RoundedGui.outline(graphics, 6, y, helpWidth, 16, 7, 1, theme.border, theme.topBar);
+        graphics.drawText(font(), help, 13, y + 4, this.listeningFor == null ? theme.muted : theme.accent, false);
         if (!query().isEmpty()) {
             String result = visibleModuleCount() + " results";
-            graphics.drawText(font(), result, this.width - 7 - font().getWidth(result), y + 5, theme.secondary, false);
+            int resultWidth = font().getWidth(result) + 14;
+            int resultX = this.width - resultWidth - 6;
+            RoundedGui.outline(graphics, resultX, y, resultWidth, 16, 7, 1, theme.border, theme.topBar);
+            graphics.drawText(font(), result, resultX + 7, y + 4, theme.secondary, false);
         }
     }
 
@@ -258,10 +266,10 @@ public final class ArcaneSettingsScreen extends Screen {
 
     private void drawPerformanceRow(DrawContext graphics, int x, int y, int mouseX, int mouseY, Theme theme) {
         drawRowBackground(graphics, x, y, ROW_HEIGHT, mouseX, mouseY, theme);
-        graphics.fill(x + 8, y + 7, x + 11, y + 10, theme.accent);
-        graphics.drawText(font(), "Performance", x + 15, y + 5, theme.text, false);
+        RoundedGui.fill(graphics, x + 9, y + 6, 4, 4, 2, theme.accent);
+        graphics.drawText(font(), "Performance", x + 16, y + 4, theme.text, false);
         String label = this.config.performanceProfile().label();
-        graphics.drawText(font(), label, x + PANEL_WIDTH - 8 - font().getWidth(label), y + 5, theme.secondary, false);
+        graphics.drawText(font(), label, x + PANEL_WIDTH - 8 - font().getWidth(label), y + 4, theme.secondary, false);
     }
 
     private void drawBinds(DrawContext graphics, int mouseX, int mouseY, Theme theme) {
@@ -272,11 +280,11 @@ public final class ArcaneSettingsScreen extends Screen {
         int rowY = this.bindsPanel.y + HEADER_HEIGHT;
         for (ArcaneKeybinds.Entry entry : entries) {
             drawRowBackground(graphics, this.bindsPanel.x, rowY, ROW_HEIGHT, mouseX, mouseY, theme);
-            graphics.drawText(font(), entry.label(), this.bindsPanel.x + 8, rowY + 5, theme.text, false);
+            graphics.drawText(font(), entry.label(), this.bindsPanel.x + 10, rowY + 4, theme.text, false);
             String key = this.listeningFor == entry.mapping() ? "..." : entry.mapping().getBoundKeyLocalizedText().getString();
             key = font().trimToWidth(key, 46);
             int color = this.listeningFor == entry.mapping() ? theme.accent : theme.muted;
-            graphics.drawText(font(), key, this.bindsPanel.x + PANEL_WIDTH - 8 - font().getWidth(key), rowY + 5, color, false);
+            graphics.drawText(font(), key, this.bindsPanel.x + PANEL_WIDTH - 8 - font().getWidth(key), rowY + 4, color, false);
             rowY += ROW_HEIGHT;
         }
     }
@@ -295,41 +303,39 @@ public final class ArcaneSettingsScreen extends Screen {
 
         int rowY = moduleY + ROW_HEIGHT;
         for (int index = 0; index < 4; index++) {
-            graphics.fill(this.chatPanel.x + 1, rowY, this.chatPanel.x + PANEL_WIDTH - 1, rowY + MACRO_ROW_HEIGHT, theme.setting);
-            graphics.fill(this.chatPanel.x + 7, rowY + 5, this.chatPanel.x + 10, rowY + 15, theme.secondary);
-            graphics.drawText(font(), "M" + (index + 1), this.chatPanel.x + 14, rowY + 6, theme.muted, false);
-            int inputX = this.chatPanel.x + 31;
-            graphics.fill(inputX - 2, rowY + 3, inputX + 82, rowY + 18, theme.row);
-            graphics.drawStrokedRectangle(inputX - 2, rowY + 3, 84, 15, theme.border);
+            RoundedGui.fill(graphics, this.chatPanel.x + 5, rowY + 1, PANEL_WIDTH - 10, MACRO_ROW_HEIGHT - 2, 4, theme.setting);
+            RoundedGui.fill(graphics, this.chatPanel.x + 9, rowY + 5, 2, 8, 1, theme.secondary);
+            graphics.drawText(font(), "M" + (index + 1), this.chatPanel.x + 14, rowY + 5, theme.muted, false);
+            int inputX = this.chatPanel.x + 27;
+            RoundedGui.outline(graphics, inputX - 2, rowY + 2, 76, 14, 5, 1, theme.border, theme.row);
             TextFieldWidget input = this.macroInputs.get(index);
             input.setX(inputX);
-            input.setY(rowY + 4);
+            input.setY(rowY + 3);
             input.setVisible(true);
 
             KeyBinding mapping = ArcaneClient.keybinds().chatMacros().get(index);
             String key = this.listeningFor == mapping ? "..." : mapping.getBoundKeyLocalizedText().getString();
-            key = font().trimToWidth(key, 26);
-            if (inside(mouseX, mouseY, this.chatPanel.x + 116, rowY, 32, MACRO_ROW_HEIGHT)) {
-                graphics.fill(this.chatPanel.x + 115, rowY + 2, this.chatPanel.x + PANEL_WIDTH - 2, rowY + 18, theme.hover);
+            key = font().trimToWidth(key, 24);
+            if (inside(mouseX, mouseY, this.chatPanel.x + 105, rowY, 31, MACRO_ROW_HEIGHT)) {
+                RoundedGui.fill(graphics, this.chatPanel.x + 105, rowY + 1, 29, MACRO_ROW_HEIGHT - 2, 4, theme.hover);
             }
             int keyColor = this.listeningFor == mapping ? theme.accent : theme.muted;
-            graphics.drawText(font(), key, this.chatPanel.x + PANEL_WIDTH - 6 - font().getWidth(key), rowY + 6, keyColor, false);
+            graphics.drawText(font(), key, this.chatPanel.x + PANEL_WIDTH - 8 - font().getWidth(key), rowY + 5, keyColor, false);
             rowY += MACRO_ROW_HEIGHT;
         }
     }
 
     private void drawPanel(DrawContext graphics, Panel panel, int height, String title, String badge, int mouseX, int mouseY, Theme theme) {
         panel.lastHeight = height;
-        fillSoftRect(graphics, panel.x + 3, panel.y + 4, PANEL_WIDTH, height, 0x50000000);
-        fillSoftRect(graphics, panel.x, panel.y, PANEL_WIDTH, height, theme.border);
-        fillSoftRect(graphics, panel.x + 1, panel.y + 1, PANEL_WIDTH - 2, height - 2, theme.panel);
-        graphics.fill(panel.x + 2, panel.y + 3, panel.x + PANEL_WIDTH - 2, panel.y + HEADER_HEIGHT, theme.header);
-        graphics.fill(panel.x + 9, panel.y + 1, panel.x + 47, panel.y + 3, theme.accent);
+        RoundedGui.fill(graphics, panel.x + 2, panel.y + 3, PANEL_WIDTH, height, PANEL_RADIUS, 0x40000000);
+        RoundedGui.outline(graphics, panel.x, panel.y, PANEL_WIDTH, height, PANEL_RADIUS, 1, theme.border, theme.panel);
+        RoundedGui.fill(graphics, panel.x + 3, panel.y + 3, PANEL_WIDTH - 6, HEADER_HEIGHT - 4, CARD_RADIUS, theme.header);
+        RoundedGui.fill(graphics, panel.x + 10, panel.y + 2, 32, 2, 1, theme.accent);
         if (inside(mouseX, mouseY, panel.x, panel.y, PANEL_WIDTH, HEADER_HEIGHT)) {
-            graphics.fill(panel.x + 2, panel.y + 3, panel.x + PANEL_WIDTH - 2, panel.y + HEADER_HEIGHT, 0x18FFFFFF);
+            RoundedGui.fill(graphics, panel.x + 3, panel.y + 3, PANEL_WIDTH - 6, HEADER_HEIGHT - 4, CARD_RADIUS, 0x18FFFFFF);
         }
-        graphics.drawText(font(), title, panel.x + 9, panel.y + 6, theme.text, false);
-        int toggleX = panel.x + PANEL_WIDTH - 13;
+        graphics.drawText(font(), title, panel.x + 10, panel.y + 6, theme.text, false);
+        int toggleX = panel.x + PANEL_WIDTH - 14;
         graphics.drawText(font(), panel.open ? "−" : "+", toggleX, panel.y + 6, theme.muted, false);
         if (badge != null && !badge.isEmpty()) {
             int badgeX = toggleX - 7 - font().getWidth(badge);
@@ -339,38 +345,32 @@ public final class ArcaneSettingsScreen extends Screen {
 
     private void drawModuleRow(DrawContext graphics, int x, int y, String label, boolean enabled, boolean hasSettings, boolean expanded, int mouseX, int mouseY, Theme theme) {
         drawRowBackground(graphics, x, y, ROW_HEIGHT, mouseX, mouseY, theme);
-        fillSoftRect(graphics, x + 8, y + 7, 5, 5, enabled ? theme.accent : theme.border);
-        graphics.drawText(font(), label, x + 17, y + 5, enabled ? theme.text : theme.muted, false);
-        if (hasSettings) graphics.drawText(font(), expanded ? "⌄" : "›", x + PANEL_WIDTH - 40, y + 5, theme.muted, false);
-        drawSwitch(graphics, x + PANEL_WIDTH - 27, y + 4, enabled, theme);
+        RoundedGui.fill(graphics, x + 9, y + 6, 4, 4, 2, enabled ? theme.accent : theme.border);
+        graphics.drawText(font(), label, x + 16, y + 4, enabled ? theme.text : theme.muted, false);
+        if (hasSettings) graphics.drawText(font(), expanded ? "⌄" : "›", x + PANEL_WIDTH - 37, y + 4, theme.muted, false);
+        drawSwitch(graphics, x + PANEL_WIDTH - 25, y + 4, enabled, theme);
     }
 
     private void drawSettingToggle(DrawContext graphics, int x, int y, ToggleRow row, int mouseX, int mouseY, Theme theme) {
-        graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.setting);
-        graphics.fill(x + 7, y, x + 8, y + SETTING_HEIGHT, theme.border);
-        if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT)) {
-            graphics.fill(x + 8, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.hover);
-        }
-        graphics.drawText(font(), row.label(), x + 13, y + 4, theme.muted, false);
-        drawSwitch(graphics, x + PANEL_WIDTH - 25, y + 4, row.value().getAsBoolean(), theme);
+        int color = inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT) ? theme.hover : theme.setting;
+        RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SETTING_HEIGHT - 2, 4, color);
+        graphics.drawText(font(), row.label(), x + 12, y + 3, theme.muted, false);
+        drawSwitch(graphics, x + PANEL_WIDTH - 24, y + 3, row.value().getAsBoolean(), theme);
     }
 
     private void drawSensitivity(DrawContext graphics, int x, int y, int mouseX, int mouseY, Theme theme) {
-        graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SLIDER_HEIGHT, theme.setting);
-        graphics.fill(x + 7, y, x + 8, y + SLIDER_HEIGHT, theme.border);
-        if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, SLIDER_HEIGHT) || this.draggingSensitivity) {
-            graphics.fill(x + 8, y, x + PANEL_WIDTH - 1, y + SLIDER_HEIGHT, theme.hover);
-        }
-        graphics.drawText(font(), "Sensitivity", x + 13, y + 4, theme.muted, false);
+        int color = inside(mouseX, mouseY, x, y, PANEL_WIDTH, SLIDER_HEIGHT) || this.draggingSensitivity ? theme.hover : theme.setting;
+        RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SLIDER_HEIGHT - 2, 4, color);
+        graphics.drawText(font(), "Sensitivity", x + 12, y + 3, theme.muted, false);
         String value = this.config.sensitivity() + "%";
-        graphics.drawText(font(), value, x + PANEL_WIDTH - 8 - font().getWidth(value), y + 4, theme.text, false);
-        int barX = x + 13;
-        int barY = y + 19;
-        int barWidth = PANEL_WIDTH - 26;
-        graphics.fill(barX, barY, barX + barWidth, barY + 3, theme.border);
+        graphics.drawText(font(), value, x + PANEL_WIDTH - 9 - font().getWidth(value), y + 3, theme.text, false);
+        int barX = x + 12;
+        int barY = y + 17;
+        int barWidth = PANEL_WIDTH - 24;
+        RoundedGui.fill(graphics, barX, barY, barWidth, 3, 2, theme.border);
         int progress = Math.round(barWidth * this.config.sensitivity() / 100.0f);
-        graphics.fill(barX, barY, barX + progress, barY + 3, theme.accent);
-        graphics.fill(barX + Math.max(0, progress - 1), barY - 2, barX + progress + 2, barY + 5, theme.text);
+        RoundedGui.fill(graphics, barX, barY, progress, 3, 2, theme.accent);
+        RoundedGui.fill(graphics, barX + Math.max(0, progress - 2), barY - 2, 5, 7, 3, theme.text);
     }
 
     private void drawVisualSettings(DrawContext graphics, VisualModule module, int x, int y, int mouseX, int mouseY, Theme theme) {
@@ -389,10 +389,10 @@ public final class ArcaneSettingsScreen extends Screen {
                 drawColorSetting(graphics, x, y + SETTING_HEIGHT, "3 x 3 tunnels", this.config.tunnelThreeByThreeColor, mouseX, mouseY, theme);
             }
             case BLOCK_ENTITY_DEBUG -> {
-                graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.setting);
-                graphics.drawText(font(), "Visible targets", x + 13, y + 4, theme.muted, false);
+                RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SETTING_HEIGHT - 2, 4, theme.setting);
+                graphics.drawText(font(), "Visible targets", x + 12, y + 3, theme.muted, false);
                 String count = Integer.toString(EspRenderer.targetCount());
-                graphics.drawText(font(), count, x + PANEL_WIDTH - 8 - font().getWidth(count), y + 4, theme.secondary, false);
+                graphics.drawText(font(), count, x + PANEL_WIDTH - 9 - font().getWidth(count), y + 3, theme.secondary, false);
             }
             default -> {
             }
@@ -400,50 +400,33 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private void drawItemSetting(DrawContext graphics, int x, int y, ItemEspCategory category, int mouseX, int mouseY, Theme theme) {
-        graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.setting);
-        if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT)) {
-            graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.hover);
-        }
-        graphics.drawText(font(), category.label(), x + 13, y + 4, theme.muted, false);
-        drawSwatch(graphics, x + PANEL_WIDTH - 46, y + 4, this.config.itemEspColor(category), theme);
-        drawSwitch(graphics, x + PANEL_WIDTH - 25, y + 4, this.config.itemEspEnabled(category), theme);
+        int color = inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT) ? theme.hover : theme.setting;
+        RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SETTING_HEIGHT - 2, 4, color);
+        graphics.drawText(font(), category.label(), x + 12, y + 3, theme.muted, false);
+        drawSwatch(graphics, x + PANEL_WIDTH - 43, y + 3, this.config.itemEspColor(category), theme);
+        drawSwitch(graphics, x + PANEL_WIDTH - 24, y + 3, this.config.itemEspEnabled(category), theme);
     }
 
     private void drawColorSetting(DrawContext graphics, int x, int y, String label, int color, int mouseX, int mouseY, Theme theme) {
-        graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.setting);
-        if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT)) {
-            graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + SETTING_HEIGHT, theme.hover);
-        }
-        graphics.drawText(font(), label, x + 13, y + 4, theme.muted, false);
-        drawSwatch(graphics, x + PANEL_WIDTH - 19, y + 4, color, theme);
+        int background = inside(mouseX, mouseY, x, y, PANEL_WIDTH, SETTING_HEIGHT) ? theme.hover : theme.setting;
+        RoundedGui.fill(graphics, x + 5, y + 1, PANEL_WIDTH - 10, SETTING_HEIGHT - 2, 4, background);
+        graphics.drawText(font(), label, x + 12, y + 3, theme.muted, false);
+        drawSwatch(graphics, x + PANEL_WIDTH - 19, y + 3, color, theme);
     }
 
     private void drawRowBackground(DrawContext graphics, int x, int y, int height, int mouseX, int mouseY, Theme theme) {
-        graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + height, theme.row);
-        if (inside(mouseX, mouseY, x, y, PANEL_WIDTH, height)) {
-            graphics.fill(x + 1, y, x + PANEL_WIDTH - 1, y + height, theme.hover);
-        }
+        int color = inside(mouseX, mouseY, x, y, PANEL_WIDTH, height) ? theme.hover : theme.row;
+        RoundedGui.fill(graphics, x + 4, y + 1, PANEL_WIDTH - 8, height - 2, CARD_RADIUS, color);
     }
 
     private static void drawSwitch(DrawContext graphics, int x, int y, boolean enabled, Theme theme) {
-        fillSoftRect(graphics, x, y, 20, 10, enabled ? theme.accent : theme.border);
-        int knobX = enabled ? x + 11 : x + 2;
-        fillSoftRect(graphics, knobX, y + 2, 7, 6, enabled ? theme.text : theme.muted);
+        RoundedGui.fill(graphics, x, y, 18, 8, 4, enabled ? theme.accent : theme.border);
+        int knobX = enabled ? x + 10 : x + 1;
+        RoundedGui.fill(graphics, knobX, y + 1, 7, 6, 3, enabled ? theme.text : theme.muted);
     }
 
     private static void drawSwatch(DrawContext graphics, int x, int y, int color, Theme theme) {
-        fillSoftRect(graphics, x, y, 10, 10, theme.border);
-        fillSoftRect(graphics, x + 1, y + 1, 8, 8, color);
-    }
-
-    private static void fillSoftRect(DrawContext graphics, int x, int y, int width, int height, int color) {
-        if (width <= 2 || height <= 2) {
-            graphics.fill(x, y, x + width, y + height, color);
-            return;
-        }
-        graphics.fill(x + 2, y, x + width - 2, y + height, color);
-        graphics.fill(x, y + 2, x + width, y + height - 2, color);
-        graphics.fill(x + 1, y + 1, x + width - 1, y + height - 1, color);
+        RoundedGui.outline(graphics, x, y, 10, 10, 4, 1, theme.border, color);
     }
 
     @Override
@@ -457,7 +440,7 @@ public final class ArcaneSettingsScreen extends Screen {
 
         int mouseX = (int) click.x();
         int mouseY = (int) click.y();
-        if (button == 0 && inside(mouseX, mouseY, themeButtonX(), 5, 84, 18)) {
+        if (button == 0 && inside(mouseX, mouseY, themeButtonX(), 8, 78, 17)) {
             this.config.uiTheme = (this.config.uiTheme + 1) % THEMES.length;
             return true;
         }
@@ -534,7 +517,7 @@ public final class ArcaneSettingsScreen extends Screen {
                 if (index == 0) this.config.itemTracers = !this.config.itemTracers;
                 else if (index > 0) {
                     ItemEspCategory category = ITEM_CATEGORIES[index - 1];
-                    int swatchX = this.renderPanel.x + PANEL_WIDTH - 46;
+                    int swatchX = this.renderPanel.x + PANEL_WIDTH - 43;
                     if (inside(mouseX, mouseY, swatchX, settingsY + index * SETTING_HEIGHT + 3, 12, 12)) {
                         this.config.setItemEspColor(category, ColorPalette.next(this.config.itemEspColor(category)));
                     } else this.config.setItemEspEnabled(category, !this.config.itemEspEnabled(category));
@@ -593,7 +576,7 @@ public final class ArcaneSettingsScreen extends Screen {
         if (!this.chatExpanded || button != 0) return false;
         int settingsY = moduleY + ROW_HEIGHT;
         int index = rowIndex(mouseY, settingsY, 4, MACRO_ROW_HEIGHT);
-        if (index >= 0 && inside(mouseX, mouseY, this.chatPanel.x + 115, settingsY + index * MACRO_ROW_HEIGHT, 33, MACRO_ROW_HEIGHT)) {
+        if (index >= 0 && inside(mouseX, mouseY, this.chatPanel.x + 105, settingsY + index * MACRO_ROW_HEIGHT, 31, MACRO_ROW_HEIGHT)) {
             this.listeningFor = ArcaneClient.keybinds().chatMacros().get(index);
             setMacroInputsVisible(false);
             return true;
@@ -656,8 +639,8 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private void updateSensitivity(int mouseX) {
-        int barX = this.finderPanel.x + 13;
-        int barWidth = PANEL_WIDTH - 26;
+        int barX = this.finderPanel.x + 12;
+        int barWidth = PANEL_WIDTH - 24;
         this.config.setSensitivity(Math.round(100.0f * (mouseX - barX) / barWidth));
     }
 
@@ -849,7 +832,7 @@ public final class ArcaneSettingsScreen extends Screen {
             place(this.renderPanel, start + PANEL_WIDTH + GAP, top);
             place(this.playerPanel, start, top + 46);
             place(this.chatPanel, start, top + 128);
-            place(this.bindsPanel, start + PANEL_WIDTH + GAP, this.height - 18 - HEADER_HEIGHT);
+            place(this.bindsPanel, start + PANEL_WIDTH + GAP, this.height - 22 - HEADER_HEIGHT);
             this.bindsPanel.open = false;
         } else {
             int x = Math.max(0, (this.width - PANEL_WIDTH) / 2);
@@ -880,7 +863,7 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private int themeButtonX() {
-        return this.width - 92;
+        return this.width - 86;
     }
 
     private void clampPanels() {
@@ -935,7 +918,7 @@ public final class ArcaneSettingsScreen extends Screen {
 
         private void clamp(int screenWidth, int screenHeight) {
             this.x = Math.clamp(this.x, 0, Math.max(0, screenWidth - PANEL_WIDTH));
-            this.y = Math.clamp(this.y, TOP_BAR_HEIGHT + 4, Math.max(TOP_BAR_HEIGHT + 4, screenHeight - this.lastHeight - 18));
+            this.y = Math.clamp(this.y, TOP_BAR_HEIGHT + 4, Math.max(TOP_BAR_HEIGHT + 4, screenHeight - this.lastHeight - 22));
         }
     }
 
@@ -977,23 +960,23 @@ public final class ArcaneSettingsScreen extends Screen {
 
     @Environment(EnvType.CLIENT)
     private enum Theme {
-        ARCANE("ARCANE", 0xFFA855F7, 0xFF22D3EE),
-        EMBER("EMBER", 0xFFFB7185, 0xFFF59E0B),
-        VERDANT("VERDANT", 0xFF34D399, 0xFF2DD4BF);
+        ARCANE("ARCANE", 0xFF9A8CFF, 0xFFC3BCFF),
+        FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF),
+        ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1);
 
         private final String label;
         private final int accent;
         private final int secondary;
-        private final int backdrop = 0xE60A0714;
-        private final int topBar = 0xF00C0916;
-        private final int panel = 0xFA120F20;
-        private final int header = 0xF0181429;
-        private final int row = 0xF2181428;
-        private final int setting = 0xF21D1830;
-        private final int hover = 0xF02A2342;
-        private final int border = 0xFF4B4168;
-        private final int text = 0xFFF8FAFC;
-        private final int muted = 0xFF94A3B8;
+        private final int backdrop = 0x78000000;
+        private final int topBar = 0xE8101114;
+        private final int panel = 0xF0121317;
+        private final int header = 0xF017181D;
+        private final int row = 0xEC1B1C22;
+        private final int setting = 0xEC202127;
+        private final int hover = 0xF02A2C34;
+        private final int border = 0xFF3A3C45;
+        private final int text = 0xFFF4F4F5;
+        private final int muted = 0xFFA1A1AA;
 
         Theme(String label, int accent, int secondary) {
             this.label = label;

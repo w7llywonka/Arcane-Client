@@ -35,7 +35,7 @@ dependencies {
 processResources {
 	def version = project.version
 	inputs.property "version", version
-	from("third-party/Inter-OFL.txt") {
+	from("third-party/Sora-OFL.txt") {
 		into "META-INF/licenses/arcaneclient"
 	}
 
