@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.3.3+mc1.21.11
+
+- Made the real local player render while Freecam uses its detached client-only camera entity.
+- Added a final ClientConnection packet boundary so entity, block, and item interaction packets cannot escape Freecam and trigger strict-server invalid-entity disconnects.
+- Changed Freecam navigation to level WASD flight with independent Space/Shift vertical movement and normalized diagonal speed.
+
 ## 2.3.2+mc1.21.11
 
 - Fixed Freecam and Freelook camera instability by keeping both interpolation endpoints synchronized for their non-ticking detached camera entities.

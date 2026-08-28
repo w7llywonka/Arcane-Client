@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.netty.channel.ChannelFutureListener;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
@@ -14,9 +15,14 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientCommonNetworkHandler;
 import net.minecraft.client.Mouse;
 import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.Frustum;
 import net.minecraft.client.render.GameRenderer;
+import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.render.state.WorldRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.network.ClientConnection;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.entity.LivingEntity;
 import org.junit.jupiter.api.Test;
@@ -35,6 +41,8 @@ final class RuntimeHookContractTest {
         method(MinecraftClient.class, "handleBlockBreaking", boolean.class);
         method(MinecraftClient.class, "doItemUse");
         method(ClientCommonNetworkHandler.class, "sendPacket", Packet.class);
+        method(ClientConnection.class, "send", Packet.class, ChannelFutureListener.class, boolean.class);
+        method(WorldRenderer.class, "fillEntityRenderStates", Camera.class, Frustum.class, RenderTickCounter.class, WorldRenderState.class);
         method(Mouse.class, "onMouseScroll", long.class, double.class, double.class);
     }
 
@@ -49,11 +57,13 @@ final class RuntimeHookContractTest {
             Set<String> names = new HashSet<>();
             client.forEach(element -> names.add(element.getAsString()));
             assertTrue(names.contains("ClientCommonNetworkHandlerMixin"));
+            assertTrue(names.contains("ClientConnectionMixin"));
             assertTrue(names.contains("EntityMixin"));
             assertTrue(names.contains("GameRendererMixin"));
             assertTrue(names.contains("LivingEntityMixin"));
             assertTrue(names.contains("MouseMixin"));
             assertTrue(names.contains("MinecraftClientMixin"));
+            assertTrue(names.contains("WorldRendererMixin"));
             assertTrue(names.contains("KeyboardInputMixin"));
         }
     }

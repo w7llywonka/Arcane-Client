@@ -102,16 +102,14 @@ public final class FreecamController {
             return;
         }
 
+        player.setSprinting(false);
         double forward = axis(client.options.forwardKey.isPressed(), client.options.backKey.isPressed());
         double sideways = axis(client.options.rightKey.isPressed(), client.options.leftKey.isPressed());
         double vertical = axis(client.options.jumpKey.isPressed(), client.options.sneakKey.isPressed());
         boolean moving = forward != 0.0 || sideways != 0.0 || vertical != 0.0;
         Vec3d target = Vec3d.ZERO;
         if (moving) {
-            Vec3d look = Vec3d.fromPolar(camera.getPitch(), camera.getYaw());
-            Vec3d right = Vec3d.fromPolar(0.0f, camera.getYaw() + 90.0f);
-            Vec3d direction = look.multiply(forward).add(right.multiply(sideways)).add(0.0, vertical, 0.0);
-            if (direction.lengthSquared() > 1.0) direction = direction.normalize();
+            Vec3d direction = FreecamNavigation.direction(camera.getYaw(), forward, sideways, vertical);
             double speed = ArcaneClient.config().freecamSpeed / 10.0;
             if (client.options.sprintKey.isPressed()) speed *= 3.0;
             target = direction.multiply(speed);
