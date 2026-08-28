@@ -8,6 +8,7 @@ import dev.arcaneclient.screen.ArcaneFont;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.screen.ClickGuiTheme;
 import dev.arcaneclient.screen.RoundedGui;
+import dev.arcaneclient.screen.UiGeometry;
 import java.util.HashMap;
 import java.util.Map;
 import net.fabricmc.api.EnvType;
@@ -26,7 +27,6 @@ public final class ArcaneHud {
     private static final Identifier HUD_ID = ArcaneClient.id("nearby_chunks");
     private static final int RADIUS = 3;
     private static final int GRID_SIZE = 7;
-    private static final int CELL_SIZE = 11;
     private static final int PANEL_X = 7;
     private static final int PANEL_Y = 7;
     private static final int HEADER_HEIGHT = 17;
@@ -60,7 +60,8 @@ public final class ArcaneHud {
         ChunkPos center = client.player.getChunkPos();
         Map<Long, TraceEngine.ChunkMarker> markers = nearbyMarkers(engine, center);
         ClickGuiTheme theme = ClickGuiTheme.fromConfig(config.uiTheme);
-        int gridPixels = GRID_SIZE * CELL_SIZE;
+        int cellSize = UiGeometry.radarCellSize(ArcaneFont.width(font, "99"));
+        int gridPixels = GRID_SIZE * cellSize;
         int panelWidth = gridPixels + PADDING * 2;
         int panelHeight = HEADER_HEIGHT + gridPixels + PADDING;
 
@@ -78,21 +79,26 @@ public final class ArcaneHud {
         int gridY = PANEL_Y + HEADER_HEIGHT;
         for (int dz = -RADIUS; dz <= RADIUS; dz++) {
             for (int dx = -RADIUS; dx <= RADIUS; dx++) {
-                int x = gridX + (dx + RADIUS) * CELL_SIZE;
-                int y = gridY + (dz + RADIUS) * CELL_SIZE;
+                int x = gridX + (dx + RADIUS) * cellSize;
+                int y = gridY + (dz + RADIUS) * cellSize;
                 TraceEngine.ChunkMarker marker = markers.get(key(center.x + dx, center.z + dz));
                 int score = marker == null ? 0 : marker.score();
                 int tile = score == 0 ? 0x5A1C1E24 : qualityColor(score, config.threshold);
                 if (dx == 0 && dz == 0) {
-                    RoundedGui.outline(graphics, x, y, CELL_SIZE, CELL_SIZE, 3, 1, theme.accent(), tile);
+                    RoundedGui.outline(graphics, x, y, cellSize, cellSize, 4, 1, theme.accent(), tile);
                 } else {
-                    RoundedGui.fill(graphics, x + 1, y + 1, CELL_SIZE - 2, CELL_SIZE - 2, 2, tile);
+                    RoundedGui.fill(graphics, x + 1, y + 1, cellSize - 2, cellSize - 2, 3, tile);
                 }
                 if (score > 0) {
                     int scoreColor = score >= config.threshold && score < 75 ? 0xFF16171B : theme.text();
-                    graphics.drawCenteredTextWithShadow(font, ArcaneFont.text(Integer.toString(Math.min(99, score))), x + CELL_SIZE / 2, y + 2, scoreColor);
+                    String scoreText = Integer.toString(Math.min(99, score));
+                    int scoreX = x + (cellSize - ArcaneFont.width(font, scoreText)) / 2;
+                    int scoreY = y + (cellSize - font.fontHeight) / 2;
+                    graphics.drawText(font, ArcaneFont.text(scoreText), scoreX, scoreY, scoreColor, false);
                 } else if (dx == 0 && dz == 0) {
-                    graphics.drawCenteredTextWithShadow(font, ArcaneFont.text("+"), x + CELL_SIZE / 2, y + 2, theme.accentBright());
+                    int plusX = x + (cellSize - ArcaneFont.width(font, "+")) / 2;
+                    int plusY = y + (cellSize - font.fontHeight) / 2;
+                    graphics.drawText(font, ArcaneFont.text("+"), plusX, plusY, theme.accentBright(), false);
                 }
             }
         }

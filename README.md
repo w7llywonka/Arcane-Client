@@ -47,13 +47,13 @@ Modules are grouped for base finding first:
 
 | Category | Modules |
 | --- | --- |
-| Base Finding | Chunk Finder, Stash Finder, Chunk Intel |
+| Base Finding | Chunk Finder, Growth Signals, Build Traces, Machine Signals, Live Changes, Light Signals, Entity Signals, Stash Finder, Chunk Intel |
 | ESP | Storage ESP, Item ESP, Tunnel ESP, Chunk Tiles, ESP Debug |
 | Render | Base Radar, Freecam |
 | Utility | Auto Totem, Chat Macros |
 | Client | Performance, Interface |
 
-Chunk Finder carries the full scan configuration in its settings: sensitivity, scan radius, scan speed, rescan delay, the seven evidence signals, and live flagged/queue counters. Search filters every category by module name, description, or setting name.
+Chunk Finder carries the scan budget and sensitivity controls. The six evidence channels are first-class modules beside it, so growth, build, machine, live-change, light, and entity evidence can be switched independently without opening a nested settings list. Search filters every category by module name, description, or setting name.
 
 ## Text sharpness
 

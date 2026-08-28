@@ -8,6 +8,8 @@ import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.render.EspRenderer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -46,12 +48,6 @@ public final class ModuleCatalog {
             .with(new GuiSetting.Slider("Scan speed", () -> config.chunksPerTick, value -> config.chunksPerTick = value, 1, 8, "/t"))
             .with(new GuiSetting.Slider("Rescan delay", () -> config.rescanSeconds, value -> config.rescanSeconds = value, 10, 300, "s"))
             .with(new GuiSetting.Toggle("Deep focus", () -> config.deepFocus, value -> config.deepFocus = value))
-            .with(new GuiSetting.Toggle("Farms", () -> config.farmSignals, value -> config.farmSignals = value))
-            .with(new GuiSetting.Toggle("Machines", () -> config.machineSignals, value -> config.machineSignals = value))
-            .with(new GuiSetting.Toggle("Player blocks", () -> config.playerBlockSignals, value -> config.playerBlockSignals = value))
-            .with(new GuiSetting.Toggle("Live activity", () -> config.packetSignals, value -> config.packetSignals = value))
-            .with(new GuiSetting.Toggle("Light leaks", () -> config.lightSignals, value -> config.lightSignals = value))
-            .with(new GuiSetting.Toggle("Entities", () -> config.entitySignals, value -> config.entitySignals = value))
             .with(new GuiSetting.Info("Flagged chunks", () -> Integer.toString(ArcaneClient.engine().flaggedCount())))
             .with(new GuiSetting.Info("Scan queue", () -> Integer.toString(ArcaneClient.engine().queueSize())))
             .with(new GuiSetting.Bind("Bind", keybinds.scanner()))
@@ -76,7 +72,68 @@ public final class ModuleCatalog {
             )
             .build();
 
-        return List.of(chunkFinder, stashFinder, chunkIntel);
+        GuiModule growthSignals = signalModule(
+            "Growth Signals",
+            "Tracks crop stages, farmland alignment, imported plants and other cultivation evidence.",
+            () -> config.farmSignals,
+            value -> config.farmSignals = value
+        );
+
+        GuiModule buildTraces = signalModule(
+            "Build Traces",
+            "Scores deliberate block placement and interaction patterns left by players.",
+            () -> config.playerBlockSignals,
+            value -> config.playerBlockSignals = value
+        );
+
+        GuiModule machineSignals = signalModule(
+            "Machine Signals",
+            "Finds automation networks, functional block entities and other working infrastructure.",
+            () -> config.machineSignals,
+            value -> config.machineSignals = value
+        );
+
+        GuiModule liveChanges = signalModule(
+            "Live Changes",
+            "Uses observed block updates and repeated scans to catch activity while a chunk stays loaded.",
+            () -> config.packetSignals,
+            value -> config.packetSignals = value
+        );
+
+        GuiModule lightSignals = signalModule(
+            "Light Signals",
+            "Looks for unnatural block light concealed inside otherwise opaque terrain.",
+            () -> config.lightSignals,
+            value -> config.lightSignals = value
+        );
+
+        GuiModule entitySignals = signalModule(
+            "Entity Signals",
+            "Scores persistent entity clusters while filtering ordinary transient traffic.",
+            () -> config.entitySignals,
+            value -> config.entitySignals = value
+        );
+
+        return List.of(
+            chunkFinder,
+            growthSignals,
+            buildTraces,
+            machineSignals,
+            liveChanges,
+            lightSignals,
+            entitySignals,
+            stashFinder,
+            chunkIntel
+        );
+    }
+
+    private static GuiModule signalModule(
+        String name,
+        String description,
+        BooleanSupplier value,
+        Consumer<Boolean> setter
+    ) {
+        return GuiModule.toggle(name, description, value, setter).build();
     }
 
     private static List<GuiModule> esp(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {

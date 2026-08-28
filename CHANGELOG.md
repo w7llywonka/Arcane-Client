@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Reworked the Click GUI around transparent top controls, collision-safe labels, tighter collapsed windows, and six first-class evidence-channel modules.
+- Made the nearby-chunk radar size its cells to the active font so two-digit scores cannot overlap.
+
 - Fixed the Sora resource path and added a vanilla glyph fallback; replaced integer scanline corners with linearly filtered high-density rounded masks so edges remain smooth at scaled GUI resolutions.
 
 - Rebuilt the Click GUI as a base-finding module menu: one draggable window per category, left click to toggle, right click for nested settings, middle click to rebind.
