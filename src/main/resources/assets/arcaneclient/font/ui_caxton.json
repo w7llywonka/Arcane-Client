@@ -1,0 +1,11 @@
+{
+  "providers": [
+    {
+      "type": "caxton",
+      "regular": {
+        "file": "arcaneclient:inter_regular.ttf",
+        "shadow_offset": 0.5
+      }
+    }
+  ]
+}

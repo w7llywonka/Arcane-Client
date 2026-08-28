@@ -5,86 +5,113 @@ import dev.arcaneclient.mixin.FontManagerAccessor;
 import dev.arcaneclient.mixin.MinecraftClientAccessor;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.EffectGlyph;
 import net.minecraft.client.font.FontManager;
-import net.minecraft.client.font.FontStorage;
-import net.minecraft.client.font.GlyphProvider;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.font.TextRenderer.GlyphsProvider;
+import net.minecraft.text.OrderedText;
+import net.minecraft.text.Style;
 import net.minecraft.text.StyleSpriteSource;
+import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.Language;
 
 /**
- * Supplies the smooth Arcane text renderer at the sharpness the player's GUI scale actually needs.
+ * Picks the font Arcane's interface draws with, and hands out text already styled to use it.
  *
- * <p>Minecraft bakes a TrueType glyph once, at {@code size * oversample} pixels, and samples the
- * glyph atlas with {@code FilterMode.NEAREST} — there is no filtering anywhere in that path. A glyph
- * is then drawn at {@code size * guiScale} physical pixels. So unless {@code oversample} equals the
- * GUI scale, every glyph is an antialiased bitmap resampled with no interpolation, which is what
- * makes the text look blocky. A single {@code oversample} baked into the font JSON can only ever be
- * right for one GUI scale.
+ * <p><b>Why text is styled rather than drawn through a private renderer.</b> Minecraft resolves a
+ * font from the {@link Style} on the text, through the {@code FontManager.Fonts} instance that backs
+ * {@code client.textRenderer}. Constructing a private {@link TextRenderer} over one font storage is
+ * the shorter route, and it is what Arcane used to do, but Caxton assumes {@code FontManager.Fonts}
+ * is the only implementation of {@code TextRenderer.GlyphsProvider} and casts to it unconditionally
+ * — so a private renderer makes Arcane silently lose its font whenever Caxton is installed. Styling
+ * the text instead keeps one code path that works either way.
  *
- * <p>Glyph metrics are all divided by {@code oversample}, so the variants below lay out identically
- * to the pixel and differ only in texture resolution. That lets us pick the one matching the current
- * GUI scale and get a 1:1 texel-to-pixel mapping — crisp text at every scale, with no changes to any
- * layout maths and no resource-pack or mod dependency.
+ * <p><b>Which font.</b> With Caxton present, {@code ui_caxton} renders Inter as multi-channel signed
+ * distance fields, which stay crisp at any size. Without it, Minecraft bakes a glyph once at
+ * {@code size * oversample} pixels and samples the atlas with {@code FilterMode.NEAREST}, so a glyph
+ * only looks right when its oversample matches the GUI scale; the {@code ui_xN} variants cover
+ * scales 1 to 6 and the matching one is selected. Every variant shares Inter's metrics, so the
+ * layout is identical whichever is chosen.
  */
 @Environment(EnvType.CLIENT)
 public final class ArcaneFont {
+    private static final String CAXTON_MOD_ID = "caxton";
     private static final int MAX_OVERSAMPLE = 6;
-    private static final Identifier FALLBACK_FONT_ID = ArcaneClient.id("ui");
-    private static final Identifier[] FONT_IDS = new Identifier[MAX_OVERSAMPLE];
+    private static final Identifier CAXTON_FONT_ID = ArcaneClient.id("ui_caxton");
+    private static final Identifier[] SCALED_FONT_IDS = new Identifier[MAX_OVERSAMPLE];
 
     static {
         for (int oversample = 1; oversample <= MAX_OVERSAMPLE; oversample++) {
-            FONT_IDS[oversample - 1] = ArcaneClient.id("ui_x" + oversample);
+            SCALED_FONT_IDS[oversample - 1] = ArcaneClient.id("ui_x" + oversample);
         }
     }
 
-    private static FontStorage cachedStorage;
-    private static TextRenderer cachedRenderer;
-    private static boolean fallbackLogged;
+    private static Boolean caxtonUsable;
+    private static Identifier styledId;
+    private static Style cachedStyle;
 
     private ArcaneFont() {
     }
 
+    /** Minecraft's own renderer, which is the only one that resolves fonts from a style. */
     public static TextRenderer renderer(MinecraftClient client) {
+        return client.textRenderer;
+    }
+
+    /** A literal in the Arcane interface font. */
+    public static Text text(String value) {
+        return Text.literal(value).setStyle(style());
+    }
+
+    public static int width(TextRenderer renderer, String value) {
+        return renderer.getWidth(text(value));
+    }
+
+    /** {@code value} cut down to {@code maxWidth}, measured in the interface font. */
+    public static OrderedText trimmed(TextRenderer renderer, String value, int maxWidth) {
+        return Language.getInstance().reorder(renderer.trimToWidth(text(value), maxWidth));
+    }
+
+    public static Style style() {
+        Identifier id = fontId();
+        if (!id.equals(styledId) || cachedStyle == null) {
+            styledId = id;
+            cachedStyle = Style.EMPTY.withFont(new StyleSpriteSource.Font(id));
+        }
+        return cachedStyle;
+    }
+
+    /** Re-checks whether the Caxton font is usable. Call after a resource reload. */
+    public static void invalidate() {
+        caxtonUsable = null;
+        cachedStyle = null;
+        styledId = null;
+    }
+
+    private static Identifier fontId() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (caxtonUsable == null) {
+            caxtonUsable = FabricLoader.getInstance().isModLoaded(CAXTON_MOD_ID) && storageExists(client, CAXTON_FONT_ID);
+        }
+        if (caxtonUsable) {
+            return CAXTON_FONT_ID;
+        }
+        return SCALED_FONT_IDS[Math.clamp(client.getWindow().getScaleFactor(), 1, MAX_OVERSAMPLE) - 1];
+    }
+
+    /**
+     * Caxton refuses to build its font providers when its native library is missing, which would
+     * leave the definition unresolved and Arcane's text blank. Check before committing to it.
+     */
+    private static boolean storageExists(MinecraftClient client, Identifier id) {
         try {
             FontManager manager = ((MinecraftClientAccessor) client).arcaneclient$getFontManager();
             FontManagerAccessor fonts = (FontManagerAccessor) manager;
-            FontStorage storage = fonts.arcaneclient$getStorage(fontId(client));
-            if (storage == fonts.arcaneclient$getStorage(FontManager.MISSING_STORAGE_ID)) {
-                storage = fonts.arcaneclient$getStorage(FALLBACK_FONT_ID);
-            }
-            if (storage != cachedStorage || cachedRenderer == null) {
-                cachedStorage = storage;
-                cachedRenderer = new TextRenderer(new FixedGlyphsProvider(storage));
-            }
-            return cachedRenderer;
+            return fonts.arcaneclient$getStorage(id) != fonts.arcaneclient$getStorage(FontManager.MISSING_STORAGE_ID);
         } catch (RuntimeException | LinkageError exception) {
-            if (!fallbackLogged) {
-                fallbackLogged = true;
-                ArcaneClient.LOGGER.warn("Smooth Arcane font unavailable; using Minecraft's default renderer", exception);
-            }
-            return client.textRenderer;
-        }
-    }
-
-    /** The font baked closest to one texel per physical pixel for the current GUI scale. */
-    private static Identifier fontId(MinecraftClient client) {
-        return FONT_IDS[Math.clamp(client.getWindow().getScaleFactor(), 1, MAX_OVERSAMPLE) - 1];
-    }
-
-    private record FixedGlyphsProvider(FontStorage storage) implements GlyphsProvider {
-        @Override
-        public GlyphProvider getGlyphs(StyleSpriteSource ignored) {
-            return this.storage.getGlyphs(false);
-        }
-
-        @Override
-        public EffectGlyph getRectangleGlyph() {
-            return this.storage.getRectangleBakedGlyph();
+            ArcaneClient.LOGGER.warn("Could not check the {} font; falling back to the bundled variants", id, exception);
+            return false;
         }
     }
 }

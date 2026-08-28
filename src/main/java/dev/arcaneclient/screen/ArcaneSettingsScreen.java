@@ -18,6 +18,7 @@ import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.input.KeyInput;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import org.jspecify.annotations.Nullable;
 
@@ -77,6 +78,7 @@ public final class ArcaneSettingsScreen extends Screen {
     @Override
     protected void init() {
         // A resize can change the GUI scale, which changes which font variant is sharpest.
+        ArcaneFont.invalidate();
         this.uiFont = null;
         this.wrapCache.clear();
         layoutWindows();
@@ -86,7 +88,8 @@ public final class ArcaneSettingsScreen extends Screen {
         this.searchInput.setDrawsBackground(false);
         this.searchInput.setTextShadow(false);
         this.searchInput.setMaxLength(48);
-        this.searchInput.setPlaceholder(Text.literal("Search modules..."));
+        this.searchInput.setPlaceholder(ArcaneFont.text("Search modules..."));
+        styleField(this.searchInput);
         this.searchInput.setText(this.searchText);
         this.searchInput.setChangedListener(this::updateFilter);
         updateFilter(this.searchText);
@@ -100,7 +103,8 @@ public final class ArcaneSettingsScreen extends Screen {
             input.setTextShadow(false);
             input.setMaxLength(256);
             input.setText(this.config.chatMacro(slot));
-            input.setPlaceholder(Text.literal("message"));
+            input.setPlaceholder(ArcaneFont.text("message"));
+            styleField(input);
             input.setChangedListener(value -> this.config.setChatMacro(index, value));
             input.setVisible(false);
             this.macroInputs.add(this.addDrawableChild(input));
@@ -180,7 +184,7 @@ public final class ArcaneSettingsScreen extends Screen {
         StringBuilder line = new StringBuilder();
         for (String word : text.split(" ")) {
             String candidate = line.isEmpty() ? word : line + " " + word;
-            if (!line.isEmpty() && font().getWidth(candidate) > maxWidth) {
+            if (!line.isEmpty() && ArcaneFont.width(font(), candidate) > maxWidth) {
                 lines.add(line.toString());
                 line = new StringBuilder(word);
             } else {
@@ -262,11 +266,11 @@ public final class ArcaneSettingsScreen extends Screen {
         graphics.fill(x + 8, y + 6, x + 11, y + 14, theme.accent());
 
         int textY = y + (HEADER_HEIGHT - lineHeight()) / 2;
-        graphics.drawText(font(), category.name(), x + 16, textY, theme.text(), false);
+        graphics.drawText(font(), ArcaneFont.text(category.name()), x + 16, textY, theme.text(), false);
 
         if (category.toggleableCount() > 0) {
             String badge = category.enabledCount() + "/" + category.toggleableCount();
-            graphics.drawText(font(), badge, x + WINDOW_WIDTH - 22 - font().getWidth(badge), textY, theme.faint(), false);
+            graphics.drawText(font(), ArcaneFont.text(badge), x + WINDOW_WIDTH - 22 - ArcaneFont.width(font(), badge), textY, theme.faint(), false);
         }
         if (category.open()) {
             drawCaretDown(graphics, x + WINDOW_WIDTH - 15, y + 9, theme.muted());
@@ -298,7 +302,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
 
         int textY = y + (MODULE_HEIGHT - lineHeight()) / 2;
-        graphics.drawText(font(), module.name(), x + 10, textY, enabled ? theme.text() : theme.muted(), false);
+        graphics.drawText(font(), ArcaneFont.text(module.name()), x + 10, textY, enabled ? theme.text() : theme.muted(), false);
 
         int right = x + WINDOW_WIDTH - 8;
         if (module.hasSettings()) {
@@ -312,7 +316,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
         String value = module.valueLabel();
         if (value != null) {
-            graphics.drawText(font(), value, right - font().getWidth(value), textY, theme.accentBright(), false);
+            graphics.drawText(font(), ArcaneFont.text(value), right - ArcaneFont.width(font(), value), textY, theme.accentBright(), false);
         }
     }
 
@@ -327,7 +331,7 @@ public final class ArcaneSettingsScreen extends Screen {
         graphics.fill(x + 1, y, x + 3, y + row.height(), theme.accentDim());
         int lineY = y + 5;
         for (String line : wrap(module.description(), WINDOW_WIDTH - NEST_INSET - 16)) {
-            graphics.drawText(font(), line, x + NEST_INSET + 5, lineY, theme.faint(), false);
+            graphics.drawText(font(), ArcaneFont.text(line), x + NEST_INSET + 5, lineY, theme.faint(), false);
             lineY += proseHeight();
         }
     }
@@ -351,7 +355,7 @@ public final class ArcaneSettingsScreen extends Screen {
         int labelX = x + NEST_INSET + 5;
         int right = x + WINDOW_WIDTH - 8;
         int textY = y + (setting instanceof GuiSetting.Slider ? 3 : (height - lineHeight()) / 2);
-        graphics.drawText(font(), setting.label(), labelX, textY, theme.muted(), false);
+        graphics.drawText(font(), ArcaneFont.text(setting.label()), labelX, textY, theme.muted(), false);
 
         switch (setting) {
             case GuiSetting.Toggle toggle -> drawCheckbox(graphics, right - 9, y + (height - 9) / 2, toggle.value(), theme);
@@ -361,7 +365,7 @@ public final class ArcaneSettingsScreen extends Screen {
             }
             case GuiSetting.Slider slider -> {
                 String display = slider.display();
-                graphics.drawText(font(), display, right - font().getWidth(display), textY, theme.text(), false);
+                graphics.drawText(font(), ArcaneFont.text(display), right - ArcaneFont.width(font(), display), textY, theme.text(), false);
                 int trackX = sliderTrackX(x);
                 int trackWidth = sliderTrackWidth();
                 int trackY = y + height - 9;
@@ -375,15 +379,15 @@ public final class ArcaneSettingsScreen extends Screen {
             case GuiSetting.Swatch swatch -> drawSwatch(graphics, right - 22, y + (height - 9) / 2, 22, swatch.color(), theme);
             case GuiSetting.Cycle cycle -> {
                 String value = cycle.value();
-                int valueWidth = font().getWidth(value);
-                graphics.drawText(font(), ">", right - 4, textY, theme.faint(), false);
-                graphics.drawText(font(), value, right - 8 - valueWidth, textY, theme.accentBright(), false);
-                graphics.drawText(font(), "<", right - 12 - valueWidth - font().getWidth("<"), textY, theme.faint(), false);
+                int valueWidth = ArcaneFont.width(font(), value);
+                graphics.drawText(font(), ArcaneFont.text(">"), right - 4, textY, theme.faint(), false);
+                graphics.drawText(font(), ArcaneFont.text(value), right - 8 - valueWidth, textY, theme.accentBright(), false);
+                graphics.drawText(font(), ArcaneFont.text("<"), right - 12 - valueWidth - ArcaneFont.width(font(), "<"), textY, theme.faint(), false);
             }
             case GuiSetting.Bind bind -> drawKeyPill(graphics, right, y, height, bind.mapping(), theme, BIND_KEY_WIDTH);
             case GuiSetting.Info info -> {
                 String value = info.value();
-                graphics.drawText(font(), value, right - font().getWidth(value), textY, theme.accentBright(), false);
+                graphics.drawText(font(), ArcaneFont.text(value), right - ArcaneFont.width(font(), value), textY, theme.accentBright(), false);
             }
             case GuiSetting.Message message -> {
                 int fieldX = macroFieldX(x);
@@ -404,13 +408,14 @@ public final class ArcaneSettingsScreen extends Screen {
 
     private void drawKeyPill(DrawContext graphics, int right, int y, int height, KeyBinding mapping, ClickGuiTheme theme, int maxKeyWidth) {
         boolean listening = this.listeningFor == mapping;
-        String key = listening ? "..." : mapping.isUnbound() ? "-" : mapping.getBoundKeyLocalizedText().getString();
-        key = font().trimToWidth(key, maxKeyWidth);
-        int width = Math.max(20, font().getWidth(key) + 8);
+        String raw = listening ? "..." : mapping.isUnbound() ? "-" : mapping.getBoundKeyLocalizedText().getString();
+        OrderedText key = ArcaneFont.trimmed(font(), raw, maxKeyWidth);
+        int keyWidth = font().getWidth(key);
+        int width = Math.max(20, keyWidth + 8);
         int pillY = y + (height - 12) / 2;
         fillRounded(graphics, right - width, pillY, width, 12, listening ? theme.accentDim() : theme.window());
         outlineRounded(graphics, right - width, pillY, width, 12, listening ? theme.accent() : theme.outline());
-        graphics.drawText(font(), key, right - width + (width - font().getWidth(key)) / 2, pillY + (12 - lineHeight()) / 2 + 1, listening ? theme.text() : theme.muted(), false);
+        graphics.drawText(font(), key, right - width + (width - keyWidth) / 2, pillY + (12 - lineHeight()) / 2 + 1, listening ? theme.text() : theme.muted(), false);
     }
 
     private void drawTopBar(DrawContext graphics, ClickGuiTheme theme) {
@@ -419,9 +424,9 @@ public final class ArcaneSettingsScreen extends Screen {
 
         int textY = (TOP_BAR_HEIGHT - lineHeight()) / 2 - 1;
         fillRounded(graphics, 10, textY - 1, 3, lineHeight() + 3, theme.accent());
-        graphics.drawText(font(), "ARCANE", 18, textY, theme.text(), true);
-        int clientX = 20 + font().getWidth("ARCANE");
-        graphics.drawText(font(), "CLIENT", clientX, textY, theme.accent(), true);
+        graphics.drawText(font(), ArcaneFont.text("ARCANE"), 18, textY, theme.text(), true);
+        int clientX = 20 + ArcaneFont.width(font(), "ARCANE");
+        graphics.drawText(font(), ArcaneFont.text("CLIENT"), clientX, textY, theme.accent(), true);
 
         int searchWidth = searchWidth();
         int searchX = searchX(searchWidth);
@@ -433,9 +438,9 @@ public final class ArcaneSettingsScreen extends Screen {
             updateFpsLabel();
             String status = activeModuleCount() + "/" + toggleableModuleCount() + " ACTIVE";
             int right = this.width - 10;
-            graphics.drawText(font(), this.fpsLabel, right - font().getWidth(this.fpsLabel), textY, theme.muted(), false);
-            right -= font().getWidth(this.fpsLabel) + 12;
-            graphics.drawText(font(), status, right - font().getWidth(status), textY, theme.accentBright(), false);
+            graphics.drawText(font(), ArcaneFont.text(this.fpsLabel), right - ArcaneFont.width(font(), this.fpsLabel), textY, theme.muted(), false);
+            right -= ArcaneFont.width(font(), this.fpsLabel) + 12;
+            graphics.drawText(font(), ArcaneFont.text(status), right - ArcaneFont.width(font(), status), textY, theme.accentBright(), false);
         }
     }
 
@@ -448,11 +453,11 @@ public final class ArcaneSettingsScreen extends Screen {
         String hint = this.listeningFor != null
             ? "Press a key or mouse button   Esc unbinds"
             : "LMB toggle   RMB settings   MMB bind   Drag a title to arrange";
-        graphics.drawText(font(), hint, 10, textY, this.listeningFor != null ? theme.accent() : theme.muted(), false);
+        graphics.drawText(font(), ArcaneFont.text(hint), 10, textY, this.listeningFor != null ? theme.accent() : theme.muted(), false);
 
         if (!this.query.isEmpty()) {
             String results = visibleModuleCount() + " results";
-            graphics.drawText(font(), results, this.width - 10 - font().getWidth(results), textY, theme.accentBright(), false);
+            graphics.drawText(font(), ArcaneFont.text(results), this.width - 10 - ArcaneFont.width(font(), results), textY, theme.accentBright(), false);
         }
     }
 
@@ -462,9 +467,9 @@ public final class ArcaneSettingsScreen extends Screen {
             return;
         }
         List<String> lines = wrap(module.description(), 150);
-        int width = font().getWidth(module.name());
+        int width = ArcaneFont.width(font(), module.name());
         for (String line : lines) {
-            width = Math.max(width, font().getWidth(line));
+            width = Math.max(width, ArcaneFont.width(font(), line));
         }
         width += 14;
         int height = 13 + lines.size() * proseHeight() + 8;
@@ -475,10 +480,10 @@ public final class ArcaneSettingsScreen extends Screen {
         fillRounded(graphics, x, y, width, height, theme.bar());
         outlineRounded(graphics, x, y, width, height, theme.outline());
         graphics.fill(x + 1, y + 1, x + 3, y + height - 1, theme.accent());
-        graphics.drawText(font(), module.name(), x + 8, y + 6, theme.text(), false);
+        graphics.drawText(font(), ArcaneFont.text(module.name()), x + 8, y + 6, theme.text(), false);
         int lineY = y + 9 + lineHeight();
         for (String line : lines) {
-            graphics.drawText(font(), line, x + 8, lineY, theme.faint(), false);
+            graphics.drawText(font(), ArcaneFont.text(line), x + 8, lineY, theme.faint(), false);
             lineY += proseHeight();
         }
     }
@@ -848,6 +853,11 @@ public final class ArcaneSettingsScreen extends Screen {
             this.uiFont = ArcaneFont.renderer(this.client == null ? MinecraftClient.getInstance() : this.client);
         }
         return this.uiFont;
+    }
+
+    /** Text fields draw plain strings, so they need the style applied through a formatter. */
+    private void styleField(TextFieldWidget input) {
+        input.addFormatter((value, offset) -> ArcaneFont.text(value).asOrderedText());
     }
 
     private int lineHeight() {
