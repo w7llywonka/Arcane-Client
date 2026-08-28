@@ -2,9 +2,7 @@ const root = document.documentElement;
 const navigation = document.querySelector(".site-nav");
 const menuButton = document.querySelector(".menu-toggle");
 const mobileMenu = document.querySelector(".mobile-menu");
-const replayButton = document.querySelector(".replay-hiss");
 const faqItems = Array.from(document.querySelectorAll(".faq-item"));
-let hissTimer;
 
 function updateNavigation() {
   if (!navigation) return;
@@ -19,38 +17,6 @@ function setMenu(open) {
   mobileMenu.hidden = !open;
   navigation.classList.toggle("menu-active", open);
   document.body.classList.toggle("menu-open", open);
-}
-
-function finishHiss() {
-  window.clearTimeout(hissTimer);
-  root.classList.add("hiss-seen");
-}
-
-function bindHissIntro(intro) {
-  if (!intro) return;
-
-  intro.addEventListener(
-    "animationend",
-    (event) => {
-      if (event.animationName === "hiss-cover") finishHiss();
-    },
-    { once: true }
-  );
-
-  hissTimer = window.setTimeout(finishHiss, 1700);
-}
-
-function replayHiss() {
-  const currentIntro = document.querySelector(".hiss-startup");
-  if (!currentIntro) return;
-
-  window.clearTimeout(hissTimer);
-  root.classList.remove("hiss-seen");
-
-  const freshIntro = currentIntro.cloneNode(true);
-  currentIntro.replaceWith(freshIntro);
-  void freshIntro.offsetWidth;
-  bindHissIntro(freshIntro);
 }
 
 updateNavigation();
@@ -105,13 +71,6 @@ faqItems.forEach((item) => {
   });
 });
 
-if (!root.classList.contains("hiss-seen")) {
-  bindHissIntro(document.querySelector(".hiss-startup"));
-}
-
-if (replayButton) {
-  replayButton.addEventListener("click", replayHiss);
-}
 const downloadDialog = document.querySelector("#download-dialog");
 const downloadForm = document.querySelector(".download-form");
 const downloadInput = document.querySelector("#download-code");
