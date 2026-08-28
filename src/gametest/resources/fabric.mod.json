@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "arcaneclient-gametest",
+  "version": "1.0.0",
+  "name": "Arcane Client GameTest",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-client-gametest": [
+      "dev.arcaneclient.gametest.ArcaneCameraClientGameTest"
+    ]
+  },
+  "depends": {
+    "arcaneclient": "*",
+    "fabric-client-gametest-api-v1": "*"
+  }
+}

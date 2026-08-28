@@ -15,11 +15,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientCommonNetworkHandler;
 import net.minecraft.client.Mouse;
 import net.minecraft.client.render.Camera;
-import net.minecraft.client.render.Frustum;
 import net.minecraft.client.render.GameRenderer;
-import net.minecraft.client.render.RenderTickCounter;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.render.state.WorldRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
 import net.minecraft.network.ClientConnection;
@@ -42,7 +38,6 @@ final class RuntimeHookContractTest {
         method(MinecraftClient.class, "doItemUse");
         method(ClientCommonNetworkHandler.class, "sendPacket", Packet.class);
         method(ClientConnection.class, "send", Packet.class, ChannelFutureListener.class, boolean.class);
-        method(WorldRenderer.class, "fillEntityRenderStates", Camera.class, Frustum.class, RenderTickCounter.class, WorldRenderState.class);
         method(Mouse.class, "onMouseScroll", long.class, double.class, double.class);
     }
 
@@ -56,6 +51,7 @@ final class RuntimeHookContractTest {
             JsonArray client = root.getAsJsonArray("client");
             Set<String> names = new HashSet<>();
             client.forEach(element -> names.add(element.getAsString()));
+            assertTrue(names.contains("CameraMixin"));
             assertTrue(names.contains("ClientCommonNetworkHandlerMixin"));
             assertTrue(names.contains("ClientConnectionMixin"));
             assertTrue(names.contains("EntityMixin"));
@@ -63,7 +59,6 @@ final class RuntimeHookContractTest {
             assertTrue(names.contains("LivingEntityMixin"));
             assertTrue(names.contains("MouseMixin"));
             assertTrue(names.contains("MinecraftClientMixin"));
-            assertTrue(names.contains("WorldRendererMixin"));
             assertTrue(names.contains("KeyboardInputMixin"));
         }
     }

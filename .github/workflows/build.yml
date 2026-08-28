@@ -27,6 +27,17 @@ jobs:
       - name: Build Arcane Client
         run: ./gradlew clean build --no-daemon
 
+      - name: Test Freecam, Freelook, and interface in Minecraft
+        run: xvfb-run -a ./gradlew runClientGameTest --no-daemon
+
+      - name: Upload client test screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: arcane-client-visual-qa-${{ github.sha }}
+          path: build/run/clientGameTest/screenshots/*.png
+          if-no-files-found: warn
+
       - name: Upload mod and sources
         uses: actions/upload-artifact@v7
         with:

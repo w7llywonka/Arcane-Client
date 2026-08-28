@@ -8,6 +8,7 @@ import net.fabricmc.api.Environment;
 /** A draggable, collapsible module window. */
 @Environment(EnvType.CLIENT)
 public final class GuiCategory {
+    private static final int HEADER_FALLBACK = 19;
     private final String name;
     private final List<GuiModule> modules;
 
@@ -16,6 +17,8 @@ public final class GuiCategory {
     private int y;
     private boolean open = true;
     private int lastHeight;
+    private int contentHeight;
+    private int scrollOffset;
 
     public GuiCategory(String name, List<GuiModule> modules) {
         this.name = name;
@@ -98,8 +101,26 @@ public final class GuiCategory {
         return this.lastHeight;
     }
 
-    public void setLastHeight(int lastHeight) {
-        this.lastHeight = lastHeight;
+    public void setLayoutHeights(int contentHeight, int viewportHeight) {
+        this.contentHeight = Math.max(HEADER_FALLBACK, contentHeight);
+        this.lastHeight = Math.max(HEADER_FALLBACK, viewportHeight);
+        this.scrollOffset = Math.clamp(this.scrollOffset, 0, maxScroll());
+    }
+
+    public int contentHeight() {
+        return this.contentHeight;
+    }
+
+    public int scrollOffset() {
+        return this.scrollOffset;
+    }
+
+    public int maxScroll() {
+        return Math.max(0, this.contentHeight - this.lastHeight);
+    }
+
+    public void scrollBy(int pixels) {
+        this.scrollOffset = Math.clamp(this.scrollOffset + pixels, 0, maxScroll());
     }
 
     /**

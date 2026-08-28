@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 2.3.4+mc1.21.11
+
+- Fixed Freecam and Freelook rendering from stale interpolated angles by making the rendered camera use the active detached camera's current yaw and pitch.
+- Added a client-only stationary player replica for Freecam, preserving the player's skin, pose, and equipment while the camera moves independently.
+- Added official Fabric client GameTests covering raw flight input, both mouse-look directions, rendered camera alignment, hotbar visibility, body anchoring, mode restoration, and invalid-entity packet safety.
+- Reworked the Click GUI layout into bounded, scrollable category viewports so tall module lists cannot overlap parked windows or clip through partial rows.
+- Removed the unused optional Caxton font path and its startup warning; Arcane now consistently uses the bundled scale-matched Sora variants.
+
 ## 2.3.3+mc1.21.11
 
 - Made the real local player render while Freecam uses its detached client-only camera entity.

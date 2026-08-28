@@ -58,7 +58,7 @@ Chunk Finder carries the scan budget and sensitivity controls. Auto Tool picks t
 
 ## Freecam and Freelook
 
-Freecam accelerates and decelerates instead of jumping between per-tick positions. Scroll up while active to increase speed and scroll down to decrease it; the selected level is persisted. Directional mining deliberately starts at the stationary player's eye position and uses the player's real interaction range, while the detached camera supplies the direction. Looking down therefore mines beneath the player's body without sending impossible remote-reach actions.
+Freecam accelerates and decelerates instead of jumping between per-tick positions. Scroll up while active to increase speed and scroll down to decrease it; the selected level is persisted. The camera flies independently with WASD, Space, and Shift while a client-only replica keeps your stationary body, skin, pose, and equipment visible. Directional mining deliberately starts at the stationary player's eye position and uses the player's real interaction range, while the detached camera supplies the direction. Looking down therefore mines beneath the player's body without sending impossible remote-reach actions.
 
 Freelook is a separate third-person orbit camera. It stays anchored to the moving character, lets the mouse rotate the camera entity, leaves player movement enabled, and never copies the orbit rotation into the player's head. Freecam and Freelook automatically disable one another.
 

@@ -3,6 +3,7 @@
   "package": "dev.arcaneclient.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "CameraMixin",
     "ClientCommonNetworkHandlerMixin",
     "ClientConnectionMixin",
     "ClientPacketListenerMixin",
@@ -13,8 +14,7 @@
     "LivingEntityMixin",
     "MinecraftClientAccessor",
     "MinecraftClientMixin",
-    "MouseMixin",
-    "WorldRendererMixin"
+    "MouseMixin"
   ],
   "injectors": {
     "defaultRequire": 1

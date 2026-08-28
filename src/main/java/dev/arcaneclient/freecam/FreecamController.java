@@ -45,6 +45,10 @@ public final class FreecamController {
         return camera != null;
     }
 
+    public static boolean hasVisualBody() {
+        return FreecamVisualBody.isPresent();
+    }
+
     public static void toggle(MinecraftClient client) {
         if (isActive()) disable(client); else enable(client);
     }
@@ -68,6 +72,7 @@ public final class FreecamController {
         );
         camera.setInvisible(true);
         camera.setNoGravity(true);
+        FreecamVisualBody.spawn(client, player);
         camera.noClip = true;
         velocity = Vec3d.ZERO;
         breaking = false;
@@ -77,8 +82,12 @@ public final class FreecamController {
     }
 
     public static void disable(MinecraftClient client) {
-        if (camera == null) return;
+        if (camera == null) {
+            FreecamVisualBody.remove();
+            return;
+        }
         stopMining(client);
+        FreecamVisualBody.remove();
         if (client.player != null) {
             client.player.setYaw(playerYaw);
             client.player.setPitch(playerPitch);

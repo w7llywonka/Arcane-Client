@@ -56,6 +56,7 @@ public final class ArcaneSettingsScreen extends Screen {
     private String query = "";
     private String fpsLabel = "";
     private long nextFpsUpdateNanos;
+    private int openWindowBottom;
 
     private @Nullable GuiCategory draggingCategory;
     private int dragOffsetX;
@@ -131,6 +132,11 @@ public final class ArcaneSettingsScreen extends Screen {
         // Anything that will not fit across the screen is parked as a collapsed title the user can
         // open or drag out, rather than being stacked on top of an already open window.
         int parkedY = this.height - BOTTOM_BAR_HEIGHT - GAP - HEADER_HEIGHT;
+        int parkedCount = Math.max(0, total - columns);
+        int parkedRows = parkedCount == 0 ? 0 : (parkedCount + columns - 1) / columns;
+        this.openWindowBottom = parkedRows == 0
+            ? this.height - BOTTOM_BAR_HEIGHT - 4
+            : parkedY - (parkedRows - 1) * (HEADER_HEIGHT + 4) - GAP;
         for (int index = columns; index < total; index++) {
             GuiCategory category = this.categories.get(index);
             int slot = index - columns;
@@ -139,22 +145,35 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    /** Positions every row of one window, top to bottom, and records the window's total height. */
+    /** Positions every row of one window and clips tall bodies into a scrollable viewport. */
     private List<Row> layout(GuiCategory category) {
         List<Row> rows = new ArrayList<>();
         int x = category.x();
         int y = category.y();
         rows.add(new Row(RowKind.HEADER, category, null, null, x, y, HEADER_HEIGHT));
 
-        int height = HEADER_HEIGHT;
+        int contentHeight = HEADER_HEIGHT;
         if (category.open()) {
-            int rowY = y + HEADER_HEIGHT;
+            for (GuiModule module : category.visible()) {
+                contentHeight += MODULE_HEIGHT;
+                if (!module.expanded() || !module.hasSettings()) continue;
+                contentHeight += descriptionHeight(module);
+                for (GuiSetting setting : module.settings()) contentHeight += setting.height();
+                contentHeight += NEST_PAD;
+            }
+            contentHeight += BODY_PAD;
+        }
+        int viewportHeight = category.open()
+            ? Math.min(contentHeight, fittedWindowHeight(category, maxWindowHeight(category)))
+            : HEADER_HEIGHT;
+        category.setLayoutHeights(contentHeight, viewportHeight);
+
+        if (category.open()) {
+            int rowY = y + HEADER_HEIGHT - category.scrollOffset();
             for (GuiModule module : category.visible()) {
                 rows.add(new Row(RowKind.MODULE, category, module, null, x, rowY, MODULE_HEIGHT));
                 rowY += MODULE_HEIGHT;
-                if (!module.expanded() || !module.hasSettings()) {
-                    continue;
-                }
+                if (!module.expanded() || !module.hasSettings()) continue;
                 int descriptionHeight = descriptionHeight(module);
                 rows.add(new Row(RowKind.DESCRIPTION, category, module, null, x, rowY, descriptionHeight));
                 rowY += descriptionHeight;
@@ -165,10 +184,40 @@ public final class ArcaneSettingsScreen extends Screen {
                 rows.add(new Row(RowKind.NEST_FOOT, category, module, null, x, rowY, NEST_PAD));
                 rowY += NEST_PAD;
             }
-            height = rowY - y + BODY_PAD;
         }
-        category.setLastHeight(height);
         return rows;
+    }
+
+    private int fittedWindowHeight(GuiCategory category, int maximumHeight) {
+        if (maximumHeight <= HEADER_HEIGHT) return HEADER_HEIGHT;
+        int available = maximumHeight - HEADER_HEIGHT - BODY_PAD;
+        int used = 0;
+        for (GuiModule module : category.visible()) {
+            if (used + MODULE_HEIGHT > available) break;
+            used += MODULE_HEIGHT;
+            if (!module.expanded() || !module.hasSettings()) continue;
+
+            int descriptionHeight = descriptionHeight(module);
+            if (used + descriptionHeight > available) break;
+            used += descriptionHeight;
+            boolean settingsFit = true;
+            for (GuiSetting setting : module.settings()) {
+                if (used + setting.height() > available) {
+                    settingsFit = false;
+                    break;
+                }
+                used += setting.height();
+            }
+            if (!settingsFit || used + NEST_PAD > available) break;
+            used += NEST_PAD;
+        }
+        return HEADER_HEIGHT + used + BODY_PAD;
+    }
+
+    private int maxWindowHeight(GuiCategory category) {
+        int screenBottom = this.height - BOTTOM_BAR_HEIGHT - 4;
+        int bottom = category.y() < this.openWindowBottom ? this.openWindowBottom : screenBottom;
+        return Math.max(HEADER_HEIGHT, bottom - category.y());
     }
 
     private int descriptionHeight(GuiModule module) {
@@ -215,7 +264,24 @@ public final class ArcaneSettingsScreen extends Screen {
             List<Row> rows = layout(category);
             drawWindowBody(graphics, category, theme);
             for (Row row : rows) {
-                drawRow(graphics, row, mouseX, mouseY, theme, macroDrawn);
+                if (row.kind() == RowKind.HEADER) {
+                    drawRow(graphics, row, mouseX, mouseY, theme, macroDrawn);
+                }
+            }
+            if (category.open() && category.lastHeight() > HEADER_HEIGHT) {
+                graphics.enableScissor(
+                    category.x(),
+                    category.y() + HEADER_HEIGHT,
+                    category.x() + WINDOW_WIDTH,
+                    category.y() + category.lastHeight()
+                );
+                for (Row row : rows) {
+                    if (row.kind() != RowKind.HEADER && rowVisible(row)) {
+                        drawRow(graphics, row, mouseX, mouseY, theme, macroDrawn);
+                    }
+                }
+                graphics.disableScissor();
+                drawScrollBar(graphics, category, theme);
             }
         }
 
@@ -229,6 +295,25 @@ public final class ArcaneSettingsScreen extends Screen {
         drawBottomBar(graphics, theme);
         super.render(graphics, mouseX, mouseY, deltaTicks);
         drawModuleTooltip(graphics, mouseX, mouseY, theme);
+    }
+
+    private boolean rowVisible(Row row) {
+        int top = row.category().y() + HEADER_HEIGHT;
+        int bottom = row.category().y() + row.category().lastHeight();
+        return row.y() < bottom && row.y() + row.height() > top;
+    }
+
+    private void drawScrollBar(DrawContext graphics, GuiCategory category, ClickGuiColors theme) {
+        if (category.maxScroll() <= 0) return;
+        int trackY = category.y() + HEADER_HEIGHT + 3;
+        int trackHeight = Math.max(8, category.lastHeight() - HEADER_HEIGHT - 6);
+        int visibleBody = category.lastHeight() - HEADER_HEIGHT;
+        int contentBody = Math.max(visibleBody, category.contentHeight() - HEADER_HEIGHT);
+        int thumbHeight = Math.max(8, trackHeight * visibleBody / contentBody);
+        int travel = Math.max(0, trackHeight - thumbHeight);
+        int thumbY = trackY + (category.maxScroll() == 0 ? 0 : travel * category.scrollOffset() / category.maxScroll());
+        graphics.fill(category.x() + WINDOW_WIDTH - 4, trackY, category.x() + WINDOW_WIDTH - 2, trackY + trackHeight, theme.outline());
+        graphics.fill(category.x() + WINDOW_WIDTH - 4, thumbY, category.x() + WINDOW_WIDTH - 2, thumbY + thumbHeight, theme.accent());
     }
 
     private void drawWindowBody(DrawContext graphics, GuiCategory category, ClickGuiColors theme) {
@@ -543,6 +628,20 @@ public final class ArcaneSettingsScreen extends Screen {
     // -----------------------------------------------------------------------------------------
 
     @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        for (int index = this.categories.size() - 1; index >= 0; index--) {
+            GuiCategory category = this.categories.get(index);
+            if (!category.open() || category.maxScroll() <= 0) continue;
+            if (mouseX < category.x() || mouseX >= category.x() + WINDOW_WIDTH) continue;
+            if (mouseY < category.y() + HEADER_HEIGHT || mouseY >= category.y() + category.lastHeight()) continue;
+            int amount = (int) Math.round(-verticalAmount * MODULE_HEIGHT);
+            category.scrollBy(amount == 0 ? (verticalAmount < 0.0 ? MODULE_HEIGHT : -MODULE_HEIGHT) : amount);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
     public boolean mouseClicked(Click click, boolean doubled) {
         if (this.listeningFor != null) {
             setBinding(InputUtil.Type.MOUSE.createFromCode(click.button()));
@@ -559,6 +658,7 @@ public final class ArcaneSettingsScreen extends Screen {
         for (int index = this.categories.size() - 1; index >= 0; index--) {
             GuiCategory category = this.categories.get(index);
             for (Row row : layout(category)) {
+                if (!rowVisible(row) && row.kind() != RowKind.HEADER) continue;
                 if (!row.contains(mouseX, mouseY)) {
                     continue;
                 }
