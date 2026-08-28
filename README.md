@@ -9,7 +9,7 @@ Arcane Client is a 42-module client-side Fabric utility suite for Minecraft 1.21
 - **Discovery engine:** incremental loaded-chunk scanning, evidence scoring, sensitivity control, deep-Y focus, configurable farm/machine/player-block/light/entity signals, packet activity, rescans, and per-dimension history.
 - **ESP:** storage, items, tunnels, players, mobs, projectiles, crystals, entity tracers, safe holes, chunk tiles, and diagnostics.
 - **Combat:** Auto Totem, Auto Sprint, Auto Eat, health/armor alerts, Hit Sound, slow-only Swing Speed, and a configurable combat HUD.
-- **Camera and media:** smooth Freecam with wheel speed and body-reach directional mining, anchored third-person Freelook, Zoom, Fullbright, No Hurt Cam, Clean Capture, and Streamer Mode.
+- **Camera and media:** smooth Freecam and anchored third-person Freelook with visible player bodies, safe body-reach mining, and invalid-entity packet guards, plus Zoom, Fullbright, No Hurt Cam, Clean Capture, and Streamer Mode.
 - **Arcane Click GUI:** exactly 42 validated modules, searchable draggable categories, collision-safe labels, arbitrary RGB accent/panel/text colors, notification volume, persistent settings, and the Sora interface font.
 - **Clean source:** readable Yarn-named Java, typed collections, warning-free compilation, client-only mixins, Gradle wrapper, sources JAR, and GitHub Actions CI.
 
@@ -58,9 +58,9 @@ Chunk Finder carries the scan budget and sensitivity controls. Auto Tool picks t
 
 ## Freecam and Freelook
 
-Freecam accelerates and decelerates instead of jumping between per-tick positions. Scroll up while active to increase speed and scroll down to decrease it; the selected level is persisted. The camera flies independently with WASD, Space, and Shift while a client-only replica keeps your stationary body, skin, pose, and equipment visible. Directional mining deliberately starts at the stationary player's eye position and uses the player's real interaction range, while the detached camera supplies the direction. Looking down therefore mines beneath the player's body without sending impossible remote-reach actions.
+Freecam accelerates and decelerates instead of jumping between per-tick positions. Scroll up while active to increase speed and scroll down to decrease it; the selected level is persisted. The camera flies independently with WASD, Space, and Shift while a client-only replica keeps your stationary body, skin, pose, and equipment visible. That replica renders normally but cannot be targeted, attacked, used, or collided with. Directional mining starts at the real player's eye position, uses the player's actual interaction range, and only sends valid body-origin block actions.
 
-Freelook is a separate third-person orbit camera. It stays anchored to the moving character, lets the mouse rotate the camera entity, leaves player movement enabled, and never copies the orbit rotation into the player's head. Freecam and Freelook automatically disable one another.
+Freelook is a separate third-person orbit camera. It stays anchored to the moving character, synchronizes the visible player replica while you move, lets the mouse rotate only the camera, and never copies orbit rotation into the player's head. Mining uses the same safe body-origin reach path, and all other detached-camera interaction packets are stopped before they can reach a server. Freecam and Freelook automatically disable one another.
 
 ## Interface customization
 

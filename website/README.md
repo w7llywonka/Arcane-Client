@@ -1,6 +1,6 @@
 # Arcane Client website
 
-This is the build-free product site for Arcane Client 2.3.4.
+This is the build-free product site for Arcane Client 2.3.5.
 
 ## Preview
 
@@ -16,7 +16,7 @@ Then open `http://127.0.0.1:4173`.
 
 - `index.html` — centered hero, benefit cards, setup bento, interface samples, explicit Base/Premium plans, FAQ, and footer.
 - `styles.css` — Krypton-inspired dark forest/mint visual system, responsive layouts, pills, cards, and lightweight motion.
-- `script.js` — fixed-nav state, mobile menu, scroll reveals, FAQ behavior, and the code-gated 2.3.4 release download.
+- `script.js` — fixed-nav state, mobile menu, scroll reveals, FAQ behavior, and the code-gated 2.3.5 release download.
 - `assets/arcane-mark.svg` — the original three-stroke Arcane mark.
 
 The implementation is original Arcane code and content; it does not copy Krypton assets or source. Sora is loaded from Google Fonts with a system-font fallback. Discord calls to action use the official invite: `https://discord.gg/DvfZW4Fk5`.

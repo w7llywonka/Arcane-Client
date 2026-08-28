@@ -109,6 +109,15 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         ArcaneClient.LOGGER.info("[QA] Freecam visual body captured at {} from camera {}", bodyView.playerPos(), bodyView.cameraPos());
 
         context.runOnClient(client -> {
+            client.gameRenderer.updateCrosshairTarget(1.0f);
+            require(!FreecamController.isVisualBody(client.targetedEntity), "Freecam visual body became a crosshair target");
+            Entity visualBody = FreecamController.visualBodyEntity();
+            require(visualBody != null, "Freecam visual body disappeared before interaction test");
+            require(!visualBody.canHit(), "Freecam visual body was hittable");
+            require(!visualBody.isAttackable(), "Freecam visual body was attackable");
+            require(!visualBody.isInteractable(), "Freecam visual body was interactable");
+            client.interactionManager.attackEntity(client.player, visualBody);
+
             Entity detachedCamera = client.getCameraEntity();
             require(detachedCamera != null && detachedCamera != client.player, "Freecam camera disappeared before interaction test");
             client.interactionManager.attackEntity(client.player, detachedCamera);
@@ -137,6 +146,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
 
         Snapshot enabled = snapshot(context);
         require(FreelookController.isActive(), "Freelook did not activate");
+        require(FreelookController.hasVisualBody(), "Freelook did not create a visible player body");
         require(!enabled.cameraIsPlayer(), "Freelook did not install an orbit camera");
         require(enabled.perspective() == Perspective.THIRD_PERSON_BACK, "Freelook did not use third-person orbit rendering");
         assertAnchored(enabled, "Freelook activation");
@@ -166,10 +176,30 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         assertHudAvailable(context, "Freelook anchored");
         context.takeScreenshot("arcane-freelook-orbit-hotbar");
 
+        context.runOnClient(client -> {
+            client.gameRenderer.updateCrosshairTarget(1.0f);
+            require(!FreelookController.isVisualBody(client.targetedEntity), "Freelook visual body became a crosshair target");
+            Entity visualBody = FreelookController.visualBodyEntity();
+            require(visualBody != null, "Freelook visual body disappeared before interaction test");
+            require(!visualBody.canHit(), "Freelook visual body was hittable");
+            require(!visualBody.isAttackable(), "Freelook visual body was attackable");
+            require(!visualBody.isInteractable(), "Freelook visual body was interactable");
+            client.interactionManager.attackEntity(client.player, visualBody);
+
+            Entity detachedCamera = client.getCameraEntity();
+            require(detachedCamera != null && detachedCamera != client.player, "Freelook camera disappeared before interaction test");
+            client.interactionManager.attackEntity(client.player, detachedCamera);
+        });
+        context.waitTicks(3);
+        Snapshot afterInvalidAttack = snapshot(context);
+        require(afterInvalidAttack.connectionOpen(), "Freelook client-only entity attack escaped to the integrated server");
+        require(FreelookController.isActive(), "Freelook was lost after guarded camera interaction");
+
         context.runOnClient(FreelookController::disable);
         context.waitTicks(2);
         Snapshot disabled = snapshot(context);
         require(!FreelookController.isActive(), "Freelook did not disable");
+        require(!FreelookController.hasVisualBody(), "Freelook left its visual body in the world after disabling");
         require(disabled.cameraIsPlayer(), "Freelook did not restore the player camera");
         require(disabled.perspective() == Perspective.FIRST_PERSON, "Freelook did not restore the previous perspective");
         assertHudAvailable(context, "Freelook disabled");

@@ -78,7 +78,7 @@ const downloadStatus = document.querySelector("#download-status");
 const downloadButtons = Array.from(document.querySelectorAll("[data-download-open]"));
 const downloadClose = document.querySelector("[data-download-close]");
 const expectedDownloadCodeHash = "eb374395dbca9ae038c691f18bedddd16fd748d106aa2e424c6987b5ed4b7348";
-const releaseDownloadUrl = "https://github.com/eiiorejierge/Arcane-Client/releases/download/v2.3.4/Arcane-Client-2.3.4%2Bmc1.21.11.jar";
+const releaseDownloadUrl = "https://github.com/w7llywonka/Arcane-Client/releases/download/v2.3.5/Arcane-Client-2.3.5%2Bmc1.21.11.jar";
 
 function resetDownloadForm() {
   if (!downloadForm || !downloadInput || !downloadStatus) return;
