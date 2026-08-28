@@ -49,6 +49,21 @@ public final class RoundedGui {
         );
     }
 
+    public static void outlineOnly(DrawContext graphics, int x, int y, int width, int height, int radius, int color) {
+        if (width <= 0 || height <= 0) return;
+        int safeRadius = Math.max(0, Math.min(radius, Math.min(width, height) / 2));
+        for (int row = 0; row < height; row++) {
+            int edgeRow = Math.min(row, height - row - 1);
+            int inset = edgeRow < safeRadius ? cornerInset(safeRadius, edgeRow) : 0;
+            if (row == 0 || row == height - 1) {
+                graphics.fill(x + inset, y + row, x + width - inset, y + row + 1, color);
+            } else {
+                graphics.fill(x + inset, y + row, x + inset + 1, y + row + 1, color);
+                graphics.fill(x + width - inset - 1, y + row, x + width - inset, y + row + 1, color);
+            }
+        }
+    }
+
     static int cornerInset(int radius, int row) {
         double centerDistance = radius - row - 0.5;
         double horizontal = Math.sqrt(Math.max(0.0, radius * radius - centerDistance * centerDistance));
