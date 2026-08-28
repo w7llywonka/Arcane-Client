@@ -45,7 +45,7 @@ public final class ItemEspRenderer {
     }
 
     public static void tick(MinecraftClient client) {
-        if (ArcaneSettingsScreen.isOpen(client)) return;
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
         ArcaneConfig config = ArcaneClient.config();
         if (!config.itemEsp || client.world == null || client.getCameraEntity() == null) {
             targets = List.of();
@@ -74,7 +74,7 @@ public final class ItemEspRenderer {
 
     private static void render(WorldRenderContext context) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (ArcaneSettingsScreen.isOpen(client)) return;
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
         ArcaneConfig config = ArcaneClient.config();
         if (!config.itemEsp || targets.isEmpty()) {
             return;

@@ -3,10 +3,12 @@ package dev.arcaneclient.render;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.TraceEngine;
+import dev.arcaneclient.combat.CombatController;
 import dev.arcaneclient.freecam.FreecamController;
+import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.screen.ArcaneFont;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
-import dev.arcaneclient.screen.ClickGuiTheme;
+import dev.arcaneclient.screen.ClickGuiColors;
 import dev.arcaneclient.screen.RoundedGui;
 import dev.arcaneclient.screen.UiGeometry;
 import java.util.HashMap;
@@ -49,9 +51,10 @@ public final class ArcaneHud {
     private static void render(DrawContext graphics) {
         ArcaneConfig config = ArcaneClient.config();
         MinecraftClient client = MinecraftClient.getInstance();
-        if (ArcaneSettingsScreen.isOpen(client) || client.player == null) return;
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client) || client.player == null) return;
         if (config.hud) renderRadar(graphics, client, config);
         if (config.chunkAnalysis) renderChunkAnalysis(graphics, client, config);
+        if (config.attackMeter) renderCombatHud(graphics, client, config);
     }
 
     private static void renderRadar(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
@@ -59,7 +62,7 @@ public final class ArcaneHud {
         TraceEngine engine = ArcaneClient.engine();
         ChunkPos center = client.player.getChunkPos();
         Map<Long, TraceEngine.ChunkMarker> markers = nearbyMarkers(engine, center);
-        ClickGuiTheme theme = ClickGuiTheme.fromConfig(config.uiTheme);
+        ClickGuiColors theme = ClickGuiColors.resolve(config);
         int cellSize = UiGeometry.radarCellSize(ArcaneFont.width(font, "99"));
         int gridPixels = GRID_SIZE * cellSize;
         int panelWidth = gridPixels + PADDING * 2;
@@ -70,7 +73,10 @@ public final class ArcaneHud {
         RoundedGui.fill(graphics, PANEL_X + 8, PANEL_Y + 2, 28, 2, 1, theme.accent());
 
         String state = config.enabled ? "ON" : "PAUSED";
-        String header = "ARCANE  " + state + (FreecamController.isActive() ? "  FC" : "") + (config.esp ? "  ESP" : "");
+        String header = "ARCANE  " + state
+            + (FreecamController.isActive() ? "  FC" : "")
+            + (FreelookController.isActive() ? "  LOOK" : "")
+            + (config.esp ? "  ESP" : "");
         graphics.drawText(font, ArcaneFont.text(header), PANEL_X + PADDING, PANEL_Y + 5, config.enabled ? theme.text() : PAUSED_COLOR, false);
         String flagged = Integer.toString(engine.flaggedCount());
         graphics.drawText(font, ArcaneFont.text(flagged), PANEL_X + panelWidth - PADDING - ArcaneFont.width(font, flagged), PANEL_Y + 5, theme.accentBright(), false);
@@ -109,7 +115,7 @@ public final class ArcaneHud {
         TraceEngine engine = ArcaneClient.engine();
         ChunkPos chunk = client.player.getChunkPos();
         TraceEngine.ChunkMarker marker = engine.snapshotMarkerAt(chunk.x, chunk.z);
-        ClickGuiTheme theme = ClickGuiTheme.fromConfig(config.uiTheme);
+        ClickGuiColors theme = ClickGuiColors.resolve(config);
         int panelWidth = 184;
         int x = graphics.getScaledWindowWidth() - panelWidth - 7;
         int y = 7;
@@ -120,7 +126,8 @@ public final class ArcaneHud {
         RoundedGui.outline(graphics, x, y, panelWidth, height, 7, 1, theme.outlineSoft(), theme.window());
         RoundedGui.fill(graphics, x + 8, y + 2, 28, 2, 1, theme.accent());
         graphics.drawText(font, ArcaneFont.text("CURRENT CHUNK"), x + 9, y + 6, theme.text(), false);
-        graphics.drawText(font, ArcaneFont.text(chunk.x + ", " + chunk.z), x + 9, y + 19, theme.accentBright(), false);
+        String coordinates = config.streamerMode ? "COORDINATES HIDDEN" : chunk.x + ", " + chunk.z;
+        graphics.drawText(font, ArcaneFont.text(coordinates), x + 9, y + 19, theme.accentBright(), false);
 
         if (marker == null || marker.score() == 0) {
             OrderedText empty = ArcaneFont.trimmed(font, "No activity evidence", panelWidth - 18);
@@ -138,6 +145,21 @@ public final class ArcaneHud {
             OrderedText reason = ArcaneFont.trimmed(font, "› " + marker.reasons().get(index), panelWidth - 22);
             graphics.drawText(font, reason, x + 9, lineY, theme.text(), false);
             lineY += 10;
+        }
+    }
+
+    private static void renderCombatHud(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
+        TextRenderer font = ArcaneFont.renderer(client);
+        ClickGuiColors theme = ClickGuiColors.resolve(config);
+        int width = 64;
+        int x = (graphics.getScaledWindowWidth() - width) / 2;
+        int y = graphics.getScaledWindowHeight() / 2 + 13;
+        float cooldown = Math.clamp(client.player.getAttackCooldownProgress(0.0f), 0.0f, 1.0f);
+        RoundedGui.fill(graphics, x, y, width, 5, 2, theme.window());
+        RoundedGui.fill(graphics, x + 1, y + 1, Math.round((width - 2) * cooldown), 3, 1, cooldown >= 0.95f ? theme.accentBright() : theme.accent());
+        if (config.totemCounter) {
+            String count = "TOTEMS " + CombatController.totemCount(client.player);
+            graphics.drawText(font, ArcaneFont.text(count), x + (width - ArcaneFont.width(font, count)) / 2, y + 7, theme.text(), false);
         }
     }
 
