@@ -1,6 +1,6 @@
 package dev.arcaneclient.mixin;
 
-import dev.arcaneclient.freecam.FreecamController;
+import dev.arcaneclient.freecam.DetachedCameraInteraction;
 import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -11,13 +11,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Cancels vanilla Freecam interactions and puts Auto Tool ahead of normal mining. */
+/** Cancels unsafe detached-camera interactions and puts Auto Tool ahead of normal mining. */
 @Environment(EnvType.CLIENT)
 @Mixin(MinecraftClient.class)
 public abstract class MinecraftClientMixin {
     @Inject(method = "doAttack", at = @At("HEAD"), cancellable = true)
     private void arcaneclient$guardAttackAndPrepareAutoTool(CallbackInfoReturnable<Boolean> cir) {
-        if (FreecamController.isActive()) {
+        if (DetachedCameraInteraction.isActive()) {
             cir.setReturnValue(false);
             return;
         }
@@ -26,7 +26,7 @@ public abstract class MinecraftClientMixin {
 
     @Inject(method = "handleBlockBreaking", at = @At("HEAD"), cancellable = true)
     private void arcaneclient$guardBreakingAndPrepareAutoTool(boolean breaking, CallbackInfo ci) {
-        if (FreecamController.isActive()) {
+        if (DetachedCameraInteraction.isActive()) {
             ci.cancel();
             return;
         }
@@ -34,7 +34,7 @@ public abstract class MinecraftClientMixin {
     }
 
     @Inject(method = "doItemUse", at = @At("HEAD"), cancellable = true)
-    private void arcaneclient$guardFreecamItemUse(CallbackInfo ci) {
-        if (FreecamController.isActive()) ci.cancel();
+    private void arcaneclient$guardDetachedCameraItemUse(CallbackInfo ci) {
+        if (DetachedCameraInteraction.isActive()) ci.cancel();
     }
 }

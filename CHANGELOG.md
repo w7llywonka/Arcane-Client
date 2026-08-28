@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2.3.5+mc1.21.11
+
+- Made both Freecam and Freelook render a synchronized client-only copy of the local player, including skin, pose, health, and equipment.
+- Made the visual body explicitly non-targetable, non-attackable, non-interactable, and non-collidable so it cannot produce an invalid entity packet.
+- Unified attack, break, use, callback, and outbound packet guards across both detached camera modes while preserving body-origin block mining within the player's real reach.
+- Expanded the Minecraft client GameTest to aim at and deliberately attack both visual bodies and detached cameras in Freecam and Freelook while verifying the connection remains open.
+
 ## 2.3.4+mc1.21.11
 
 - Fixed Freecam and Freelook rendering from stale interpolated angles by making the rendered camera use the active detached camera's current yaw and pitch.

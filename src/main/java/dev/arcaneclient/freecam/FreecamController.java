@@ -14,11 +14,7 @@ import net.minecraft.client.option.Perspective;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 
 /** Smooth detached camera with server-valid directional mining from the player's body. */
@@ -29,16 +25,15 @@ public final class FreecamController {
     private static float playerYaw;
     private static float playerPitch;
     private static Vec3d velocity = Vec3d.ZERO;
-    private static boolean breaking;
 
     private FreecamController() {
     }
 
     public static void register() {
-        ClientPreAttackCallback.EVENT.register((client, player, clickCount) -> isActive());
-        UseBlockCallback.EVENT.register((player, world, hand, hit) -> world.isClient() && isActive() ? ActionResult.FAIL : ActionResult.PASS);
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> world.isClient() && isActive() ? ActionResult.FAIL : ActionResult.PASS);
-        UseItemCallback.EVENT.register((player, world, hand) -> world.isClient() && isActive() ? ActionResult.FAIL : ActionResult.PASS);
+        ClientPreAttackCallback.EVENT.register((client, player, clickCount) -> DetachedCameraInteraction.isActive());
+        UseBlockCallback.EVENT.register((player, world, hand, hit) -> world.isClient() && DetachedCameraInteraction.isActive() ? ActionResult.FAIL : ActionResult.PASS);
+        UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> world.isClient() && DetachedCameraInteraction.isActive() ? ActionResult.FAIL : ActionResult.PASS);
+        UseItemCallback.EVENT.register((player, world, hand) -> world.isClient() && DetachedCameraInteraction.isActive() ? ActionResult.FAIL : ActionResult.PASS);
     }
 
     public static boolean isActive() {
@@ -47,6 +42,14 @@ public final class FreecamController {
 
     public static boolean hasVisualBody() {
         return FreecamVisualBody.isPresent();
+    }
+
+    public static boolean isVisualBody(Entity entity) {
+        return FreecamVisualBody.owns(entity);
+    }
+
+    public static Entity visualBodyEntity() {
+        return FreecamVisualBody.entity();
     }
 
     public static void toggle(MinecraftClient client) {
@@ -72,21 +75,21 @@ public final class FreecamController {
         );
         camera.setInvisible(true);
         camera.setNoGravity(true);
-        FreecamVisualBody.spawn(client, player);
         camera.noClip = true;
+        FreecamVisualBody.spawn(client, player);
         velocity = Vec3d.ZERO;
-        breaking = false;
+        DetachedCameraInteraction.stopMining(client);
         client.options.setPerspective(Perspective.FIRST_PERSON);
         client.setCameraEntity((Entity) camera);
         ArcaneClient.LOGGER.info("Freecam enabled");
     }
 
     public static void disable(MinecraftClient client) {
+        DetachedCameraInteraction.stopMining(client);
         if (camera == null) {
             FreecamVisualBody.remove();
             return;
         }
-        stopMining(client);
         FreecamVisualBody.remove();
         if (client.player != null) {
             client.player.setYaw(playerYaw);
@@ -130,7 +133,12 @@ public final class FreecamController {
             camera.getY() + velocity.y,
             camera.getZ() + velocity.z
         );
-        tickMining(client, player);
+        DetachedCameraInteraction.tickMining(
+            client,
+            player,
+            camera,
+            ArcaneClient.config().freecamMining
+        );
     }
 
     /** Receives vanilla's sensitivity-adjusted mouse deltas and rotates only the detached camera. */
@@ -141,34 +149,6 @@ public final class FreecamController {
         );
         DetachedCameraPose.rotate(camera, next.yaw(), next.pitch());
         return true;
-    }
-
-    private static void tickMining(MinecraftClient client, ClientPlayerEntity player) {
-        if (!ArcaneClient.config().freecamMining || !client.options.attackKey.isPressed() || client.interactionManager == null) {
-            stopMining(client);
-            return;
-        }
-        Vec3d start = player.getEyePos();
-        Vec3d end = FreecamMining.rayEnd(start, camera.getYaw(), camera.getPitch(), player.getBlockInteractionRange());
-        HitResult result = client.world.raycast(new RaycastContext(
-            start,
-            end,
-            RaycastContext.ShapeType.OUTLINE,
-            RaycastContext.FluidHandling.NONE,
-            player
-        ));
-        if (!(result instanceof BlockHitResult blockHit) || result.getType() != HitResult.Type.BLOCK) {
-            stopMining(client);
-            return;
-        }
-        boolean progressed = client.interactionManager.updateBlockBreakingProgress(blockHit.getBlockPos(), blockHit.getSide());
-        breaking = true;
-        if (progressed) player.swingHand(Hand.MAIN_HAND);
-    }
-
-    private static void stopMining(MinecraftClient client) {
-        if (breaking && client.interactionManager != null) client.interactionManager.cancelBlockBreaking();
-        breaking = false;
     }
 
     /** Consumes the wheel only while freecam is active and persists the selected speed. */
