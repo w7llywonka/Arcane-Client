@@ -1,26 +1,25 @@
 package dev.arcaneclient.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 final class RoundedGuiTest {
     @Test
-    void cornerInsetsShrinkTowardTheCenter() {
-        int previous = Integer.MAX_VALUE;
-        for (int row = 0; row < 7; row++) {
-            int inset = RoundedGui.cornerInset(7, row);
-            assertTrue(inset >= 0);
-            assertTrue(inset <= previous);
-            previous = inset;
-        }
-        assertEquals(1, previous);
+    void radiusIsClampedToTheSmallestHalfDimension() {
+        assertEquals(7, RoundedGui.effectiveRadius(146, 15, 20));
+        assertEquals(5, RoundedGui.effectiveRadius(146, 15, 5));
     }
 
     @Test
-    void smallRadiusStillProducesAVisibleCorner() {
-        assertTrue(RoundedGui.cornerInset(4, 0) > 0);
-        assertEquals(1, RoundedGui.cornerInset(4, 3));
+    void invalidOrFlatGeometryFallsBackToASquare() {
+        assertEquals(0, RoundedGui.effectiveRadius(100, 20, 0));
+        assertEquals(0, RoundedGui.effectiveRadius(0, 20, 8));
+    }
+
+    @Test
+    void sourceTextureKeepsAFourPixelStretchableCenter() {
+        assertEquals(4, RoundedGui.SOURCE_CENTER);
+        assertEquals(68, RoundedGui.SOURCE_BORDER * 2 + RoundedGui.SOURCE_CENTER);
     }
 }
