@@ -1,5 +1,8 @@
 package dev.arcaneclient.freecam;
 
+import dev.arcaneclient.ArcaneClient;
+import dev.arcaneclient.ArcaneConfig;
+import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -76,6 +79,17 @@ public final class DetachedCameraInteraction {
             return;
         }
 
+        ArcaneConfig config = ArcaneClient.config();
+        if (config != null && config.autoTool) {
+            AutoToolController.selectForState(
+                client,
+                player,
+                client.world.getBlockState(blockHit.getBlockPos()),
+                config.autoToolPreserveDurability
+            );
+        } else {
+            AutoToolController.restore(client);
+        }
         boolean progressed = client.interactionManager.updateBlockBreakingProgress(
             blockHit.getBlockPos(),
             blockHit.getSide()
@@ -89,5 +103,6 @@ public final class DetachedCameraInteraction {
             client.interactionManager.cancelBlockBreaking();
         }
         breaking = false;
+        AutoToolController.restore(client);
     }
 }
