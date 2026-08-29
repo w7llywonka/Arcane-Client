@@ -25,13 +25,11 @@ public final class ActivityClassifier {
     private static final Set<String> BREEDING_BLOCKS = Set.of("frogspawn", "turtle_egg", "sniffer_egg");
     private static final Set<String> SNIFFER_CROPS = Set.of("torchflower_crop", "pitcher_crop", "pitcher_plant", "torchflower");
     private static final Set<String> CROPS = Set.of("wheat", "carrots", "potatoes", "beetroots", "nether_wart", "cocoa", "melon_stem", "pumpkin_stem", "attached_melon_stem", "attached_pumpkin_stem", "sweet_berry_bush", "torchflower_crop", "pitcher_crop");
-    private static final Set<String> STORAGE = Set.of("chest", "trapped_chest", "barrel", "ender_chest", "hopper", "beehive");
-    private static final Set<String> FUNCTIONAL = Set.of("furnace", "smoker", "blast_furnace", "brewing_stand", "lectern", "jukebox", "chiseled_bookshelf", "crafter", "dispenser", "dropper", "note_block");
+    private static final Set<String> FUNCTIONAL = Set.of("note_block");
     private static final Set<String> REDSTONE = Set.of("redstone_wire", "repeater", "comparator", "observer", "piston", "sticky_piston", "redstone_lamp", "lever", "target", "daylight_detector", "tripwire_hook", "redstone_torch", "redstone_wall_torch", "redstone_block");
     private static final Set<String> AMETHYST = Set.of("budding_amethyst", "amethyst_cluster", "large_amethyst_bud", "medium_amethyst_bud", "small_amethyst_bud");
-    private static final Set<String> HIGH_BLOCK_ENTITIES = Set.of("shelf", "copper_golem_statue", "crafter", "shulker_box", "ender_chest", "hopper");
-    private static final Set<String> FUNCTIONAL_BLOCK_ENTITIES = Set.of("chest", "trapped_chest", "barrel", "furnace", "smoker", "blast_furnace", "brewing_stand", "beehive", "lectern", "jukebox", "chiseled_bookshelf", "dispenser", "dropper", "comparator", "daylight_detector", "bed", "sign", "hanging_sign", "banner");
-    private static final Set<String> AUTOMATION_STORAGE = Set.of("chest", "trapped_chest", "barrel", "furnace", "smoker", "blast_furnace", "beehive", "dispenser", "dropper");
+    private static final Set<String> HIGH_BLOCK_ENTITIES = Set.of("copper_golem_statue");
+    private static final Set<String> FUNCTIONAL_BLOCK_ENTITIES = Set.of("comparator", "daylight_detector", "bed", "sign", "hanging_sign", "banner");
 
     public Signal classifyBlock(BlockState state) {
         return this.facts(state).signal();
@@ -44,7 +42,7 @@ public final class ActivityClassifier {
         }
         String path = ActivityClassifier.blockPath(state);
         boolean crop = this.isCrop(path);
-        BlockFacts facts = new BlockFacts(path, this.classifyBlock(state, path), crop, crop ? ActivityClassifier.growthBucket(state) : -1, this.isFarmland(path), ActivityClassifier.isImportedPlantPath(path), this.isPointedDripstone(path), this.isCauldron(path), this.isAmethystStage(path), this.isOpaqueMaskBlock(state, path), path.equals("spawner"), path.equals("hopper"), ActivityClassifier.isAutomationStorage(path), path.equals("crafter"), ActivityClassifier.isFlowingWater(state, path), ActivityClassifier.isTemporalStable(path));
+        BlockFacts facts = new BlockFacts(path, this.classifyBlock(state, path), crop, crop ? ActivityClassifier.growthBucket(state) : -1, this.isFarmland(path), ActivityClassifier.isImportedPlantPath(path), this.isPointedDripstone(path), this.isCauldron(path), this.isAmethystStage(path), this.isOpaqueMaskBlock(state, path), path.equals("spawner"), ActivityClassifier.isTemporalStable(path));
         this.factsCache.put(state, facts);
         return facts;
     }
@@ -54,9 +52,11 @@ public final class ActivityClassifier {
             return false;
         }
         BlockFacts facts = this.facts(state);
+        if (ScannerStorageFilter.isStoragePath(facts.path())) {
+            return false;
+        }
         if (facts.signal() != null || facts.crop() || facts.farmland() || facts.importedPlantCandidate()
-            || facts.pointedDripstone() || facts.cauldron() || facts.spawner() || facts.hopper()
-            || facts.automationStorage() || facts.crafter() || facts.flowingWater() || facts.amethystStage()
+            || facts.pointedDripstone() || facts.cauldron() || facts.spawner() || facts.amethystStage()
             || state.getLuminance() > 0) {
             return true;
         }
@@ -73,6 +73,9 @@ public final class ActivityClassifier {
     }
 
     Signal classifyBlock(BlockState state, String path) {
+        if (ScannerStorageFilter.isStoragePath(path)) {
+            return null;
+        }
         if (path.endsWith("_leaves") && state.contains(Properties.PERSISTENT) && ((Boolean)state.get(Properties.PERSISTENT)).booleanValue()) {
             return Signal.PERSISTENT_LEAVES;
         }
@@ -85,7 +88,7 @@ public final class ActivityClassifier {
         if (path.equals("resin_clump")) {
             return Signal.RESIN;
         }
-        if (path.endsWith("_shelf") || path.contains("copper_golem_statue") || path.contains("copper_chest")) {
+        if (path.contains("copper_golem_statue")) {
             return Signal.COPPER_BASE_BLOCK;
         }
         if (path.equals("respawn_anchor") && state.contains(Properties.CHARGES) && (Integer)state.get(Properties.CHARGES) > 0) {
@@ -93,9 +96,6 @@ public final class ActivityClassifier {
         }
         if (path.equals("sculk_shrieker") && state.contains(Properties.CAN_SUMMON) && !((Boolean)state.get(Properties.CAN_SUMMON)).booleanValue()) {
             return Signal.DISABLED_SHRIEKER;
-        }
-        if (path.endsWith("_shulker_box") || STORAGE.contains(path)) {
-            return Signal.STORAGE;
         }
         if (REDSTONE.contains(path) || path.endsWith("_copper_bulb")) {
             return Signal.REDSTONE;
@@ -159,23 +159,6 @@ public final class ActivityClassifier {
         return path.endsWith("cauldron");
     }
 
-    private static boolean isAutomationStorage(String path) {
-        return AUTOMATION_STORAGE.contains(path) || path.endsWith("_shulker_box") || path.contains("copper_chest");
-    }
-
-    private static boolean isFlowingWater(BlockState state, String path) {
-        if (!path.equals("water")) {
-            return false;
-        }
-        for (Map.Entry<Property<?>, Comparable<?>> entry : state.getEntries().entrySet()) {
-            Object v;
-            if (!((Property)entry.getKey()).getName().equals("level") || !((v = entry.getValue()) instanceof Integer)) continue;
-            Integer level = (Integer)v;
-            return level > 0;
-        }
-        return false;
-    }
-
     public boolean isAmethystStage(BlockState state) {
         return this.isAmethystStage(ActivityClassifier.blockPath(state));
     }
@@ -193,11 +176,11 @@ public final class ActivityClassifier {
     }
 
     public boolean isHighBlockEntityType(String path) {
-        return HIGH_BLOCK_ENTITIES.contains(path);
+        return !ScannerStorageFilter.isStoragePath(path) && HIGH_BLOCK_ENTITIES.contains(path);
     }
 
     public boolean isFunctionalBlockEntityType(String path) {
-        return FUNCTIONAL_BLOCK_ENTITIES.contains(path);
+        return !ScannerStorageFilter.isStoragePath(path) && FUNCTIONAL_BLOCK_ENTITIES.contains(path);
     }
 
     public boolean isImportedPlant(ClientWorld level, BlockPos pos, BlockState state) {
@@ -272,7 +255,7 @@ public final class ActivityClassifier {
     }
 
     private static boolean isTemporalStable(String path) {
-        return !CROPS.contains(path) && !SAPLINGS.contains(path) && !AMETHYST.contains(path) && !path.contains("vine") && !path.contains("kelp") && !path.contains("bamboo") && !path.endsWith("_leaves") && !path.contains("grass") && !path.contains("fern") && !path.contains("flower") && !path.contains("mushroom") && !path.equals("cactus") && !path.equals("sugar_cane") && !path.contains("fire") && !path.contains("snow") && !path.equals("water") && !path.equals("lava") && !path.equals("bubble_column") && !path.equals("pointed_dripstone") && !path.startsWith("chorus_");
+        return !ScannerStorageFilter.isStoragePath(path) && !CROPS.contains(path) && !SAPLINGS.contains(path) && !AMETHYST.contains(path) && !path.contains("vine") && !path.contains("kelp") && !path.contains("bamboo") && !path.endsWith("_leaves") && !path.contains("grass") && !path.contains("fern") && !path.contains("flower") && !path.contains("mushroom") && !path.equals("cactus") && !path.equals("sugar_cane") && !path.contains("fire") && !path.contains("snow") && !path.equals("water") && !path.equals("lava") && !path.equals("bubble_column") && !path.equals("pointed_dripstone") && !path.startsWith("chorus_");
     }
 
     public static String blockPath(BlockState state) {
@@ -294,7 +277,7 @@ public final class ActivityClassifier {
     }
 
     @Environment(value=EnvType.CLIENT)
-    record BlockFacts(String path, Signal signal, boolean crop, int growthBucket, boolean farmland, boolean importedPlantCandidate, boolean pointedDripstone, boolean cauldron, boolean amethystStage, boolean opaqueMaskBlock, boolean spawner, boolean hopper, boolean automationStorage, boolean crafter, boolean flowingWater, boolean temporalStable) {
+    record BlockFacts(String path, Signal signal, boolean crop, int growthBucket, boolean farmland, boolean importedPlantCandidate, boolean pointedDripstone, boolean cauldron, boolean amethystStage, boolean opaqueMaskBlock, boolean spawner, boolean temporalStable) {
     }
 
     @Environment(value=EnvType.CLIENT)
@@ -304,10 +287,9 @@ public final class ActivityClassifier {
         BREEDING_EGGS(SignalCategory.INTERACTION, "player-bred or placed eggs", 110, 15, 180),
         SNIFFER_CROP(SignalCategory.CULTIVATION, "sniffer crops", 85, 10, 150),
         RESIN(SignalCategory.INTERACTION, "resin clumps", 30, 4, 70),
-        COPPER_BASE_BLOCK(SignalCategory.INFRASTRUCTURE, "copper chest, shelf, or golem statue", 125, 12, 200),
+        COPPER_BASE_BLOCK(SignalCategory.INFRASTRUCTURE, "copper golem statues", 125, 12, 200),
         CHARGED_ANCHOR(SignalCategory.INTERACTION, "charged respawn anchor", 120, 10, 180),
         DISABLED_SHRIEKER(SignalCategory.INTERACTION, "non-summoning sculk shrieker", 28, 4, 70),
-        STORAGE(SignalCategory.INFRASTRUCTURE, "storage blocks", 20, 4, 85),
         FUNCTIONAL(SignalCategory.INFRASTRUCTURE, "functional blocks", 16, 3, 70),
         REDSTONE(SignalCategory.INFRASTRUCTURE, "redstone machinery", 22, 4, 90),
         HORIZONTAL_DEEPSLATE(SignalCategory.PLACED_BLOCK, "horizontal deepslate axis", 90, 8, 170),

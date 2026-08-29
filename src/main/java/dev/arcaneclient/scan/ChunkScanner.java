@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,7 +41,6 @@ import net.minecraft.entity.passive.TameableEntity;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.vehicle.AbstractBoatEntity;
 import net.minecraft.entity.vehicle.AbstractMinecartEntity;
-import net.minecraft.entity.vehicle.VehicleInventory;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -207,85 +205,6 @@ public final class ChunkScanner {
         }
     }
 
-    private static void emitSpawnerFarm(ScanResult.Builder result, List<BlockPos> spawners, List<BlockPos> hoppers) {
-        int pairs = 0;
-        BlockPos representative = null;
-        block0: for (BlockPos spawner : spawners) {
-            for (BlockPos hopper : hoppers) {
-                if (Math.abs(spawner.getX() - hopper.getX()) > 12 || Math.abs(spawner.getY() - hopper.getY()) > 16 || Math.abs(spawner.getZ() - hopper.getZ()) > 12) continue;
-                ++pairs;
-                representative = representative == null ? hopper : representative;
-                continue block0;
-            }
-        }
-        int strength = EvidenceHeuristics.spawnerCollection(pairs);
-        if (strength > 0) {
-            result.addStatic(SignalCategory.INFRASTRUCTURE, ChunkScanner.modelPosition(representative), "spawners paired with hopper collection x" + pairs, strength);
-        }
-    }
-
-    private static void emitAutomationNetwork(ScanResult.Builder result, List<BlockPos> hoppers, List<BlockPos> storage, List<BlockPos> crafters) {
-        HashSet<BlockPos> linkedHoppers = new HashSet<BlockPos>();
-        HashSet<BlockPos> linkedStorage = new HashSet<BlockPos>();
-        HashSet<BlockPos> linkedCrafters = new HashSet<BlockPos>();
-        int links = 0;
-        for (BlockPos hopper : hoppers) {
-            for (BlockPos endpoint : storage) {
-                if (!ChunkScanner.within(endpoint, hopper, 2, 2)) continue;
-                ++links;
-                linkedHoppers.add(hopper);
-                linkedStorage.add(endpoint);
-            }
-            for (BlockPos crafter : crafters) {
-                if (!ChunkScanner.within(crafter, hopper, 2, 2)) continue;
-                ++links;
-                linkedHoppers.add(hopper);
-                linkedCrafters.add(crafter);
-            }
-        }
-        int strength = EvidenceHeuristics.automationNetwork(linkedHoppers.size(), linkedStorage.size(), linkedCrafters.size(), links);
-        if (strength > 0) {
-            int devices = linkedHoppers.size() + linkedStorage.size() + linkedCrafters.size();
-            result.addStatic(SignalCategory.INFRASTRUCTURE, ChunkScanner.modelPosition((BlockPos)linkedHoppers.iterator().next()), "connected hopper, storage, and crafter farm network x" + devices, strength);
-        }
-    }
-
-    private static void emitFlowingWaterCollection(ScanResult.Builder result, Map<Integer, Grid> waterLayers, List<BlockPos> hoppers, List<BlockPos> storage, List<BlockPos> crafters) {
-        FlowCollectionEvidence best = null;
-        for (Grid waterGrid : waterLayers.values()) {
-            boolean[] linkedCells = new boolean[256];
-            HashSet<BlockPos> linkedCollectors = new HashSet<BlockPos>();
-            HashSet<BlockPos> linkedStorage = new HashSet<BlockPos>();
-            for (BlockPos blockPos : hoppers) {
-                if (!waterGrid.markWithin(blockPos, 8, 4, linkedCells)) continue;
-                linkedCollectors.add(blockPos);
-            }
-            for (BlockPos blockPos : crafters) {
-                if (!waterGrid.markWithin(blockPos, 8, 4, linkedCells)) continue;
-                linkedCollectors.add(blockPos);
-            }
-            for (BlockPos blockPos : storage) {
-                if (!waterGrid.hasWithin(blockPos, 8, 4)) continue;
-                linkedStorage.add(blockPos);
-            }
-            int linkedWater = 0;
-            for (boolean linked : linkedCells) {
-                if (!linked) continue;
-                ++linkedWater;
-            }
-            int n = EvidenceHeuristics.flowingWaterCollection(waterGrid.count, waterGrid.maxRun(), linkedWater, linkedCollectors.size(), linkedStorage.size());
-            if (n <= 0 || best != null && n <= best.strength) continue;
-            best = new FlowCollectionEvidence(waterGrid, linkedWater, n);
-        }
-        if (best != null) {
-            result.addStatic(SignalCategory.CULTIVATION, ChunkScanner.modelPosition(best.grid.representative), "flowing-water item channel feeding farm machinery x" + best.linkedWater, best.strength);
-        }
-    }
-
-    private static boolean within(BlockPos first, BlockPos second, int horizontal, int vertical) {
-        return Math.abs(first.getX() - second.getX()) <= horizontal && Math.abs(first.getY() - second.getY()) <= vertical && Math.abs(first.getZ() - second.getZ()) <= horizontal;
-    }
-
     private void emitAmethystChanges(ScanResult.Builder result, WorldChunk chunk, Map<Long, String> current, int observerSectionY, long tick) {
         AmethystSnapshot snapshot = new AmethystSnapshot(Map.copyOf(current), observerSectionY);
         AmethystSnapshot previous = this.amethystSnapshots.put(chunk, snapshot);
@@ -412,9 +331,7 @@ public final class ChunkScanner {
             if (entity2 instanceof ArmorStandEntity || entity2 instanceof ItemFrameEntity || entity2 instanceof PaintingEntity) {
                 signals.addDecorative(entity2);
             }
-            if (entity2 instanceof VehicleInventory) {
-                signals.addContainer(entity2);
-            } else if (entity2 instanceof AbstractMinecartEntity || entity2 instanceof AbstractBoatEntity) {
+            if (entity2 instanceof AbstractMinecartEntity || entity2 instanceof AbstractBoatEntity) {
                 signals.addVehicle(entity2);
             }
             if (entity2.hasCustomName()) {
@@ -477,13 +394,8 @@ public final class ChunkScanner {
         private final Map<Integer, Grid> cropLayers = new HashMap<Integer, Grid>();
         private final Map<Integer, Grid> berryLayers = new HashMap<Integer, Grid>();
         private final Map<Integer, Grid> farmlandLayers = new HashMap<Integer, Grid>();
-        private final Map<Integer, Grid> flowingWaterLayers = new HashMap<Integer, Grid>();
         private final ArrayList<BlockPos> dripstone = new ArrayList<>();
         private final ArrayList<BlockPos> cauldrons = new ArrayList<>();
-        private final ArrayList<BlockPos> spawners = new ArrayList<>();
-        private final ArrayList<BlockPos> hoppers = new ArrayList<>();
-        private final ArrayList<BlockPos> automationStorage = new ArrayList<>();
-        private final ArrayList<BlockPos> crafters = new ArrayList<>();
         private final Map<Long, String> currentAmethyst = new HashMap<Long, String>();
         private final KelpColumns kelpColumns = new KelpColumns();
         private final BlockPos.Mutable cursor = new BlockPos.Mutable();
@@ -628,21 +540,6 @@ public final class ChunkScanner {
             if (facts.cauldron() && this.cauldrons.size() < 32) {
                 this.cauldrons.add(this.cursor.toImmutable());
             }
-            if (facts.spawner() && this.spawners.size() < 32) {
-                this.spawners.add(this.cursor.toImmutable());
-            }
-            if (facts.hopper() && this.hoppers.size() < 96) {
-                this.hoppers.add(this.cursor.toImmutable());
-            }
-            if (facts.automationStorage() && this.automationStorage.size() < 96) {
-                this.automationStorage.add(this.cursor.toImmutable());
-            }
-            if (facts.crafter() && this.crafters.size() < 32) {
-                this.crafters.add(this.cursor.toImmutable());
-            }
-            if (facts.flowingWater()) {
-                this.flowingWaterLayers.computeIfAbsent(y, ignored -> new Grid()).add(localX, localZ, (BlockPos)this.cursor);
-            }
             if (facts.amethystStage()) {
                 this.currentAmethyst.put(this.cursor.asLong(), facts.path());
                 if (facts.path().equals("budding_amethyst")) {
@@ -698,9 +595,6 @@ public final class ChunkScanner {
                 this.builder.addStatic(SignalCategory.CULTIVATION, ChunkScanner.modelPosition(this.importedRepresentative), "plants outside their native biome x" + this.importedPlants, Math.min(110, 30 + this.importedPlants * 5));
             }
             ChunkScanner.emitDripstoneFarm(this.builder, this.dripstone, this.cauldrons);
-            ChunkScanner.emitSpawnerFarm(this.builder, this.spawners, this.hoppers);
-            ChunkScanner.emitAutomationNetwork(this.builder, this.hoppers, this.automationStorage, this.crafters);
-            ChunkScanner.emitFlowingWaterCollection(this.builder, this.flowingWaterLayers, this.hoppers, this.automationStorage, this.crafters);
             if (this.lightLeakCount > 0) {
                 int rawStrength = Math.min(200, 80 + this.strongestLeakedLight * 6 + Math.min(40, this.lightLeakCount * 2));
                 this.builder.addStatic(SignalCategory.INFRASTRUCTURE, ChunkScanner.modelPosition(this.lightRepresentative), "block light inside opaque stone mask x" + this.lightLeakCount, rawStrength);
@@ -796,46 +690,6 @@ public final class ChunkScanner {
             return area <= 96 && this.count * 100 >= area * 60;
         }
 
-        private boolean hasWithin(BlockPos endpoint, int horizontal, int vertical) {
-            if (this.representative == null || Math.abs(this.representative.getY() - endpoint.getY()) > vertical) {
-                return false;
-            }
-            int baseX = this.representative.getX() & 0xFFFFFFF0;
-            int baseZ = this.representative.getZ() & 0xFFFFFFF0;
-            int minLocalX = Math.max(0, endpoint.getX() - horizontal - baseX);
-            int maxLocalX = Math.min(15, endpoint.getX() + horizontal - baseX);
-            int minLocalZ = Math.max(0, endpoint.getZ() - horizontal - baseZ);
-            int maxLocalZ = Math.min(15, endpoint.getZ() + horizontal - baseZ);
-            for (int z = minLocalZ; z <= maxLocalZ; ++z) {
-                for (int x = minLocalX; x <= maxLocalX; ++x) {
-                    if (!this.occupied[z * 16 + x]) continue;
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private boolean markWithin(BlockPos endpoint, int horizontal, int vertical, boolean[] marked) {
-            if (this.representative == null || Math.abs(this.representative.getY() - endpoint.getY()) > vertical) {
-                return false;
-            }
-            int baseX = this.representative.getX() & 0xFFFFFFF0;
-            int baseZ = this.representative.getZ() & 0xFFFFFFF0;
-            int minLocalX = Math.max(0, endpoint.getX() - horizontal - baseX);
-            int maxLocalX = Math.min(15, endpoint.getX() + horizontal - baseX);
-            int minLocalZ = Math.max(0, endpoint.getZ() - horizontal - baseZ);
-            int maxLocalZ = Math.min(15, endpoint.getZ() + horizontal - baseZ);
-            boolean found = false;
-            for (int z = minLocalZ; z <= maxLocalZ; ++z) {
-                for (int x = minLocalX; x <= maxLocalX; ++x) {
-                    int index = z * 16 + x;
-                    if (!this.occupied[index]) continue;
-                    marked[index] = true;
-                    found = true;
-                }
-            }
-            return found;
-        }
     }
 
     @Environment(value=EnvType.CLIENT)
@@ -890,10 +744,6 @@ public final class ChunkScanner {
     }
 
     @Environment(value=EnvType.CLIENT)
-    private record FlowCollectionEvidence(Grid grid, int linkedWater, int strength) {
-    }
-
-    @Environment(value=EnvType.CLIENT)
     private record AmethystSnapshot(Map<Long, String> stages, int observerSectionY) {
     }
 
@@ -926,10 +776,6 @@ public final class ChunkScanner {
 
         private void addDecorative(Entity entity) {
             this.add("decorative entities", SignalCategory.PLACED_BLOCK, 45, entity);
-        }
-
-        private void addContainer(Entity entity) {
-            this.add("container vehicles", SignalCategory.INFRASTRUCTURE, 65, entity);
         }
 
         private void addVehicle(Entity entity) {

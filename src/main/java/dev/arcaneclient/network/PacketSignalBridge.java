@@ -6,6 +6,7 @@ import dev.arcaneclient.model.ScanResult;
 import dev.arcaneclient.model.SignalCategory;
 import dev.arcaneclient.scan.EvidenceHeuristics;
 import dev.arcaneclient.scan.GrowthTransitions;
+import dev.arcaneclient.scan.ScannerStorageFilter;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -38,7 +39,7 @@ import net.minecraft.util.math.Vec3i;
 
 @Environment(value=EnvType.CLIENT)
 public final class PacketSignalBridge {
-    private static final Set<String> INTERACTION_SOUNDS = Set.of("block.chest.open", "block.chest.close", "block.barrel.open", "block.barrel.close", "block.shulker_box.open", "block.shulker_box.close", "block.piston.extend", "block.piston.contract", "block.lever.click", "block.stone_button.click_on", "block.stone_button.click_off", "block.wooden_button.click_on", "block.wooden_button.click_off", "block.note_block.harp", "block.crafter.craft", "block.crafter.fail", "block.respawn_anchor.charge", "block.beacon.activate", "block.brewing_stand.brew", "block.anvil.use", "block.grindstone.use", "block.smithing_table.use", "item.book.page_turn", "block.copper_bulb.turn_on", "block.copper_bulb.turn_off");
+    private static final Set<String> INTERACTION_SOUNDS = Set.of("block.piston.extend", "block.piston.contract", "block.lever.click", "block.stone_button.click_on", "block.stone_button.click_off", "block.wooden_button.click_on", "block.wooden_button.click_off", "block.note_block.harp", "block.respawn_anchor.charge", "block.beacon.activate", "block.anvil.use", "block.grindstone.use", "block.smithing_table.use", "block.copper_bulb.turn_on", "block.copper_bulb.turn_off");
     private static final Set<String> INTERACTION_PROPERTIES = Set.of("powered", "open", "lit", "charges", "bites", "note", "delay", "mode", "disarmed", "occupied");
 
     private PacketSignalBridge() {
@@ -52,8 +53,11 @@ public final class PacketSignalBridge {
         ScanResult.Builder result = ScanResult.builder();
         packet.getChunkData().getBlockEntities(packet.getChunkX(), packet.getChunkZ()).accept((pos, type, tag) -> {
             String id = PacketSignalBridge.path(Registries.BLOCK_ENTITY_TYPE.getId(type));
+            if (ScannerStorageFilter.isStoragePath(id)) return;
             int strength = PacketSignalBridge.blockEntityStrength(id);
-            result.addStatic(SignalCategory.BLOCK_ENTITY, PacketSignalBridge.at(pos), "raw packet " + id, strength);
+            if (strength > 0) {
+                result.addStatic(SignalCategory.BLOCK_ENTITY, PacketSignalBridge.at(pos), "raw packet " + id, strength);
+            }
         });
         int litBytes = 0;
         Iterator iterator = packet.getLightData().getBlockNibbles().iterator();
@@ -82,6 +86,9 @@ public final class PacketSignalBridge {
         }
         String oldId = PacketSignalBridge.blockId(old);
         String newId = PacketSignalBridge.blockId(incoming);
+        if (ScannerStorageFilter.isStoragePath(oldId) || ScannerStorageFilter.isStoragePath(newId)) {
+            return;
+        }
         String location = PacketSignalBridge.hiddenSuffix(client, pos);
         if (PacketSignalBridge.isPlayerFingerprint(newId, incoming)) {
             ArcaneClient.engine().recordLive(pos, SignalCategory.PLACED_BLOCK, 110, "placed fingerprint: " + newId + location);
@@ -111,6 +118,7 @@ public final class PacketSignalBridge {
             return;
         }
         String id = PacketSignalBridge.path(Registries.BLOCK_ENTITY_TYPE.getId(type));
+        if (ScannerStorageFilter.isStoragePath(id)) return;
         ArcaneClient.engine().recordLive(pos, SignalCategory.BLOCK_ENTITY, PacketSignalBridge.blockEntityStrength(id) + 70, source + ": " + id);
     }
 
@@ -119,7 +127,8 @@ public final class PacketSignalBridge {
             return;
         }
         String id = PacketSignalBridge.path(Registries.BLOCK.getId(packet.getBlock()));
-        int strength = id.contains("chest") || id.contains("shulker") || id.contains("piston") || id.contains("note_block") ? 140 : 65;
+        if (ScannerStorageFilter.isStoragePath(id)) return;
+        int strength = id.contains("piston") || id.contains("note_block") ? 140 : 65;
         ArcaneClient.engine().recordLive(packet.getPos(), SignalCategory.INTERACTION, strength, "block event: " + id);
     }
 
@@ -171,7 +180,7 @@ public final class PacketSignalBridge {
             return;
         }
         int type = packet.getEventId();
-        if (type == 1000 || type == 1010 || type == 1030 || type == 1035 || type == 1042 || type == 1043 || type == 1044 || type == 1049 || type == 1500 || type == 1502 || type == 2012 || type == 3003 || type == 3004 || type == 3005) {
+        if (type == 1030 || type == 1042 || type == 1044 || type == 1500 || type == 1502 || type == 2012 || type == 3003 || type == 3004 || type == 3005) {
             ArcaneClient.engine().recordLive(packet.getPos(), SignalCategory.INTERACTION, 75, "server level event " + type, 3600, 10);
         }
     }
@@ -286,7 +295,7 @@ public final class PacketSignalBridge {
     }
 
     private static boolean isPlayerFingerprint(String id, BlockState state) {
-        if (id.endsWith("_shelf") || id.contains("copper_chest") || id.contains("copper_golem_statue") || id.equals("crafter") || id.equals("respawn_anchor") || id.equals("scaffolding") || id.equals("frogspawn") || id.equals("torchflower_crop") || id.equals("pitcher_crop") || id.equals("nether_portal")) {
+        if (id.contains("copper_golem_statue") || id.equals("respawn_anchor") || id.equals("scaffolding") || id.equals("frogspawn") || id.equals("torchflower_crop") || id.equals("pitcher_crop") || id.equals("nether_portal")) {
             return true;
         }
         Object persistent = PacketSignalBridge.property(state, "persistent");
@@ -294,17 +303,14 @@ public final class PacketSignalBridge {
     }
 
     private static int blockEntityStrength(String id) {
-        if (id.contains("shelf") || id.contains("copper_chest") || id.equals("crafter") || id.contains("shulker")) {
-            return 140;
+        if (ScannerStorageFilter.isStoragePath(id)) {
+            return 0;
         }
-        if (id.equals("hopper") || id.equals("brewing_stand") || id.equals("beacon") || id.equals("lectern") || id.equals("jukebox")) {
+        if (id.equals("beacon")) {
             return 110;
         }
         if (id.equals("mob_spawner") || id.equals("spawner")) {
             return 55;
-        }
-        if (id.contains("chest") || id.equals("barrel") || id.contains("furnace") || id.equals("smoker") || id.equals("blast_furnace")) {
-            return 75;
         }
         return 18;
     }
@@ -315,9 +321,6 @@ public final class PacketSignalBridge {
         }
         if (id.equals("copper_golem") || id.equals("armor_stand") || id.contains("item_frame") || id.equals("painting")) {
             return 150;
-        }
-        if (id.contains("minecart") && (id.contains("chest") || id.contains("hopper") || id.contains("furnace"))) {
-            return 140;
         }
         if (id.equals("allay") || id.equals("villager")) {
             return 35;
