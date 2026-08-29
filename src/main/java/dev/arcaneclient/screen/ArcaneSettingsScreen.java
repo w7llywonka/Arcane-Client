@@ -22,19 +22,21 @@ import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import org.jspecify.annotations.Nullable;
 
-/** Arcane's application-style control center. */
+/** Arcane's detached, game-first overlay control center. */
 @Environment(EnvType.CLIENT)
 public final class ArcaneSettingsScreen extends Screen {
     private static final int FRAME_MARGIN = 10;
-    private static final int FRAME_MAX_WIDTH = 760;
-    private static final int FRAME_MAX_HEIGHT = 430;
-    private static final int SIDEBAR_WIDTH = 116;
-    private static final int HEADER_HEIGHT = 50;
-    private static final int FOOTER_HEIGHT = 22;
+    private static final int FRAME_MAX_WIDTH = 420;
+    private static final int FRAME_MAX_HEIGHT = 48;
+    private static final int HEADER_HEIGHT = 48;
+    private static final int HERO_HEIGHT = 42;
     private static final int CONTENT_PAD = 10;
-    private static final int PANEL_GAP = 9;
-    private static final int MODULE_ROW_HEIGHT = 39;
-    private static final int NAV_ROW_HEIGHT = 27;
+    private static final int CARD_GAP = 8;
+    private static final int CARD_HEIGHT = 58;
+    private static final int SHEET_MARGIN = 12;
+    private static final int WORKSPACE_MAX_WIDTH = 342;
+    private static final int WORKSPACE_MAX_HEIGHT = 248;
+    private static final int SHEET_MAX_HEIGHT = 286;
     private static final int MACRO_COUNT = 4;
     private static final int MACRO_FIELD_WIDTH = 68;
     private static final int BIND_KEY_WIDTH = 48;
@@ -60,6 +62,10 @@ public final class ArcaneSettingsScreen extends Screen {
     private int listScroll, listMaxScroll, detailScroll, detailMaxScroll;
     private GuiCategory selectedCategory;
     private GuiModule selectedModule;
+    private boolean settingsOpen;
+    private int workspaceOffsetX, workspaceOffsetY, detailOffsetX, detailOffsetY;
+    private @Nullable DragTarget draggingSurface;
+    private int dragStartMouseX, dragStartMouseY, dragStartOffsetX, dragStartOffsetY;
     private GuiSetting.@Nullable Slider draggingSlider;
     private int sliderTrackX;
     private int sliderTrackWidth;
@@ -81,9 +87,9 @@ public final class ArcaneSettingsScreen extends Screen {
         this.uiFont = null;
         this.wrapCache.clear();
         layoutFrame();
-        int searchWidth = Math.clamp(this.workspaceWidth / 3, 116, 190);
-        int searchX = this.frameX + this.frameWidth - searchWidth - 14;
-        this.searchInput = new TextFieldWidget(font(), searchX, this.frameY + 18, searchWidth, 12, Text.literal("Search modules"));
+        int searchWidth = Math.clamp(this.frameWidth / 4, 126, 190);
+        int searchX = this.frameX + this.frameWidth - searchWidth - 23;
+        this.searchInput = new TextFieldWidget(font(), searchX, this.frameY + 17, searchWidth, 12, Text.literal("Search modules"));
         this.searchInput.setDrawsBackground(false);
         this.searchInput.setTextShadow(false);
         this.searchInput.setMaxLength(48);
@@ -112,204 +118,243 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private void layoutFrame() {
-        this.frameWidth = Math.min(FRAME_MAX_WIDTH, Math.max(430, this.width - FRAME_MARGIN * 2));
-        this.frameHeight = Math.min(FRAME_MAX_HEIGHT, Math.max(260, this.height - FRAME_MARGIN * 2));
+        boolean compactViewport = this.width < 520;
+        int launcherMaxWidth = compactViewport ? 330 : FRAME_MAX_WIDTH;
+        this.frameWidth = Math.min(launcherMaxWidth, Math.max(292, this.width - FRAME_MARGIN * 2));
+        this.frameHeight = FRAME_MAX_HEIGHT;
         this.frameX = (this.width - this.frameWidth) / 2;
-        this.frameY = (this.height - this.frameHeight) / 2;
-        this.workspaceX = this.frameX + SIDEBAR_WIDTH;
-        this.workspaceY = this.frameY + HEADER_HEIGHT;
-        this.workspaceWidth = this.frameWidth - SIDEBAR_WIDTH;
-        this.workspaceHeight = this.frameHeight - HEADER_HEIGHT - FOOTER_HEIGHT;
-        int innerWidth = this.workspaceWidth - CONTENT_PAD * 2;
-        this.listWidth = Math.clamp(innerWidth * 43 / 100, 188, 260);
+        this.frameY = 8;
+        this.detailWidth = this.settingsOpen ? Math.clamp(this.width * 39 / 100, 226, 260) : 0;
+        this.workspaceWidth = Math.min(compactViewport ? 300 : WORKSPACE_MAX_WIDTH, this.width - 24);
+        if (this.settingsOpen) this.workspaceWidth = Math.min(this.workspaceWidth, Math.max(280, this.width - this.detailWidth - 38));
+        int baseWorkspaceX = 14;
+        int baseWorkspaceY = this.frameY + HEADER_HEIGHT + 10;
+        this.workspaceHeight = Math.max(148, Math.min(WORKSPACE_MAX_HEIGHT, this.height - baseWorkspaceY - 6));
+        this.workspaceX = Math.clamp(baseWorkspaceX + this.workspaceOffsetX, 6, Math.max(6, this.width - this.workspaceWidth - 6));
+        this.workspaceY = Math.clamp(baseWorkspaceY + this.workspaceOffsetY, this.frameY + HEADER_HEIGHT + 4, Math.max(this.frameY + HEADER_HEIGHT + 4, this.height - this.workspaceHeight - 6));
+        this.workspaceOffsetX = this.workspaceX - baseWorkspaceX;
+        this.workspaceOffsetY = this.workspaceY - baseWorkspaceY;
         this.listX = this.workspaceX + CONTENT_PAD;
-        this.listY = this.workspaceY + CONTENT_PAD;
-        this.listHeight = this.workspaceHeight - CONTENT_PAD * 2;
-        this.detailX = this.listX + this.listWidth + PANEL_GAP;
-        this.detailY = this.listY;
-        this.detailWidth = Math.max(185, innerWidth - this.listWidth - PANEL_GAP);
-        this.detailHeight = this.listHeight;
+        this.listY = this.workspaceY + HERO_HEIGHT;
+        this.listWidth = this.workspaceWidth - CONTENT_PAD * 2;
+        this.listHeight = this.workspaceY + this.workspaceHeight - CONTENT_PAD - this.listY;
+        int baseDetailX = Math.min(this.width - this.detailWidth - SHEET_MARGIN, this.workspaceX + this.workspaceWidth + SHEET_MARGIN);
+        int baseDetailY = this.workspaceY;
+        this.detailX = this.settingsOpen ? Math.clamp(baseDetailX + this.detailOffsetX, 6, Math.max(6, this.width - this.detailWidth - 6)) : 0;
+        this.detailY = Math.clamp(baseDetailY + this.detailOffsetY, this.frameY + HEADER_HEIGHT + 4, Math.max(this.frameY + HEADER_HEIGHT + 4, this.height - SHEET_MAX_HEIGHT - 6));
+        this.detailOffsetX = this.detailX - baseDetailX;
+        this.detailOffsetY = this.detailY - baseDetailY;
+        this.detailHeight = Math.min(SHEET_MAX_HEIGHT, this.workspaceHeight);
     }
 
     @Override
     public void render(DrawContext graphics, int mouseX, int mouseY, float deltaTicks) {
+        layoutFrame();
+        boolean compactViewport = this.width < 520;
+        int searchWidth = Math.clamp(this.frameWidth / 4, 96, 116);
+        this.searchInput.setX(this.frameX + this.frameWidth - searchWidth - 11);
+        this.searchInput.setY(this.frameY + 18);
+        this.searchInput.setWidth(searchWidth);
+        this.searchInput.setVisible(!compactViewport);
+        if (compactViewport && this.searchInput.isFocused()) this.searchInput.setFocused(false);
         ClickGuiColors theme = theme();
         this.hitRegions.clear();
         boolean[] macroDrawn = new boolean[MACRO_COUNT];
-        graphics.fill(0, 0, this.width, this.height, theme.backdrop());
         drawFrame(graphics, theme);
-        drawSidebar(graphics, mouseX, mouseY, theme);
-        drawHeader(graphics, theme);
+        drawHeader(graphics, mouseX, mouseY, theme);
+        drawTelemetry(graphics, theme);
         drawModuleList(graphics, mouseX, mouseY, theme);
-        drawInspector(graphics, mouseX, mouseY, theme, macroDrawn);
-        drawFooter(graphics, theme);
+        if (this.settingsOpen) drawInspector(graphics, mouseX, mouseY, theme, macroDrawn);
         for (int slot = 0; slot < MACRO_COUNT; slot++) if (!macroDrawn[slot]) hideMacroInput(slot);
         super.render(graphics, mouseX, mouseY, deltaTicks);
     }
 
     private void drawFrame(DrawContext graphics, ClickGuiColors theme) {
-        RoundedGui.fill(graphics, this.frameX + 4, this.frameY + 6, this.frameWidth, this.frameHeight, 12, 0x62000000);
-        RoundedGui.fill(graphics, this.frameX, this.frameY, this.frameWidth, this.frameHeight, 12, theme.bar());
-        RoundedGui.fill(graphics, this.frameX + 1, this.frameY + 1, SIDEBAR_WIDTH - 1, this.frameHeight - 2, 11, theme.window());
-        graphics.fill(this.workspaceX, this.frameY + HEADER_HEIGHT, this.frameX + this.frameWidth, this.frameY + this.frameHeight - FOOTER_HEIGHT, theme.nest());
-        graphics.fill(this.workspaceX, this.frameY + 12, this.workspaceX + 1, this.frameY + this.frameHeight - 12, theme.outlineSoft());
-        graphics.fill(this.workspaceX + 12, this.workspaceY - 1, this.frameX + this.frameWidth - 12, this.workspaceY, theme.outlineSoft());
+        RoundedGui.fill(graphics, this.frameX + 3, this.frameY + 4, this.frameWidth, this.frameHeight, 15, 0x65000000);
+        RoundedGui.fill(graphics, this.frameX, this.frameY, this.frameWidth, this.frameHeight, 15, theme.bar());
+        RoundedGui.fill(graphics, this.frameX + 1, this.frameY + 1, this.frameWidth - 2, this.frameHeight - 2, 14, theme.window());
     }
 
-    private void drawSidebar(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme) {
-        int brandX = this.frameX + 14;
-        int brandY = this.frameY + 13;
-        RoundedGui.fill(graphics, brandX, brandY, 22, 22, 7, theme.accent());
-        graphics.drawText(font(), ArcaneFont.text("A"), brandX + 7, brandY + 7, opaque(theme.bar()), false);
-        graphics.drawText(font(), ArcaneFont.text("ARCANE"), brandX + 29, brandY + 4, theme.text(), false);
-        graphics.drawText(font(), ArcaneFont.text("CLIENT"), brandX + 29, brandY + 14, theme.accentBright(), false);
+    private void drawTelemetry(DrawContext graphics, ClickGuiColors theme) {
+        int widgetWidth = 92;
+        int widgetX = this.width - widgetWidth - 12;
+        int widgetY = this.frameY;
+        if (widgetX < this.frameX + this.frameWidth + 8) return;
+        updateFpsLabel();
+        RoundedGui.fill(graphics, widgetX + 3, widgetY + 4, widgetWidth, this.frameHeight, 15, 0x65000000);
+        RoundedGui.fill(graphics, widgetX, widgetY, widgetWidth, this.frameHeight, 15, theme.window());
+        RoundedGui.fill(graphics, widgetX + 9, widgetY + 10, 5, 28, 3, theme.accent());
+        graphics.drawText(font(), ArcaneFont.text(this.fpsLabel), widgetX + 22, widgetY + 10, theme.text(), false);
+        graphics.drawText(font(), ArcaneFont.text(activeModuleCount() + " ACTIVE"), widgetX + 22, widgetY + 25, theme.faint(), false);
+    }
 
-        int navY = this.frameY + 58;
-        graphics.drawText(font(), ArcaneFont.text("WORKSPACE"), brandX, navY, theme.faint(), false);
-        navY += 15;
+    private void drawHeader(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme) {
+        boolean compactViewport = this.width < 520;
+        int brandX = this.frameX + 10;
+        int brandY = this.frameY + 10;
+        RoundedGui.fill(graphics, brandX, brandY, 28, 28, 9, theme.accent());
+        graphics.drawText(font(), ArcaneFont.text("A/"), brandX + 7, brandY + 10, opaque(theme.bar()), false);
+
+        int searchX = this.searchInput.getX();
+        if (!compactViewport) {
+            int searchY = this.searchInput.getY();
+            int searchWidth = this.searchInput.getWidth();
+            boolean focused = this.searchInput.isFocused();
+            RoundedGui.fill(graphics, searchX - 21, searchY - 5, searchWidth + 27, 22, 8, focused ? theme.hover() : theme.header());
+            graphics.drawText(font(), ArcaneFont.text("/"), searchX - 13, searchY + 1, focused ? theme.accentBright() : theme.faint(), false);
+            if (focused) graphics.fill(searchX - 14, searchY + 15, searchX + searchWidth, searchY + 16, theme.accent());
+        }
+
+        int tabsX = brandX + 37;
+        int tabsY = brandY + 2;
+        int tabsWidth = (compactViewport ? this.frameX + this.frameWidth - 10 : searchX - 29) - tabsX;
+        int tabWidth = Math.max(28, tabsWidth / this.categories.size());
         for (int index = 0; index < this.categories.size(); index++) {
             GuiCategory category = this.categories.get(index);
-            boolean selected = category == this.selectedCategory;
-            boolean hovered = contains(brandX - 5, navY, SIDEBAR_WIDTH - 18, NAV_ROW_HEIGHT - 3, mouseX, mouseY);
-            if (selected) {
-                RoundedGui.fill(graphics, brandX - 5, navY, SIDEBAR_WIDTH - 18, NAV_ROW_HEIGHT - 3, 7, theme.active());
-                RoundedGui.fill(graphics, brandX - 5, navY + 7, 3, NAV_ROW_HEIGHT - 17, 2, theme.accent());
-            } else if (hovered) {
-                RoundedGui.fill(graphics, brandX - 5, navY, SIDEBAR_WIDTH - 18, NAV_ROW_HEIGHT - 3, 7, theme.hover());
-            }
-            String number = String.format(Locale.ROOT, "%02d", index + 1);
-            int textY = navY + (NAV_ROW_HEIGHT - 3 - lineHeight()) / 2;
-            graphics.drawText(font(), ArcaneFont.text(number), brandX + 2, textY, selected ? theme.accentBright() : theme.faint(), false);
-            OrderedText label = ArcaneFont.trimmed(font(), titleCase(category.name()), SIDEBAR_WIDTH - 54);
-            graphics.drawText(font(), label, brandX + 24, textY, selected ? theme.text() : theme.muted(), false);
-            this.hitRegions.add(HitRegion.category(category, brandX - 5, navY, SIDEBAR_WIDTH - 18, NAV_ROW_HEIGHT - 3));
-            navY += NAV_ROW_HEIGHT;
+            int tabX = tabsX + index * tabWidth;
+            int width = tabWidth - 3;
+            boolean selected = category == this.selectedCategory && this.query.isEmpty();
+            boolean hovered = contains(tabX, tabsY, width, 24, mouseX, mouseY);
+            if (selected || hovered) RoundedGui.fill(graphics, tabX, tabsY, width, 24, 8, selected ? theme.active() : theme.hover());
+            String glyph = categoryGlyph(category.name());
+            int glyphWidth = ArcaneFont.width(font(), glyph);
+            graphics.drawText(font(), ArcaneFont.text(glyph), tabX + (width - glyphWidth) / 2, tabsY + 8, selected ? theme.accentBright() : theme.muted(), false);
+            if (selected) RoundedGui.fill(graphics, tabX + width / 2 - 2, tabsY + 27, 4, 2, 1, theme.accent());
+            this.hitRegions.add(HitRegion.category(category, tabX, tabsY, width, 28));
         }
-
-        if (this.frameHeight >= 310) {
-            int cardX = this.frameX + 10;
-            int cardY = this.frameY + this.frameHeight - 54;
-            RoundedGui.fill(graphics, cardX, cardY, SIDEBAR_WIDTH - 20, 39, 8, theme.header());
-            RoundedGui.fill(graphics, cardX + 9, cardY + 10, 7, 7, 4, theme.accent());
-            graphics.drawText(font(), ArcaneFont.text("SYSTEM ONLINE"), cardX + 21, cardY + 8, theme.text(), false);
-            graphics.drawText(font(), ArcaneFont.text(activeModuleCount() + " active modules"), cardX + 9, cardY + 22, theme.faint(), false);
-        }
-    }
-
-    private void drawHeader(DrawContext graphics, ClickGuiColors theme) {
-        int x = this.workspaceX + 14;
-        int y = this.frameY + 11;
-        String categoryName = this.query.isEmpty() ? titleCase(this.selectedCategory.name()) : "Search results";
-        graphics.drawText(font(), ArcaneFont.text(categoryName), x, y, theme.text(), false);
-        String context = this.query.isEmpty()
-            ? this.selectedCategory.visible().size() + " modules · " + this.selectedCategory.enabledCount() + " active"
-            : visibleModuleCount() + " matches across Arcane";
-        graphics.drawText(font(), ArcaneFont.text(context), x, y + 15, theme.faint(), false);
-        int searchX = this.searchInput.getX();
-        int searchY = this.searchInput.getY();
-        int searchWidth = this.searchInput.getWidth();
-        boolean focused = this.searchInput.isFocused();
-        RoundedGui.fill(graphics, searchX - 25, searchY - 5, searchWidth + 31, 22, 8, focused ? theme.hover() : theme.header());
-        graphics.drawText(font(), ArcaneFont.text("⌕"), searchX - 17, searchY + 1, focused ? theme.accentBright() : theme.faint(), false);
-        if (focused) graphics.fill(searchX - 18, searchY + 15, searchX + searchWidth, searchY + 16, theme.accentDim());
     }
 
     private void drawModuleList(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme) {
-        RoundedGui.fill(graphics, this.listX, this.listY, this.listWidth, this.listHeight, 10, theme.window());
-        graphics.drawText(font(), ArcaneFont.text("MODULES"), this.listX + 12, this.listY + 10, theme.faint(), false);
+        RoundedGui.fill(graphics, this.workspaceX + 4, this.workspaceY + 5, this.workspaceWidth, this.workspaceHeight, 13, 0x65000000);
+        RoundedGui.fill(graphics, this.workspaceX, this.workspaceY, this.workspaceWidth, this.workspaceHeight, 13, theme.window());
+        RoundedGui.fill(graphics, this.workspaceX + 1, this.workspaceY + 1, this.workspaceWidth - 2, HERO_HEIGHT - 7, 12, theme.header());
+        this.hitRegions.add(HitRegion.dragWorkspace(this.workspaceX + 1, this.workspaceY + 1, this.workspaceWidth - 2, HERO_HEIGHT - 7));
+        int titleX = this.workspaceX + 13;
+        int titleY = this.workspaceY + 9;
+        String title = this.query.isEmpty() ? titleCase(this.selectedCategory.name()) : "Search / " + this.searchText;
+        graphics.drawText(font(), ArcaneFont.text(title), titleX, titleY, theme.text(), false);
+        String summary = this.query.isEmpty()
+            ? this.selectedCategory.visible().size() + " modules · " + this.selectedCategory.enabledCount() + " on"
+            : visibleModuleCount() + " matching modules";
+        graphics.drawText(font(), ArcaneFont.text(summary), titleX, titleY + 15, theme.faint(), false);
+        int statusX = this.workspaceX + this.workspaceWidth - 12;
+        for (int dot = 0; dot < 3; dot++) RoundedGui.fill(graphics, statusX - 13 + dot * 6, titleY + 9, 3, 3, 2, theme.faint());
+
         List<ModuleEntry> entries = visibleEntries();
-        int viewportY = this.listY + 27;
-        int viewportHeight = this.listHeight - 34;
-        int contentHeight = entries.size() * MODULE_ROW_HEIGHT;
-        this.listMaxScroll = Math.max(0, contentHeight - viewportHeight);
+        int columns = this.listWidth >= 610 ? 3 : 2;
+        int cardWidth = (this.listWidth - CARD_GAP * (columns - 1)) / columns;
+        int rows = (entries.size() + columns - 1) / columns;
+        int contentHeight = Math.max(0, rows * (CARD_HEIGHT + CARD_GAP) - CARD_GAP);
+        this.listMaxScroll = Math.max(0, contentHeight - this.listHeight);
         this.listScroll = Math.clamp(this.listScroll, 0, this.listMaxScroll);
-        graphics.enableScissor(this.listX + 5, viewportY, this.listX + this.listWidth - 5, viewportY + viewportHeight);
-        int rowY = viewportY - this.listScroll;
-        for (ModuleEntry entry : entries) {
-            if (rowY + MODULE_ROW_HEIGHT >= viewportY && rowY <= viewportY + viewportHeight) drawModuleCard(graphics, entry, rowY, mouseX, mouseY, theme);
-            rowY += MODULE_ROW_HEIGHT;
+        graphics.enableScissor(this.listX, this.listY, this.listX + this.listWidth, this.listY + this.listHeight);
+        for (int index = 0; index < entries.size(); index++) {
+            int column = index % columns;
+            int row = index / columns;
+            int cardX = this.listX + column * (cardWidth + CARD_GAP);
+            int cardY = this.listY + row * (CARD_HEIGHT + CARD_GAP) - this.listScroll;
+            if (cardY + CARD_HEIGHT >= this.listY && cardY <= this.listY + this.listHeight) {
+                drawModuleCard(graphics, entries.get(index), index, cardX, cardY, cardWidth, mouseX, mouseY, theme);
+            }
         }
         graphics.disableScissor();
         if (entries.isEmpty()) graphics.drawCenteredTextWithShadow(font(), ArcaneFont.text("No matching modules"), this.listX + this.listWidth / 2, this.listY + this.listHeight / 2, theme.faint());
-        drawScrollBar(graphics, this.listX + this.listWidth - 5, viewportY, viewportHeight, this.listScroll, this.listMaxScroll, contentHeight, theme);
+        drawScrollBar(graphics, this.listX + this.listWidth + 5, this.listY, this.listHeight, this.listScroll, this.listMaxScroll, contentHeight, theme);
     }
 
-    private void drawModuleCard(DrawContext graphics, ModuleEntry entry, int y, int mouseX, int mouseY, ClickGuiColors theme) {
+    private void drawModuleCard(DrawContext graphics, ModuleEntry entry, int index, int x, int y, int width, int mouseX, int mouseY, ClickGuiColors theme) {
         GuiModule module = entry.module();
-        int x = this.listX + 7;
-        int width = this.listWidth - 14;
-        int height = MODULE_ROW_HEIGHT - 5;
-        boolean selected = module == this.selectedModule;
-        boolean hovered = contains(x, y, width, height, mouseX, mouseY);
-        RoundedGui.fill(graphics, x, y, width, height, 8, selected ? theme.active() : hovered ? theme.hover() : theme.row());
-        if (selected) RoundedGui.fill(graphics, x, y + 9, 3, height - 18, 2, theme.accent());
-        int labelX = x + 11;
-        int labelY = y + 7;
-        int toggleReserve = module.toggleable() ? 37 : 10;
-        graphics.drawText(font(), ArcaneFont.trimmed(font(), module.name(), width - toggleReserve - 18), labelX, labelY, selected ? theme.text() : theme.muted(), false);
-        String meta = this.query.isEmpty() ? shortDescription(module.description(), width - 56) : titleCase(entry.category().name());
-        graphics.drawText(font(), ArcaneFont.trimmed(font(), meta, width - 56), labelX, labelY + 13, theme.faint(), false);
-        if (module.toggleable()) drawSwitch(graphics, x + width - 30, y + 11, module.enabled(), theme);
+        boolean selected = module == this.selectedModule && this.settingsOpen;
+        boolean hovered = contains(x, y, width, CARD_HEIGHT, mouseX, mouseY);
+        int surface = selected ? theme.active() : hovered ? theme.hover() : theme.row();
+        RoundedGui.fill(graphics, x, y, width, CARD_HEIGHT, 11, surface);
+        if (selected || module.enabled()) RoundedGui.fill(graphics, x, y, 3, CARD_HEIGHT, 2, selected ? theme.accentBright() : theme.accentDim());
+
+        String serial = twoDigits(index + 1);
+        graphics.drawText(font(), ArcaneFont.text(serial), x + 12, y + 10, module.enabled() ? theme.accentBright() : theme.faint(), false);
+        String category = this.query.isEmpty() ? "MODULE" : titleCase(entry.category().name());
+        graphics.drawText(font(), ArcaneFont.text(category), x + 32, y + 10, theme.faint(), false);
+        if (module.toggleable()) drawSwitch(graphics, x + width - 36, y + 8, module.enabled(), theme);
         else if (module.valueLabel() != null) {
             OrderedText value = ArcaneFont.trimmed(font(), module.valueLabel(), 48);
-            graphics.drawText(font(), value, x + width - font().getWidth(value) - 9, labelY + 13, theme.accentBright(), false);
+            graphics.drawText(font(), value, x + width - font().getWidth(value) - 12, y + 11, theme.accentBright(), false);
         }
-        int viewportTop = this.listY + 27;
-        int viewportBottom = this.listY + this.listHeight - 7;
-        if (y >= viewportTop && y + height <= viewportBottom) {
-            this.hitRegions.add(HitRegion.module(entry.category(), module, x, y, width, height));
+
+        graphics.drawText(font(), ArcaneFont.trimmed(font(), module.name(), width - 26), x + 12, y + 30, selected ? theme.accentBright() : theme.text(), false);
+        String meta = shortDescription(module.description(), width - 42);
+        graphics.drawText(font(), ArcaneFont.trimmed(font(), meta, width - 42), x + 12, y + 46, theme.muted(), false);
+        if (module.hasSettings()) {
+            RoundedGui.fill(graphics, x + width - 24, y + CARD_HEIGHT - 19, 13, 13, 7, selected ? theme.accent() : theme.header());
+            graphics.drawText(font(), ArcaneFont.text("+"), x + width - 20, y + CARD_HEIGHT - 16, selected ? opaque(theme.bar()) : theme.faint(), false);
+        }
+        if (y >= this.listY && y + CARD_HEIGHT <= this.listY + this.listHeight) {
+            this.hitRegions.add(HitRegion.module(entry.category(), module, x, y, width, CARD_HEIGHT));
         }
     }
 
     private void drawInspector(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
-        RoundedGui.fill(graphics, this.detailX, this.detailY, this.detailWidth, this.detailHeight, 10, theme.window());
         GuiModule module = this.selectedModule;
         if (module == null) {
-            graphics.drawCenteredTextWithShadow(font(), ArcaneFont.text("Select a module"), this.detailX + this.detailWidth / 2, this.detailY + this.detailHeight / 2, theme.faint());
+            this.settingsOpen = false;
             this.detailMaxScroll = 0;
             return;
         }
-        int pad = 13;
-        int contentX = this.detailX + pad;
-        int contentWidth = this.detailWidth - pad * 2;
-        List<String> description = wrap(module.description(), Math.max(70, contentWidth - 2));
-        int introHeight = 50 + description.size() * proseHeight();
-        int settingsHeight = module.hasSettings() ? 18 : 0;
-        for (GuiSetting setting : module.settings()) settingsHeight += settingHeight(setting) + 4;
-        int contentHeight = introHeight + settingsHeight + 12;
-        this.detailMaxScroll = Math.max(0, contentHeight - this.detailHeight);
-        this.detailScroll = Math.clamp(this.detailScroll, 0, this.detailMaxScroll);
-        graphics.enableScissor(this.detailX + 1, this.detailY + 1, this.detailX + this.detailWidth - 1, this.detailY + this.detailHeight - 1);
-        int y = this.detailY + 12 - this.detailScroll;
-        graphics.drawText(font(), ArcaneFont.text("MODULE SETTINGS"), contentX, y, theme.faint(), false);
-        y += 17;
-        graphics.drawText(font(), ArcaneFont.text(module.name()), contentX, y, theme.text(), false);
+        RoundedGui.fill(graphics, this.detailX + 4, this.detailY + 5, this.detailWidth, this.detailHeight, 13, 0x68000000);
+        RoundedGui.fill(graphics, this.detailX, this.detailY, this.detailWidth, this.detailHeight, 14, theme.bar());
+        RoundedGui.fill(graphics, this.detailX + 1, this.detailY + 1, this.detailWidth - 2, this.detailHeight - 2, 13, theme.window());
+        this.hitRegions.add(HitRegion.dragDetail(this.detailX + 1, this.detailY + 1, this.detailWidth - 2, 45));
+
+        int headerX = this.detailX + 12;
+        int headerY = this.detailY + 10;
+        RoundedGui.fill(graphics, headerX, headerY, 30, 30, 9, theme.accent());
+        int moduleIndex = Math.max(0, this.selectedCategory.modules().indexOf(module));
+        graphics.drawText(font(), ArcaneFont.text(twoDigits(moduleIndex + 1)), headerX + 7, headerY + 11, opaque(theme.bar()), false);
+        graphics.drawText(font(), ArcaneFont.text("CONTROL / " + categoryGlyph(this.selectedCategory.name())), headerX + 39, headerY + 1, theme.accentBright(), false);
+        graphics.drawText(font(), ArcaneFont.trimmed(font(), module.name(), this.detailWidth - 118), headerX + 39, headerY + 16, theme.text(), false);
+
+        int closeX = this.detailX + this.detailWidth - 31;
+        int closeY = this.detailY + 12;
+        boolean closeHovered = contains(closeX, closeY, 18, 18, mouseX, mouseY);
+        RoundedGui.fill(graphics, closeX, closeY, 18, 18, 9, closeHovered ? theme.hover() : theme.header());
+        graphics.drawText(font(), ArcaneFont.text("×"), closeX + 6, closeY + 5, closeHovered ? theme.text() : theme.faint(), false);
+        this.hitRegions.add(HitRegion.close(closeX, closeY, 18, 18));
         if (module.toggleable()) {
-            drawSwitch(graphics, this.detailX + this.detailWidth - 37, y - 2, module.enabled(), theme);
-            if (y - 6 >= this.detailY && y + 16 <= this.detailY + this.detailHeight) {
-                this.hitRegions.add(HitRegion.moduleToggle(module, this.detailX + this.detailWidth - 42, y - 6, 34, 22));
-            }
+            int toggleX = closeX - 36;
+            drawSwitch(graphics, toggleX, closeY + 3, module.enabled(), theme);
+            this.hitRegions.add(HitRegion.moduleToggle(module, toggleX - 3, closeY - 2, 30, 23));
         }
-        y += 17;
-        for (String line : description) {
-            graphics.drawText(font(), ArcaneFont.text(line), contentX, y, theme.muted(), false);
-            y += proseHeight();
-        }
-        y += 8;
+
+        int descriptionY = this.detailY + 51;
+        graphics.drawText(font(), ArcaneFont.trimmed(font(), module.description(), this.detailWidth - 24), this.detailX + 12, descriptionY, theme.muted(), false);
+        graphics.fill(this.detailX + 12, descriptionY + 16, this.detailX + this.detailWidth - 12, descriptionY + 17, theme.outlineSoft());
+
+        int viewportX = this.detailX + 11;
+        int viewportY = descriptionY + 25;
+        int viewportWidth = this.detailWidth - 22;
+        int viewportHeight = this.detailY + this.detailHeight - viewportY - 11;
+        int columns = 1;
+        int cellWidth = viewportWidth;
+        int rows = (module.settings().size() + columns - 1) / columns;
+        int contentHeight = Math.max(viewportHeight, rows * 40);
+        this.detailMaxScroll = Math.max(0, contentHeight - viewportHeight);
+        this.detailScroll = Math.clamp(this.detailScroll, 0, this.detailMaxScroll);
         if (!module.hasSettings()) {
-            RoundedGui.fill(graphics, contentX, y, contentWidth, 30, 8, theme.header());
-            graphics.drawText(font(), ArcaneFont.text("No additional configuration"), contentX + 10, y + 10, theme.faint(), false);
+            RoundedGui.fill(graphics, viewportX, viewportY, viewportWidth, 34, 9, theme.header());
+            graphics.drawText(font(), ArcaneFont.text("This module has no additional controls."), viewportX + 12, viewportY + 12, theme.faint(), false);
         } else {
-            graphics.drawText(font(), ArcaneFont.text("CONFIGURATION"), contentX, y, theme.faint(), false);
-            y += 15;
-            for (GuiSetting setting : module.settings()) {
-                int height = settingHeight(setting);
-                drawSetting(graphics, setting, contentX, y, contentWidth, height, mouseX, mouseY, theme, macroDrawn);
-                y += height + 4;
+            graphics.enableScissor(viewportX, viewportY, viewportX + viewportWidth, viewportY + viewportHeight);
+            for (int index = 0; index < module.settings().size(); index++) {
+                int column = index % columns;
+                int row = index / columns;
+                int cellX = viewportX + column * (cellWidth + CARD_GAP);
+                int cellY = viewportY + row * 40 - this.detailScroll;
+                if (cellY + 36 >= viewportY && cellY <= viewportY + viewportHeight) {
+                    drawSetting(graphics, module.settings().get(index), cellX, cellY, cellWidth, 36, mouseX, mouseY, theme, macroDrawn);
+                }
             }
+            graphics.disableScissor();
         }
-        graphics.disableScissor();
-        drawScrollBar(graphics, this.detailX + this.detailWidth - 5, this.detailY + 6, this.detailHeight - 12, this.detailScroll, this.detailMaxScroll, contentHeight, theme);
+        drawScrollBar(graphics, this.detailX + this.detailWidth - 8, viewportY, viewportHeight, this.detailScroll, this.detailMaxScroll, contentHeight, theme);
     }
 
     private void drawSetting(DrawContext graphics, GuiSetting setting, int x, int y, int width, int height, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
@@ -358,17 +403,6 @@ public final class ArcaneSettingsScreen extends Screen {
         }
     }
 
-    private void drawFooter(DrawContext graphics, ClickGuiColors theme) {
-        int y = this.frameY + this.frameHeight - FOOTER_HEIGHT;
-        graphics.fill(this.workspaceX + 12, y, this.frameX + this.frameWidth - 12, y + 1, theme.outlineSoft());
-        int textY = y + (FOOTER_HEIGHT - lineHeight()) / 2;
-        String hint = this.listeningFor != null ? "Press a key · Esc clears the bind" : "Left click toggles · Right click configures · Middle click binds";
-        graphics.drawText(font(), ArcaneFont.text(hint), this.workspaceX + 14, textY, this.listeningFor != null ? theme.accentBright() : theme.faint(), false);
-        updateFpsLabel();
-        int right = this.frameX + this.frameWidth - 14;
-        graphics.drawText(font(), ArcaneFont.text(this.fpsLabel), right - ArcaneFont.width(font(), this.fpsLabel), textY, theme.muted(), false);
-    }
-
     private void drawScrollBar(DrawContext graphics, int x, int y, int height, int offset, int maxOffset, int contentHeight, ClickGuiColors theme) {
         if (maxOffset <= 0 || contentHeight <= 0) return;
         int thumbHeight = Math.max(14, height * height / Math.max(height, contentHeight));
@@ -410,12 +444,12 @@ public final class ArcaneSettingsScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         int amount = (int) Math.round(-verticalAmount * 24.0);
-        if (contains(this.listX, this.listY, this.listWidth, this.listHeight, mouseX, mouseY)) {
-            this.listScroll = Math.clamp(this.listScroll + amount, 0, this.listMaxScroll);
+        if (this.settingsOpen && contains(this.detailX, this.detailY, this.detailWidth, this.detailHeight, mouseX, mouseY)) {
+            this.detailScroll = Math.clamp(this.detailScroll + amount, 0, this.detailMaxScroll);
             return true;
         }
-        if (contains(this.detailX, this.detailY, this.detailWidth, this.detailHeight, mouseX, mouseY)) {
-            this.detailScroll = Math.clamp(this.detailScroll + amount, 0, this.detailMaxScroll);
+        if (contains(this.listX, this.listY, this.listWidth, this.listHeight, mouseX, mouseY)) {
+            this.listScroll = Math.clamp(this.listScroll + amount, 0, this.listMaxScroll);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
@@ -446,6 +480,10 @@ public final class ArcaneSettingsScreen extends Screen {
                     this.detailScroll = 0;
                     setFocused(null);
                     if (button == 2) startListening(firstBind(region.module()));
+                    else if (button == 1 && region.module().hasSettings()) this.settingsOpen = true;
+                    else if (button == 0 && region.module().hasSettings()
+                        && mouseX >= region.x() + region.width() - 34
+                        && mouseY >= region.y() + region.height() - 25) this.settingsOpen = true;
                     else if (button == 0 && region.module().toggleable()) region.module().toggle();
                     return true;
                 }
@@ -456,6 +494,21 @@ public final class ArcaneSettingsScreen extends Screen {
                 case SETTING -> {
                     Boolean handled = handleSettingClick(region, click, doubled, mouseX, mouseY, button);
                     if (handled != null) return handled;
+                }
+                case CLOSE_SETTINGS -> {
+                    if (button == 0) {
+                        this.settingsOpen = false;
+                        setFocused(null);
+                    }
+                    return true;
+                }
+                case DRAG_WORKSPACE -> {
+                    if (button == 0) beginSurfaceDrag(DragTarget.WORKSPACE, mouseX, mouseY);
+                    return true;
+                }
+                case DRAG_DETAIL -> {
+                    if (button == 0) beginSurfaceDrag(DragTarget.DETAIL, mouseX, mouseY);
+                    return true;
                 }
             }
         }
@@ -504,6 +557,19 @@ public final class ArcaneSettingsScreen extends Screen {
             updateSlider((int) click.x());
             return true;
         }
+        if (this.draggingSurface != null) {
+            int mouseX = (int) click.x();
+            int mouseY = (int) click.y();
+            if (this.draggingSurface == DragTarget.WORKSPACE) {
+                this.workspaceOffsetX = this.dragStartOffsetX + mouseX - this.dragStartMouseX;
+                this.workspaceOffsetY = this.dragStartOffsetY + mouseY - this.dragStartMouseY;
+            } else {
+                this.detailOffsetX = this.dragStartOffsetX + mouseX - this.dragStartMouseX;
+                this.detailOffsetY = this.dragStartOffsetY + mouseY - this.dragStartMouseY;
+            }
+            layoutFrame();
+            return true;
+        }
         return super.mouseDragged(click, offsetX, offsetY);
     }
 
@@ -513,7 +579,20 @@ public final class ArcaneSettingsScreen extends Screen {
             this.draggingSlider = null;
             return true;
         }
+        if (this.draggingSurface != null) {
+            this.draggingSurface = null;
+            return true;
+        }
         return super.mouseReleased(click);
+    }
+
+    private void beginSurfaceDrag(DragTarget target, int mouseX, int mouseY) {
+        setFocused(null);
+        this.draggingSurface = target;
+        this.dragStartMouseX = mouseX;
+        this.dragStartMouseY = mouseY;
+        this.dragStartOffsetX = target == DragTarget.WORKSPACE ? this.workspaceOffsetX : this.detailOffsetX;
+        this.dragStartOffsetY = target == DragTarget.WORKSPACE ? this.workspaceOffsetY : this.detailOffsetY;
     }
 
     @Override
@@ -528,6 +607,11 @@ public final class ArcaneSettingsScreen extends Screen {
             this.searchInput.setFocused(false);
             return true;
         }
+        if (input.key() == 256 && this.settingsOpen) {
+            this.settingsOpen = false;
+            setFocused(null);
+            return true;
+        }
         return super.keyPressed(input);
     }
 
@@ -535,6 +619,7 @@ public final class ArcaneSettingsScreen extends Screen {
         if (category == null) return;
         this.selectedCategory = category;
         this.selectedModule = category.visible().isEmpty() ? null : category.visible().getFirst();
+        this.settingsOpen = false;
         this.listScroll = 0;
         this.detailScroll = 0;
     }
@@ -549,6 +634,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
         if (this.selectedModule == null || !this.selectedCategory.visible().contains(this.selectedModule)) {
             this.selectedModule = this.selectedCategory.visible().isEmpty() ? null : this.selectedCategory.visible().getFirst();
+            this.settingsOpen = false;
             this.detailScroll = 0;
         }
     }
@@ -567,6 +653,7 @@ public final class ArcaneSettingsScreen extends Screen {
         this.searchText = value;
         this.query = value.trim().toLowerCase(Locale.ROOT);
         for (GuiCategory category : this.categories) category.filter(this.query);
+        this.settingsOpen = false;
         this.listScroll = 0;
         ensureSelection();
     }
@@ -648,6 +735,22 @@ public final class ArcaneSettingsScreen extends Screen {
         return result.toString();
     }
 
+    private static String twoDigits(int value) {
+        return value < 10 ? "0" + value : Integer.toString(value);
+    }
+
+    private static String categoryGlyph(String name) {
+        return switch (name) {
+            case "COMBAT" -> "CO";
+            case "ESP" -> "ES";
+            case "RENDER" -> "RE";
+            case "CLIENT" -> "CL";
+            case "UTILITY" -> "UT";
+            case "BASE FINDING" -> "BF";
+            default -> name.substring(0, Math.min(2, name.length()));
+        };
+    }
+
     private static int settingHeight(GuiSetting setting) {
         if (setting instanceof GuiSetting.Slider) return 34;
         if (setting instanceof GuiSetting.Message) return 28;
@@ -698,7 +801,8 @@ public final class ArcaneSettingsScreen extends Screen {
     @Override
     public boolean shouldPause() { return false; }
 
-    private enum RegionKind { CATEGORY, MODULE, MODULE_TOGGLE, SETTING }
+    private enum DragTarget { WORKSPACE, DETAIL }
+    private enum RegionKind { CATEGORY, MODULE, MODULE_TOGGLE, SETTING, CLOSE_SETTINGS, DRAG_WORKSPACE, DRAG_DETAIL }
     private record WrapKey(String text, int maxWidth) { }
     private record ModuleEntry(GuiCategory category, GuiModule module) { }
 
@@ -707,6 +811,9 @@ public final class ArcaneSettingsScreen extends Screen {
         private static HitRegion module(GuiCategory category, GuiModule module, int x, int y, int width, int height) { return new HitRegion(RegionKind.MODULE, category, module, null, x, y, width, height); }
         private static HitRegion moduleToggle(GuiModule module, int x, int y, int width, int height) { return new HitRegion(RegionKind.MODULE_TOGGLE, null, module, null, x, y, width, height); }
         private static HitRegion setting(GuiSetting setting, int x, int y, int width, int height) { return new HitRegion(RegionKind.SETTING, null, null, setting, x, y, width, height); }
+        private static HitRegion close(int x, int y, int width, int height) { return new HitRegion(RegionKind.CLOSE_SETTINGS, null, null, null, x, y, width, height); }
+        private static HitRegion dragWorkspace(int x, int y, int width, int height) { return new HitRegion(RegionKind.DRAG_WORKSPACE, null, null, null, x, y, width, height); }
+        private static HitRegion dragDetail(int x, int y, int width, int height) { return new HitRegion(RegionKind.DRAG_DETAIL, null, null, null, x, y, width, height); }
         private boolean contains(int mouseX, int mouseY) { return ArcaneSettingsScreen.contains(this.x, this.y, this.width, this.height, mouseX, mouseY); }
     }
 }

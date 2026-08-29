@@ -6,7 +6,7 @@ import net.fabricmc.api.Environment;
 /** Accent palettes drawn over one neutral graphite foundation. */
 @Environment(EnvType.CLIENT)
 public enum ClickGuiTheme {
-    ARCANE("ARCANE", 0xFF69D993, 0xFFA4EABF, 0xFF3F9D64, 0xE6244933),
+    ARCANE("ARCANE", 0xFFCBFF4A, 0xFFE7FFA6, 0xFF7DA528, 0xE6354818),
     FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
     ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440);
 
