@@ -24,13 +24,14 @@ import net.fabricmc.loader.api.FabricLoader;
 @Environment(value=EnvType.CLIENT)
 public final class ArcaneConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final int CURRENT_CONFIG_VERSION = 5;
+    private static final int CURRENT_CONFIG_VERSION = 6;
     public boolean enabled = true;
     public boolean overlay = true;
     public boolean hud = true;
     public boolean packetSignals = true;
     public boolean esp = true;
     public boolean storageTracers = true;
+    public boolean storageChatAlerts = true;
     public boolean itemTracers = true;
     public boolean blockEntityDebug = false;
     public boolean itemEsp = false;
@@ -152,6 +153,7 @@ public final class ArcaneConfig {
             boolean upgradedFeatureDefaults = loadedConfigVersion < 3;
             boolean upgradedSlowSwingAndInfo = loadedConfigVersion < 4;
             boolean upgradedGrowthScanner = loadedConfigVersion < 5;
+            boolean upgradedStorageDiscovery = loadedConfigVersion < 6;
             if (upgradedFeatureDefaults) {
                 config.entityNameTags = true;
                 config.soundNotifications = true;
@@ -189,12 +191,15 @@ public final class ArcaneConfig {
             if (upgradedGrowthScanner && config.chunksPerTick == 3) {
                 config.chunksPerTick = 8;
             }
-            if (upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner) {
+            if (upgradedStorageDiscovery) {
+                config.storageChatAlerts = true;
+            }
+            if (upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery) {
                 config.configVersion = CURRENT_CONFIG_VERSION;
             }
 
             config.clamp();
-            if (upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner) {
+            if (upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery) {
                 config.save();
             }
             return config;

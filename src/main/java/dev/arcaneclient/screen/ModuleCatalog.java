@@ -108,9 +108,11 @@ public final class ModuleCatalog {
 
     private static List<GuiModule> esp(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
         GuiModule storage = GuiModule.toggle(
-            "Storage ESP", "Draws containers through walls.", () -> config.esp, value -> config.esp = value
+            "Storage ESP", "Draws loaded containers through walls with no vertical cutoff.", () -> config.esp, value -> config.esp = value
         )
             .with(new GuiSetting.Toggle("Tracers", () -> config.storageTracers, value -> config.storageTracers = value))
+            .with(new GuiSetting.Toggle("Chat alerts", () -> config.storageChatAlerts, value -> config.storageChatAlerts = value))
+            .with(new GuiSetting.Info("Vertical range", () -> "World bottom"))
             .with(new GuiSetting.Info("Visible", () -> Integer.toString(EspRenderer.targetCount())))
             .with(new GuiSetting.Bind("Bind", keybinds.esp()))
             .build();
@@ -156,7 +158,9 @@ public final class ModuleCatalog {
             .with(new GuiSetting.Swatch("Color", () -> config.projectileEspColor, color -> config.projectileEspColor = color)).build();
         GuiModule crystals = GuiModule.toggle("Crystal ESP", "Outlines end crystals separately from mobs.", () -> config.crystalEsp, value -> config.crystalEsp = value)
             .with(new GuiSetting.Swatch("Color", () -> config.crystalEspColor, color -> config.crystalEspColor = color)).build();
-        GuiModule tracers = GuiModule.toggle("Entity Tracers", "Draws view-origin lines to enabled entity ESP targets.", () -> config.entityTracers, value -> config.entityTracers = value)
+        GuiModule tracers = GuiModule.toggle("Entity Tracers", "Draws to loaded targets in horizontal range, including deep underground.", () -> config.entityTracers, value -> config.entityTracers = value)
+            .with(new GuiSetting.Slider("Horizontal range", () -> config.entityEspRange, value -> config.entityEspRange = value, 16, 192, "m"))
+            .with(new GuiSetting.Info("Vertical range", () -> "World bottom"))
             .with(new GuiSetting.Info("Targets", () -> Integer.toString(EntityEspRenderer.targetCount()))).build();
         GuiModule holes = GuiModule.toggle("Hole ESP", "Marks one-block obsidian or bedrock safety holes.", () -> config.holeEsp, value -> config.holeEsp = value)
             .with(new GuiSetting.Slider("Range", () -> config.holeEspRange, value -> config.holeEspRange = value, 4, 16, "m"))
