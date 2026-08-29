@@ -11,10 +11,10 @@ import org.junit.jupiter.api.Test;
 
 final class FreecamPacketGuardTest {
     @Test
-    void blocksEveryCameraOriginInteractionPacket() {
+    void blocksCameraOriginWorldTargetsButAllowsHeldItemUse() {
         assertTrue(FreecamPacketGuard.isUnsafeInteractionType(PlayerInteractEntityC2SPacket.class));
         assertTrue(FreecamPacketGuard.isUnsafeInteractionType(PlayerInteractBlockC2SPacket.class));
-        assertTrue(FreecamPacketGuard.isUnsafeInteractionType(PlayerInteractItemC2SPacket.class));
+        assertFalse(FreecamPacketGuard.isUnsafeInteractionType(PlayerInteractItemC2SPacket.class));
     }
 
     @Test

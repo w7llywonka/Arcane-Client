@@ -1,21 +1,27 @@
 package dev.arcaneclient.mixin;
 
 import dev.arcaneclient.freecam.DetachedCameraInteraction;
-import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.util.hit.HitResult;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Cancels unsafe detached-camera interactions and puts Auto Tool ahead of normal mining. */
+/** Routes detached-camera interaction input safely and puts Auto Tool ahead of normal mining. */
 @Environment(EnvType.CLIENT)
 @Mixin(MinecraftClient.class)
 public abstract class MinecraftClientMixin {
+    @Unique
+    private HitResult arcaneclient$savedItemUseTarget;
+    @Unique
+    private boolean arcaneclient$retargetedItemUse;
+
     @Inject(method = "doAttack", at = @At("HEAD"), cancellable = true)
     private void arcaneclient$guardAttackAndPrepareAutoTool(CallbackInfoReturnable<Boolean> cir) {
         if (DetachedCameraInteraction.isActive()) {
@@ -34,8 +40,24 @@ public abstract class MinecraftClientMixin {
         AutoToolController.prepareForCrosshair((MinecraftClient) (Object) this, breaking);
     }
 
-    @Inject(method = "doItemUse", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "doItemUse", at = @At("HEAD"))
     private void arcaneclient$guardDetachedCameraItemUse(CallbackInfo ci) {
-        if (FreecamController.isActive()) ci.cancel();
+        MinecraftClient client = (MinecraftClient) (Object) this;
+        if (!DetachedCameraInteraction.isActive()) {
+            return;
+        }
+        this.arcaneclient$savedItemUseTarget = client.crosshairTarget;
+        this.arcaneclient$retargetedItemUse = true;
+        client.crosshairTarget = DetachedCameraInteraction.itemUseTarget(client);
+    }
+
+    @Inject(method = "doItemUse", at = @At("RETURN"))
+    private void arcaneclient$restoreDetachedCameraItemTarget(CallbackInfo ci) {
+        if (!this.arcaneclient$retargetedItemUse) {
+            return;
+        }
+        ((MinecraftClient) (Object) this).crosshairTarget = this.arcaneclient$savedItemUseTarget;
+        this.arcaneclient$savedItemUseTarget = null;
+        this.arcaneclient$retargetedItemUse = false;
     }
 }

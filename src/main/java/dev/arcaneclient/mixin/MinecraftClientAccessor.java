@@ -14,6 +14,9 @@ public interface MinecraftClientAccessor {
     @Accessor("itemUseCooldown")
     int arcaneclient$getItemUseCooldown();
 
+    @Accessor("itemUseCooldown")
+    void arcaneclient$setItemUseCooldown(int cooldown);
+
     @Invoker("doItemUse")
     void arcaneclient$doItemUse();
 }
