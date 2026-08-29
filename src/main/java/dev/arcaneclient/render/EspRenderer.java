@@ -5,17 +5,23 @@ import com.mojang.blaze3d.platform.DepthTestFunction;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.esp.BlockEntityEspClassifier;
+import dev.arcaneclient.esp.EspRanges;
+import dev.arcaneclient.esp.StorageDiscoveryTracker;
 import dev.arcaneclient.performance.PerformanceProfile;
 import dev.arcaneclient.render.TracerLines;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.PriorityQueue;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.world.ClientWorld;
 import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderSetup;
@@ -25,6 +31,8 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.Identifier;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.util.math.Vec3d;
@@ -42,6 +50,8 @@ public final class EspRenderer {
     private static final RenderLayer ESP_FILL_TYPE = RenderLayer.of((String)"arcaneclient_storage_esp_fill", (RenderSetup)RenderSetup.builder((RenderPipeline)ESP_FILL).translucent().build());
     private static List<Target> targets = List.of();
     private static long lastRefresh = Long.MIN_VALUE;
+    private static final StorageDiscoveryTracker DISCOVERIES = new StorageDiscoveryTracker(65_536);
+    private static ClientWorld discoveryWorld;
 
     private EspRenderer() {
     }
@@ -53,6 +63,11 @@ public final class EspRenderer {
     public static void tick(MinecraftClient client) {
         if (ArcaneSettingsScreen.isOpen(client)) return;
         ArcaneConfig config = ArcaneClient.config();
+        if (client.world != discoveryWorld) {
+            discoveryWorld = client.world;
+            DISCOVERIES.reset();
+            lastRefresh = Long.MIN_VALUE;
+        }
         if ((!config.esp && !config.blockEntityDebug) || client.world == null || client.getCameraEntity() == null) {
             targets = List.of();
             return;
@@ -68,7 +83,12 @@ public final class EspRenderer {
         int centerZ = ChunkSectionPos.getSectionCoord((int)cameraEntity.getBlockZ());
         int radius = profile.storageRadiusChunks();
         int targetLimit = profile.storageTargetLimit();
-        ArrayList<Target> refreshed = new ArrayList<Target>();
+        PriorityQueue<RankedTarget> nearest = new PriorityQueue<>(
+            Comparator.comparingDouble(RankedTarget::horizontalDistanceSquared)
+                .thenComparingInt(ranked -> ranked.target.pos.getY())
+                .reversed()
+        );
+        ArrayList<StorageDiscovery> discovered = new ArrayList<>();
         for (int dz = -radius; dz <= radius; ++dz) {
             for (int dx = -radius; dx <= radius; ++dx) {
                 WorldChunk chunk = client.world.getChunkManager().getWorldChunk(centerX + dx, centerZ + dz, false);
@@ -78,14 +98,70 @@ public final class EspRenderer {
                     String path = id == null ? "unknown" : id.getPath();
                     int color = BlockEntityEspClassifier.color(path, config.esp, config.blockEntityDebug);
                     if (color == 0) continue;
-                    refreshed.add(new Target(blockEntity.getPos().toImmutable(), color, BlockEntityEspClassifier.isStorageTarget(path)));
-                    if (refreshed.size() < targetLimit) continue;
-                    targets = List.copyOf(refreshed);
-                    return;
+                    BlockPos pos = blockEntity.getPos().toImmutable();
+                    boolean storageTarget = BlockEntityEspClassifier.isStorageTarget(path);
+                    if (config.esp && config.storageChatAlerts && BlockEntityEspClassifier.isContainerTarget(path) && DISCOVERIES.markNew(pos.asLong())) {
+                        discovered.add(new StorageDiscovery(pos, path));
+                    }
+                    double horizontalDistanceSquared = EspRanges.horizontalDistanceSquared(
+                        pos.getX() + 0.5,
+                        pos.getZ() + 0.5,
+                        cameraEntity.getX(),
+                        cameraEntity.getZ()
+                    );
+                    RankedTarget ranked = new RankedTarget(new Target(pos, color, storageTarget), horizontalDistanceSquared);
+                    nearest.add(ranked);
+                    if (nearest.size() > targetLimit) {
+                        nearest.poll();
+                    }
                 }
             }
         }
-        targets = List.copyOf(refreshed);
+        ArrayList<RankedTarget> ranked = new ArrayList<>(nearest);
+        ranked.sort(
+            Comparator.comparingDouble(RankedTarget::horizontalDistanceSquared)
+                .thenComparingInt(candidate -> candidate.target.pos.getY())
+        );
+        targets = ranked.stream().map(RankedTarget::target).toList();
+        discovered.sort(Comparator.comparingDouble(discovery -> EspRanges.horizontalDistanceSquared(
+            discovery.pos.getX() + 0.5,
+            discovery.pos.getZ() + 0.5,
+            cameraEntity.getX(),
+            cameraEntity.getZ()
+        )));
+        publishDiscoveries(client, discovered);
+    }
+
+    private static void publishDiscoveries(MinecraftClient client, List<StorageDiscovery> discovered) {
+        if (client.player == null || discovered.isEmpty()) {
+            return;
+        }
+        LinkedHashMap<String, Integer> counts = new LinkedHashMap<>();
+        for (StorageDiscovery discovery : discovered) {
+            counts.merge(displayName(discovery.type), 1, Integer::sum);
+        }
+        String types = counts.entrySet().stream()
+            .limit(4)
+            .map(entry -> entry.getValue() == 1 ? entry.getKey() : entry.getKey() + " x" + entry.getValue())
+            .reduce((left, right) -> left + ", " + right)
+            .orElse("container");
+        if (counts.size() > 4) {
+            types += ", +" + (counts.size() - 4) + " types";
+        }
+        BlockPos nearest = discovered.getFirst().pos;
+        String message = discovered.size() == 1
+            ? "Storage found: " + types + " at " + nearest.getX() + ", " + nearest.getY() + ", " + nearest.getZ()
+            : "Storage found: " + discovered.size() + " block entities (" + types + "), nearest at "
+                + nearest.getX() + ", " + nearest.getY() + ", " + nearest.getZ();
+        client.player.sendMessage(
+            Text.literal("[Arcane] ").formatted(Formatting.DARK_PURPLE)
+                .append(Text.literal(message).formatted(Formatting.GREEN)),
+            false
+        );
+    }
+
+    private static String displayName(String path) {
+        return path.replace('_', ' ');
     }
 
     private static void render(WorldRenderContext context) {
@@ -144,5 +220,13 @@ public final class EspRenderer {
 
     @Environment(value=EnvType.CLIENT)
     private record Target(BlockPos pos, int color, boolean storageTarget) {
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    private record RankedTarget(Target target, double horizontalDistanceSquared) {
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    private record StorageDiscovery(BlockPos pos, String type) {
     }
 }

@@ -22,6 +22,13 @@ public final class BlockEntityEspClassifier {
         return BlockEntityEspClassifier.storageColor(id) != 0;
     }
 
+    public static boolean isContainerTarget(String id) {
+        return id.contains("chest") || id.equals("barrel") || id.contains("shulker") || id.endsWith("shelf")
+            || id.equals("hopper") || id.equals("crafter") || id.equals("dispenser") || id.equals("dropper")
+            || id.contains("furnace") || id.equals("smoker") || id.equals("brewing_stand")
+            || id.equals("lectern") || id.equals("jukebox") || id.equals("beehive");
+    }
+
     private static int storageColor(String id) {
         if (id.equals("mob_spawner") || id.equals("trial_spawner") || id.equals("vault")) {
             return -218152880;

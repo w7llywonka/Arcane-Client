@@ -4,6 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
+import dev.arcaneclient.esp.EspRanges;
 import dev.arcaneclient.screen.ArcaneFont;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.ArrayList;
@@ -91,7 +92,8 @@ public final class EntityEspRenderer {
         double maxDistance = config.entityEspRange * (double) config.entityEspRange;
         ArrayList<Target> refreshed = new ArrayList<>();
         for (Entity entity : client.world.getEntities()) {
-            if (entity == client.player || entity == camera || entity.isRemoved() || entity.squaredDistanceTo(camera) > maxDistance) continue;
+            if (entity == client.player || entity == camera || entity.isRemoved()
+                || EspRanges.horizontalDistanceSquared(entity.getX(), entity.getZ(), camera.getX(), camera.getZ()) > maxDistance) continue;
             int color = targetColor(entity, config);
             if (color == 0) continue;
             Box box = entity.getBoundingBox();
