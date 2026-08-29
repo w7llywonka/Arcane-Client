@@ -24,7 +24,7 @@ import net.fabricmc.loader.api.FabricLoader;
 @Environment(value=EnvType.CLIENT)
 public final class ArcaneConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final int CURRENT_CONFIG_VERSION = 6;
+    private static final int CURRENT_CONFIG_VERSION = 7;
     public boolean enabled = true;
     public boolean overlay = true;
     public boolean hud = true;
@@ -54,6 +54,8 @@ public final class ArcaneConfig {
     // Utility and information modules.
     public boolean autoTool = false;
     public boolean autoToolPreserveDurability = true;
+    public boolean elytraAssist = false;
+    public boolean elytraAssistSmartConservation = true;
     public boolean infoHud = true;
     public boolean infoFps = true;
     public boolean infoCoordinates = true;
@@ -110,6 +112,8 @@ public final class ArcaneConfig {
     public int configVersion = CURRENT_CONFIG_VERSION;
     public int freecamSpeed = 8;
     public int autoEatHunger = 8;
+    public int elytraAssistDelayTicks = 40;
+    public int elytraAssistBoostBelow = 24;
     public int lowHealthHearts = 4;
     public int armorAlertPercent = 15;
     public int swingDuration = SwingDuration.DEFAULT_TICKS;
@@ -154,6 +158,7 @@ public final class ArcaneConfig {
             boolean upgradedSlowSwingAndInfo = loadedConfigVersion < 4;
             boolean upgradedGrowthScanner = loadedConfigVersion < 5;
             boolean upgradedStorageDiscovery = loadedConfigVersion < 6;
+            boolean upgradedElytraAssist = loadedConfigVersion < 7;
             if (upgradedFeatureDefaults) {
                 config.entityNameTags = true;
                 config.soundNotifications = true;
@@ -194,12 +199,18 @@ public final class ArcaneConfig {
             if (upgradedStorageDiscovery) {
                 config.storageChatAlerts = true;
             }
-            if (upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery) {
+            if (upgradedElytraAssist) {
+                config.elytraAssist = false;
+                config.elytraAssistSmartConservation = true;
+                config.elytraAssistDelayTicks = 40;
+                config.elytraAssistBoostBelow = 24;
+            }
+            if (upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery || upgradedElytraAssist) {
                 config.configVersion = CURRENT_CONFIG_VERSION;
             }
 
             config.clamp();
-            if (upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery) {
+            if (upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery || upgradedElytraAssist) {
                 config.save();
             }
             return config;
@@ -389,6 +400,8 @@ public final class ArcaneConfig {
         this.configVersion = CURRENT_CONFIG_VERSION;
         this.freecamSpeed = Math.clamp(this.freecamSpeed, 1, 20);
         this.autoEatHunger = Math.clamp(this.autoEatHunger, 1, 20);
+        this.elytraAssistDelayTicks = Math.clamp(this.elytraAssistDelayTicks, 10, 100);
+        this.elytraAssistBoostBelow = Math.clamp(this.elytraAssistBoostBelow, 5, 60);
         this.lowHealthHearts = Math.clamp(this.lowHealthHearts, 1, 10);
         this.armorAlertPercent = Math.clamp(this.armorAlertPercent, 1, 100);
         this.swingDuration = SwingDuration.clamp(this.swingDuration);

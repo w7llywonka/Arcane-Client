@@ -7,6 +7,7 @@ import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.mixin.MinecraftClientAccessor;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.scan.ChunkScanner;
+import dev.arcaneclient.utility.ElytraAssistController;
 
 import java.util.function.Function;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -27,6 +28,7 @@ import net.minecraft.item.Items;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.chunk.WorldChunk;
@@ -49,6 +51,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             testFreecam(context);
             testFreelook(context);
             testModeSwitching(context);
+            testElytraAssist(context);
             testInterface(context);
             testScannerThroughput(context);
         } finally {
@@ -400,6 +403,64 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         require(FreecamController.isActive() && !FreelookController.isActive(), "switching Freelook to Freecam left both modes active");
         context.runOnClient(FreecamController::disable);
         context.waitTick();
+    }
+
+    private static void testElytraAssist(ClientGameTestContext context) {
+        ArcaneClient.LOGGER.info("[QA] Starting Elytra Assist rocket-use test");
+        context.runOnClient(client -> {
+            require(client.player != null && client.world != null, "Elytra Assist test lost its world");
+            boolean previousEnabled = ArcaneClient.config().elytraAssist;
+            boolean previousSmart = ArcaneClient.config().elytraAssistSmartConservation;
+            int previousDelay = ArcaneClient.config().elytraAssistDelayTicks;
+            int previousThreshold = ArcaneClient.config().elytraAssistBoostBelow;
+            int previousSlot = client.player.getInventory().getSelectedSlot();
+            ItemStack previousSlotZero = client.player.getInventory().getStack(0).copy();
+            ItemStack previousSlotTwo = client.player.getInventory().getStack(2).copy();
+            ItemStack previousOffhand = client.player.getOffHandStack().copy();
+            Vec3d previousVelocity = client.player.getVelocity();
+            try {
+                ArcaneClient.config().elytraAssist = true;
+                ArcaneClient.config().elytraAssistSmartConservation = false;
+                ArcaneClient.config().elytraAssistDelayTicks = 40;
+                ArcaneClient.config().elytraAssistBoostBelow = 24;
+                client.player.getInventory().setStack(0, new ItemStack(Items.STICK));
+                client.player.getInventory().setStack(2, new ItemStack(Items.FIREWORK_ROCKET, 8));
+                client.player.setStackInHand(Hand.OFF_HAND, ItemStack.EMPTY);
+                client.player.getInventory().setSelectedSlot(0);
+                client.player.startGliding();
+                ElytraAssistController.reset();
+
+                ElytraAssistController.tick(client);
+                require(ElytraAssistController.cooldownTicks() == 40,
+                    "Elytra Assist did not use a hotbar rocket while gliding");
+                require(client.player.getInventory().getSelectedSlot() == 0,
+                    "Elytra Assist did not restore the selected slot after boosting");
+
+                ElytraAssistController.tick(client);
+                require(ElytraAssistController.cooldownTicks() == 39,
+                    "Elytra Assist ignored its configured boost delay");
+
+                ElytraAssistController.reset();
+                ArcaneClient.config().elytraAssistSmartConservation = true;
+                client.player.setVelocity(2.0, 0.0, 0.0);
+                ElytraAssistController.tick(client);
+                require(ElytraAssistController.cooldownTicks() == 0,
+                    "Elytra Assist smart conservation spent a rocket above its speed threshold");
+            } finally {
+                ElytraAssistController.reset();
+                client.player.stopGliding();
+                client.player.setVelocity(previousVelocity);
+                client.player.getInventory().setStack(0, previousSlotZero);
+                client.player.getInventory().setStack(2, previousSlotTwo);
+                client.player.setStackInHand(Hand.OFF_HAND, previousOffhand);
+                client.player.getInventory().setSelectedSlot(previousSlot);
+                ArcaneClient.config().elytraAssist = previousEnabled;
+                ArcaneClient.config().elytraAssistSmartConservation = previousSmart;
+                ArcaneClient.config().elytraAssistDelayTicks = previousDelay;
+                ArcaneClient.config().elytraAssistBoostBelow = previousThreshold;
+            }
+        });
+        ArcaneClient.LOGGER.info("[QA] Elytra Assist rocket-use test passed");
     }
 
     private static void testInterface(ClientGameTestContext context) {

@@ -10,6 +10,7 @@ import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.render.EntityEspRenderer;
 import dev.arcaneclient.render.EspRenderer;
+import dev.arcaneclient.utility.ElytraAssistController;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
@@ -19,16 +20,16 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 
-/** Builds and validates Arcane's exact 42-module Click GUI catalog. */
+/** Builds and validates Arcane's exact 43-module Click GUI catalog. */
 @Environment(EnvType.CLIENT)
 public final class ModuleCatalog {
-    public static final int EXPECTED_MODULE_COUNT = 42;
+    public static final int EXPECTED_MODULE_COUNT = 43;
     private static final List<String> REQUIRED_MODULE_NAMES = List.of(
         "Auto Totem", "Auto Sprint", "Auto Eat", "Health Alert", "Armor Alert", "Hit Sound", "Swing Speed", "Combat HUD",
         "Storage ESP", "Item ESP", "Tunnel ESP", "Chunk Tiles", "ESP Debug", "Player ESP", "Mob ESP", "Projectile ESP", "Crystal ESP", "Entity Tracers", "Hole ESP",
         "Base Radar", "Freecam", "Freelook", "Fullbright", "No Hurt Cam", "Zoom", "Clean Capture",
         "Performance", "Interface", "Info HUD", "Sound Notifications", "Streamer Mode",
-        "Auto Tool", "Chat Macros",
+        "Elytra Assist", "Auto Tool", "Chat Macros",
         "Chunk Finder", "Growth Signals", "Build Traces", "Machine Signals", "Live Changes", "Light Signals", "Entity Signals", "Stash Finder", "Chunk Intel"
     );
 
@@ -42,7 +43,7 @@ public final class ModuleCatalog {
             new GuiCategory("ESP", esp(config, keybinds, client)),
             new GuiCategory("RENDER", render(config, keybinds, client)),
             new GuiCategory("CLIENT", clientTools(config, keybinds, client)),
-            new GuiCategory("UTILITY", utility(config, keybinds)),
+            new GuiCategory("UTILITY", utility(config, keybinds, client)),
             new GuiCategory("BASE FINDING", baseFinding(config, keybinds))
         );
         int count = countModules(categories);
@@ -51,7 +52,7 @@ public final class ModuleCatalog {
             for (GuiModule module : category.modules()) actualNames.add(module.name());
         }
         if (count != EXPECTED_MODULE_COUNT || !actualNames.equals(REQUIRED_MODULE_NAMES)) {
-            throw new IllegalStateException("Arcane module catalog does not match the exact 42-module product contract: " + actualNames);
+            throw new IllegalStateException("Arcane module catalog does not match the exact 43-module product contract: " + actualNames);
         }
         return categories;
     }
@@ -221,13 +222,24 @@ public final class ModuleCatalog {
         if (client.currentScreen instanceof ArcaneSettingsScreen) client.setScreen(null);
     }
 
-    private static List<GuiModule> utility(ArcaneConfig config, ArcaneKeybinds keybinds) {
+    private static List<GuiModule> utility(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
+        GuiModule elytraAssist = GuiModule.toggle(
+            "Elytra Assist",
+            "Automatically uses hotbar or off-hand rockets while gliding, then restores your selected slot.",
+            () -> config.elytraAssist,
+            value -> config.elytraAssist = value
+        )
+            .with(new GuiSetting.Slider("Boost delay", () -> config.elytraAssistDelayTicks, value -> config.elytraAssistDelayTicks = value, 10, 100, "t"))
+            .with(new GuiSetting.Toggle("Smart conservation", () -> config.elytraAssistSmartConservation, value -> config.elytraAssistSmartConservation = value))
+            .with(new GuiSetting.Slider("Boost below", () -> config.elytraAssistBoostBelow, value -> config.elytraAssistBoostBelow = value, 5, 60, "m/s"))
+            .with(new GuiSetting.Info("Rockets", () -> client.player == null ? "0" : Integer.toString(ElytraAssistController.rocketCount(client.player))))
+            .build();
         GuiModule autoTool = GuiModule.toggle("Auto Tool", "Selects the best hotbar tool before mining, then restores your slot.", () -> config.autoTool, value -> config.autoTool = value)
             .with(new GuiSetting.Toggle("Protect 1 durability", () -> config.autoToolPreserveDurability, value -> config.autoToolPreserveDurability = value)).build();
         GuiModule.Builder macros = GuiModule.toggle("Chat Macros", "Sends four saved messages, each on its own key.", () -> config.chatMacros, value -> config.chatMacros = value);
         List<KeyBinding> macroKeys = keybinds.chatMacros();
         for (int slot = 0; slot < macroKeys.size(); slot++) macros.with(new GuiSetting.Message(Integer.toString(slot + 1), slot, macroKeys.get(slot)));
-        return List.of(autoTool, macros.build());
+        return List.of(elytraAssist, autoTool, macros.build());
     }
 
     private static List<GuiModule> clientTools(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
