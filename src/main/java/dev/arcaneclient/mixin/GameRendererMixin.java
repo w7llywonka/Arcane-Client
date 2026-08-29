@@ -1,7 +1,6 @@
 package dev.arcaneclient.mixin;
 
 import dev.arcaneclient.ArcaneClient;
-import dev.arcaneclient.freecam.FreecamController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -9,7 +8,6 @@ import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.LivingEntity;
-import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -19,11 +17,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Environment(EnvType.CLIENT)
 @Mixin(GameRenderer.class)
 public abstract class GameRendererMixin {
-    @Inject(method = "renderHand", at = @At("HEAD"), cancellable = true)
-    private void arcaneclient$hideHandInFreecam(float tickProgress, boolean sleeping, Matrix4f viewMatrix, CallbackInfo ci) {
-        if (FreecamController.isActive()) ci.cancel();
-    }
-
     @Inject(method = "tiltViewWhenHurt", at = @At("HEAD"), cancellable = true)
     private void arcaneclient$removeHurtCamera(MatrixStack matrices, float tickProgress, CallbackInfo ci) {
         if (ArcaneClient.config() != null && ArcaneClient.config().noHurtCam) ci.cancel();

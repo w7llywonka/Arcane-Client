@@ -19,6 +19,7 @@ import net.minecraft.util.math.Vec3d;
 @Environment(EnvType.CLIENT)
 public final class FreecamController {
     private static boolean active;
+    private static boolean previousChunkCullingEnabled = true;
     private static Perspective previousPerspective = Perspective.FIRST_PERSON;
     private static float playerYaw;
     private static float playerPitch;
@@ -67,6 +68,7 @@ public final class FreecamController {
         cameraYaw = playerYaw;
         cameraPitch = playerPitch;
         previousPerspective = client.options.getPerspective();
+        previousChunkCullingEnabled = client.chunkCullingEnabled;
         position = player.getEyePos();
         previousPosition = position;
         active = true;
@@ -75,6 +77,11 @@ public final class FreecamController {
         DetachedCameraInteraction.stopMining(client);
         client.options.setPerspective(Perspective.FIRST_PERSON);
         client.setCameraEntity(player);
+        // Vanilla's section-occlusion graph assumes an ordinary player camera. Underground,
+        // that graph can hide loaded sections behind solid chunks and leave large black gaps
+        // when our rendered camera moves through walls. Freecam needs the complete frustum.
+        client.chunkCullingEnabled = false;
+        client.worldRenderer.scheduleTerrainUpdate();
         ArcaneClient.LOGGER.info("Freecam enabled");
     }
 
@@ -86,6 +93,8 @@ public final class FreecamController {
         }
         active = false;
         FreecamVisualBody.remove();
+        client.chunkCullingEnabled = previousChunkCullingEnabled;
+        client.worldRenderer.scheduleTerrainUpdate();
         if (client.player != null) {
             client.player.setYaw(playerYaw);
             client.player.setPitch(playerPitch);
@@ -111,6 +120,10 @@ public final class FreecamController {
         }
 
         if (client.getCameraEntity() != player) client.setCameraEntity(player);
+        // Keep this authoritative if another mod or a vanilla debug toggle changes it while
+        // Freecam is active. WorldRenderer already recenters its section graph from CameraMixin's
+        // detached position every eight blocks.
+        client.chunkCullingEnabled = false;
         // The real player still receives gravity and server corrections while movement input is
         // detached. Keep the rendered copy on that authoritative position so it cannot hover at
         // the activation coordinate after the player lands or is moved by the server.
