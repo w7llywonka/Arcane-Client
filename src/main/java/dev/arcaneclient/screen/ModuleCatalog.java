@@ -192,7 +192,7 @@ public final class ModuleCatalog {
             .with(new GuiSetting.Slider("Speed", () -> config.freecamSpeed, value -> config.freecamSpeed = value, 1, 20, ""))
             .with(new GuiSetting.Toggle("Directional mining", () -> config.freecamMining, value -> config.freecamMining = value))
             .with(new GuiSetting.Bind("Bind", keybinds.freecam())).build();
-        GuiModule freelook = GuiModule.toggle("Freelook", "Visible third-person orbit with safe body-reach mining and no head rotation.", FreelookController::isActive, value -> {
+        GuiModule freelook = GuiModule.toggle("Freelook", "Orbit around your real skin while movement and mining keep using your actual aim.", FreelookController::isActive, value -> {
             if (value != FreelookController.isActive()) FreelookController.toggle(client);
         }).with(new GuiSetting.Bind("Bind", keybinds.freelook())).build();
         GuiModule fullbright = GuiModule.toggle("Fullbright", "Applies full client-side night-vision brightness.", () -> config.fullbright, value -> config.fullbright = value).build();
