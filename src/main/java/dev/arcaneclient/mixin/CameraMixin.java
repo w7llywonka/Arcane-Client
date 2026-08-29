@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Prevents vanilla from interpolating detached camera angles against stale non-ticking entity state. */
 @Environment(EnvType.CLIENT)
@@ -25,6 +26,16 @@ public abstract class CameraMixin {
 
     @Shadow
     protected abstract void setPos(Vec3d pos);
+
+    @Inject(method = "clipToSpace", at = @At("HEAD"), cancellable = true)
+    private void arcaneclient$allowFreelookThroughWalls(
+        float desiredDistance,
+        CallbackInfoReturnable<Float> cir
+    ) {
+        if (FreelookController.ignoresCameraCollision()) {
+            cir.setReturnValue(desiredDistance);
+        }
+    }
 
     @Redirect(
         method = "update",
