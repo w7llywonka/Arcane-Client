@@ -136,7 +136,8 @@ public final class FreecamController {
         DetachedCameraInteraction.tickMining(
             client,
             player,
-            camera,
+            camera.getYaw(),
+            camera.getPitch(),
             ArcaneClient.config().freecamMining
         );
     }

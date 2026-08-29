@@ -7,6 +7,7 @@
     "ClientCommonNetworkHandlerMixin",
     "ClientConnectionMixin",
     "ClientPacketListenerMixin",
+    "ClientPlayerEntityMixin",
     "EntityMixin",
     "FontManagerAccessor",
     "GameRendererMixin",

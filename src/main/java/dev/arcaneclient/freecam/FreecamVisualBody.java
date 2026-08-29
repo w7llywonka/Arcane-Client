@@ -11,6 +11,7 @@ import net.minecraft.client.network.OtherClientPlayerEntity;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.player.SkinTextures;
 import net.minecraft.util.math.Vec3d;
 
 /** Owns the client-only player snapshot shown while a detached camera is active. */
@@ -27,7 +28,11 @@ final class FreecamVisualBody {
         ClientWorld world = client.world;
         if (world == null) return;
 
-        OtherClientPlayerEntity snapshot = new VisualBodyEntity(world, player.getGameProfile());
+        OtherClientPlayerEntity snapshot = new VisualBodyEntity(
+            world,
+            player.getGameProfile(),
+            player.getSkin()
+        );
         UUID snapshotUuid = UUID.nameUUIDFromBytes(
             ("arcane-detached-camera-body:" + player.getUuidAsString()).getBytes(StandardCharsets.UTF_8)
         );
@@ -98,8 +103,16 @@ final class FreecamVisualBody {
 
     /** Renders normally but is excluded from crosshair picking, attacks, use, and collision. */
     private static final class VisualBodyEntity extends OtherClientPlayerEntity {
-        private VisualBodyEntity(ClientWorld world, GameProfile profile) {
+        private final SkinTextures skin;
+
+        private VisualBodyEntity(ClientWorld world, GameProfile profile, SkinTextures skin) {
             super(world, profile);
+            this.skin = skin;
+        }
+
+        @Override
+        public SkinTextures getSkin() {
+            return skin;
         }
 
         @Override

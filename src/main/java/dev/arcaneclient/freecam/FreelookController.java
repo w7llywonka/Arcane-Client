@@ -23,17 +23,6 @@ public final class FreelookController {
         return camera != null;
     }
 
-    public static boolean hasVisualBody() {
-        return FreecamVisualBody.isPresent();
-    }
-
-    public static boolean isVisualBody(Entity entity) {
-        return FreecamVisualBody.owns(entity);
-    }
-
-    public static Entity visualBodyEntity() {
-        return FreecamVisualBody.entity();
-    }
 
     public static void toggle(MinecraftClient client) {
         if (isActive()) disable(client); else enable(client);
@@ -56,7 +45,7 @@ public final class FreelookController {
         camera.setInvisible(true);
         camera.setNoGravity(true);
         camera.noClip = true;
-        FreecamVisualBody.spawn(client, player);
+
         DetachedCameraInteraction.stopMining(client);
         client.options.setPerspective(Perspective.THIRD_PERSON_BACK);
         client.setCameraEntity((Entity) camera);
@@ -66,7 +55,7 @@ public final class FreelookController {
     public static void disable(MinecraftClient client) {
         if (camera == null) return;
         DetachedCameraInteraction.stopMining(client);
-        FreecamVisualBody.remove();
+
         if (client.player != null) client.setCameraEntity(client.player); else client.setCameraEntity(null);
         client.options.setPerspective(previousPerspective);
         camera = null;
@@ -86,8 +75,15 @@ public final class FreelookController {
             player.getEyeY() - camera.getStandingEyeHeight(),
             player.getZ()
         );
-        FreecamVisualBody.sync(player);
-        DetachedCameraInteraction.tickMining(client, player, camera, true);
+        // Freelook only changes the rendered orbit. The real player's look direction
+        // remains authoritative for body-origin mining and movement.
+        DetachedCameraInteraction.tickMining(
+            client,
+            player,
+            player.getYaw(),
+            player.getPitch(),
+            true
+        );
     }
 
     /** Receives vanilla's sensitivity-adjusted mouse deltas and rotates only the orbit camera. */

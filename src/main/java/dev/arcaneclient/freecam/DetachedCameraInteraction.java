@@ -4,7 +4,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.Entity;
+
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -26,7 +26,8 @@ public final class DetachedCameraInteraction {
     static void tickMining(
         MinecraftClient client,
         ClientPlayerEntity player,
-        Entity camera,
+        float yaw,
+        float pitch,
         boolean enabled
     ) {
         if (!enabled
@@ -38,7 +39,7 @@ public final class DetachedCameraInteraction {
         }
 
         Vec3d start = player.getEyePos();
-        Vec3d end = FreecamMining.rayEnd(start, camera.getYaw(), camera.getPitch(), player.getBlockInteractionRange());
+        Vec3d end = FreecamMining.rayEnd(start, yaw, pitch, player.getBlockInteractionRange());
         HitResult result = client.world.raycast(new RaycastContext(
             start,
             end,

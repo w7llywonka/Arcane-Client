@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2.3.7+mc1.21.11
+
+- Made Freelook render the real local player directly so the authenticated skin, animation, equipment, and hotbar remain intact.
+- Kept normal player movement active during Freelook and preserved the moved position when the orbit is disabled.
+- Decoupled Freelook mining from the orbit camera: block breaking now follows the real player's stored yaw and pitch.
+- Preserved the authenticated skin textures on Freecam's client-only stationary body.
+
 ## 2.3.6+mc1.21.11
 
 - Replaced bright perimeter outlines across the Click GUI and HUD with dense smoked-glass surfaces and low-alpha dark edges.
