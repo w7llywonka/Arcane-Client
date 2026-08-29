@@ -23,6 +23,8 @@ public final class GuiModule {
     private final @Nullable Consumer<Boolean> setter;
     private final @Nullable Supplier<String> valueLabel;
     private final List<GuiSetting> settings;
+    private final UiAnimation.Track switchTrack = new UiAnimation.Track();
+    private final UiAnimation.Track hoverTrack = new UiAnimation.Track();
 
     private boolean expanded;
 
@@ -88,6 +90,16 @@ public final class GuiModule {
 
     public @Nullable String valueLabel() {
         return this.valueLabel == null ? null : this.valueLabel.get();
+    }
+
+    /** The eased position of this row's switch knob, advanced once per drawn frame. */
+    public float toggleFraction(float deltaSeconds) {
+        return this.switchTrack.advance(enabled(), deltaSeconds, UiAnimation.SWITCH_SPEED);
+    }
+
+    /** The eased hover weight of this row, advanced once per drawn frame. */
+    public float hoverFraction(boolean hovered, float deltaSeconds) {
+        return this.hoverTrack.advance(hovered, deltaSeconds, UiAnimation.HOVER_SPEED);
     }
 
     public boolean expanded() {

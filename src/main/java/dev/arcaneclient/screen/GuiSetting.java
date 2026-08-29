@@ -17,16 +17,22 @@ import org.jspecify.annotations.Nullable;
  */
 @Environment(EnvType.CLIENT)
 public abstract sealed class GuiSetting {
-    static final int COMPACT_HEIGHT = 15;
-    static final int SLIDER_HEIGHT = 25;
-    static final int MESSAGE_HEIGHT = 20;
+    static final int COMPACT_HEIGHT = 13;
+    static final int SLIDER_HEIGHT = 22;
+    static final int MESSAGE_HEIGHT = 18;
 
     private final String label;
     private final String searchText;
+    private final UiAnimation.Track hoverTrack = new UiAnimation.Track();
 
     private GuiSetting(String label) {
         this.label = label;
         this.searchText = label.toLowerCase(Locale.ROOT);
+    }
+
+    /** The eased hover weight of this row, advanced once per drawn frame. */
+    public float hoverFraction(boolean hovered, float deltaSeconds) {
+        return this.hoverTrack.advance(hovered, deltaSeconds, UiAnimation.HOVER_SPEED);
     }
 
     public String label() {
@@ -44,6 +50,7 @@ public abstract sealed class GuiSetting {
     public static final class Toggle extends GuiSetting {
         private final BooleanSupplier value;
         private final Consumer<Boolean> setter;
+        private final UiAnimation.Track switchTrack = new UiAnimation.Track();
 
         public Toggle(String label, BooleanSupplier value, Consumer<Boolean> setter) {
             super(label);
@@ -53,6 +60,10 @@ public abstract sealed class GuiSetting {
 
         public boolean value() {
             return this.value.getAsBoolean();
+        }
+
+        public float toggleFraction(float deltaSeconds) {
+            return this.switchTrack.advance(value(), deltaSeconds, UiAnimation.SWITCH_SPEED);
         }
 
         public void toggle() {
@@ -72,6 +83,7 @@ public abstract sealed class GuiSetting {
         private final Consumer<Boolean> setter;
         private final IntSupplier color;
         private final IntConsumer colorSetter;
+        private final UiAnimation.Track switchTrack = new UiAnimation.Track();
 
         public ToggleSwatch(
             String label,
@@ -89,6 +101,10 @@ public abstract sealed class GuiSetting {
 
         public boolean value() {
             return this.value.getAsBoolean();
+        }
+
+        public float toggleFraction(float deltaSeconds) {
+            return this.switchTrack.advance(value(), deltaSeconds, UiAnimation.SWITCH_SPEED);
         }
 
         public void toggle() {

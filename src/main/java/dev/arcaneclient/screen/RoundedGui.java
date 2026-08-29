@@ -55,6 +55,34 @@ public final class RoundedGui {
         );
     }
 
+    /**
+     * A soft drop shadow: concentric rounded rings whose alpha decays outward, biased one pixel
+     * down so a panel reads as lifted off the world rather than pasted onto it.
+     */
+    public static void shadow(DrawContext graphics, int x, int y, int width, int height, int radius, int color, int spread) {
+        if (width <= 0 || height <= 0 || spread <= 0) return;
+        int alpha = color >>> 24;
+        for (int ring = spread; ring >= 1; ring--) {
+            int ringAlpha = Math.round(alpha * (spread - ring + 1) / (float) (spread + 1));
+            if (ringAlpha <= 1) continue;
+            fill(
+                graphics,
+                x - ring,
+                y - ring + 1,
+                width + ring * 2,
+                height + ring * 2,
+                radius + ring,
+                color & 0x00FFFFFF | ringAlpha << 24
+            );
+        }
+    }
+
+    /** The glass highlight along the top inside edge of a surface, fading to nothing downward. */
+    public static void sheen(DrawContext graphics, int x, int y, int width, int height, int color) {
+        if (width <= 0 || height <= 0) return;
+        graphics.fillGradient(x, y, x + width, y + height, color, color & 0x00FFFFFF);
+    }
+
     public static void outlineOnly(DrawContext graphics, int x, int y, int width, int height, int radius, int color) {
         if (width <= 0 || height <= 0) return;
         int safeRadius = effectiveRadius(width, height, radius);

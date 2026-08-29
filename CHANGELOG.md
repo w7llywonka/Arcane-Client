@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Rebuilt the Click GUI around denser, near-opaque panels: a deeper world dim, layered drop shadows, a glass sheen along each top edge, and a hairline border on every window, bar, and tooltip.
+- Shrank the interface: 132-pixel windows, 13-pixel module rows, and tighter setting rows, so six categories fit across a small window instead of five.
+- Replaced module checkboxes and bare rows with animated toggle switches, an accent rail and accent label on every enabled module, and a per-category header glyph.
+- Gave expanded modules one recessed, rounded settings card instead of per-row bands, moved the scroll bar into the window gutter, and stopped scrollable windows from showing a sliver of the next row.
+- Added a search field with its own magnifier and clear control, and moved the wordmark, status, and hint text into matching floating bars.
+- Trimmed every setting label to the space its own control leaves, so long names no longer run under a switch, slider, or key pill.
+
 ## 2.3.6+mc1.21.11
 
 - Replaced bright perimeter outlines across the Click GUI and HUD with dense smoked-glass surfaces and low-alpha dark edges.

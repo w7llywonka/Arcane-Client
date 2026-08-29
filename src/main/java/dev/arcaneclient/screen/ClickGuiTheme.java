@@ -3,12 +3,12 @@ package dev.arcaneclient.screen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
-/** Accent palettes drawn over one neutral graphite foundation. */
+/** Accent palettes drawn over one dense, near-opaque graphite foundation. */
 @Environment(EnvType.CLIENT)
 public enum ClickGuiTheme {
-    ARCANE("ARCANE", 0xFF9A8CFF, 0xFFC3BCFF, 0xFF6F63C9, 0xE639345E),
-    FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
-    ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440);
+    ARCANE("ARCANE", 0xFF9D8CFF, 0xFFC9C1FF, 0xFF6E62C6, 0xFF2A2450),
+    FROST("FROST", 0xFF54A8FF, 0xFFB2D8FF, 0xFF3D77BE, 0xFF16304F),
+    ROSE("ROSE", 0xFFF2839C, 0xFFF9B8C6, 0xFFBB6076, 0xFF4A2233);
 
     private static final ClickGuiTheme[] VALUES = values();
 
@@ -17,15 +17,18 @@ public enum ClickGuiTheme {
     private final int accentBright;
     private final int accentDim;
     private final int active;
-    private final int backdrop = 0x82000000;
-    private final int bar = 0xF5080D0B;
-    private final int window = 0xF40C1210;
-    private final int header = 0xF1161D1A;
-    private final int row = 0xED1A211E;
-    private final int nest = 0xEF141B18;
-    private final int outline = 0x5C395047;
-    private final int text = 0xFFF4F4F5;
-    private final int muted = 0xFFA1A1AA;
+    private final int backdrop = 0xA6070910;
+    private final int bar = 0xFC0A0D13;
+    private final int window = 0xFB0D1017;
+    private final int header = 0xFF161B25;
+    private final int row = 0xFF1B212C;
+    private final int nest = 0xFF06080C;
+    private final int outline = 0x74303B4E;
+    private final int edge = 0x66000000;
+    private final int sheen = 0x24FFFFFF;
+    private final int track = 0xFF232A36;
+    private final int text = 0xFFF3F4F8;
+    private final int muted = 0xFF98A0AE;
     private final int hover;
     private final int activeHover;
     private final int outlineSoft;
@@ -38,8 +41,8 @@ public enum ClickGuiTheme {
         this.accentDim = accentDim;
         this.active = active;
         this.hover = shade(this.row, 1.34f);
-        this.activeHover = shade(active, 1.15f);
-        this.outlineSoft = withAlpha(shade(this.outline, 0.74f), 0x32);
+        this.activeHover = shade(active, 1.28f);
+        this.outlineSoft = withAlpha(shade(this.outline, 0.74f), 0x3C);
         this.faint = shade(this.muted, 0.66f);
     }
 
@@ -58,6 +61,9 @@ public enum ClickGuiTheme {
     public int nest() { return this.nest; }
     public int outline() { return this.outline; }
     public int outlineSoft() { return this.outlineSoft; }
+    public int edge() { return this.edge; }
+    public int sheen() { return this.sheen; }
+    public int track() { return this.track; }
     public int text() { return this.text; }
     public int muted() { return this.muted; }
     public int faint() { return this.faint; }

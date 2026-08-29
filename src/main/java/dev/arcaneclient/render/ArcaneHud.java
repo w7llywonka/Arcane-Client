@@ -219,9 +219,10 @@ public final class ArcaneHud {
         int height,
         ClickGuiColors theme
     ) {
-        RoundedGui.fill(graphics, x + 2, y + 3, width, height, 7, 0x52000000);
+        RoundedGui.shadow(graphics, x, y, width, height, 7, theme.edge(), 3);
         RoundedGui.fill(graphics, x, y, width, height, 7, theme.window());
-        RoundedGui.fill(graphics, x + 11, y + 1, width - 22, 1, 1, theme.outlineSoft());
+        RoundedGui.sheen(graphics, x + 7, y + 1, width - 14, 8, theme.sheen());
+        RoundedGui.outlineOnly(graphics, x, y, width, height, 7, theme.outlineSoft());
     }
 
     private static boolean isStashChunk(TraceEngine engine, ChunkPos chunk) {
