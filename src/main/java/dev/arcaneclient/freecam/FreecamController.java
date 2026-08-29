@@ -34,9 +34,9 @@ public final class FreecamController {
 
     public static void register() {
         ClientPreAttackCallback.EVENT.register((client, player, clickCount) -> DetachedCameraInteraction.isActive());
-        UseBlockCallback.EVENT.register((player, world, hand, hit) -> world.isClient() && DetachedCameraInteraction.isActive() ? ActionResult.FAIL : ActionResult.PASS);
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> world.isClient() && DetachedCameraInteraction.isActive() ? ActionResult.FAIL : ActionResult.PASS);
-        UseItemCallback.EVENT.register((player, world, hand) -> world.isClient() && DetachedCameraInteraction.isActive() ? ActionResult.FAIL : ActionResult.PASS);
+        UseBlockCallback.EVENT.register((player, world, hand, hit) -> world.isClient() && FreecamController.isActive() ? ActionResult.FAIL : ActionResult.PASS);
+        UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> world.isClient() && FreecamController.isActive() ? ActionResult.FAIL : ActionResult.PASS);
+        UseItemCallback.EVENT.register((player, world, hand) -> world.isClient() && FreecamController.isActive() ? ActionResult.FAIL : ActionResult.PASS);
     }
 
     public static boolean isActive() {
