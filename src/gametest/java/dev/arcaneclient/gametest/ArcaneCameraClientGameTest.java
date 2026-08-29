@@ -138,6 +138,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
     private static void testFreecam(ClientGameTestContext context) {
         ArcaneClient.LOGGER.info("[QA] Starting Freecam end-to-end test");
         Snapshot bodyStart = snapshot(context);
+        boolean previousChunkCulling = context.computeOnClient(client -> client.chunkCullingEnabled);
         context.runOnClient(FreecamController::enable);
         context.waitTicks(2);
 
@@ -145,6 +146,10 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         require(FreecamController.isActive(), "Freecam did not activate");
         require(enabled.cameraIsPlayer(), "Freecam replaced the player camera entity and broke the hotbar");
         require(FreecamController.hasVisualBody(), "Freecam did not create the visible stationary body");
+        context.runOnClient(client -> require(
+            !client.chunkCullingEnabled,
+            "Freecam left underground section occlusion enabled"
+        ));
         context.runOnClient(client -> {
             Entity visualBody = FreecamController.visualBodyEntity();
             require(visualBody instanceof AbstractClientPlayerEntity, "Freecam visual body was not player-rendered");
@@ -232,6 +237,10 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         require(!FreecamController.hasVisualBody(), "Freecam left its visual body in the world after disabling");
         require(disabled.cameraIsPlayer(), "Freecam did not restore the player camera");
         require(disabled.perspective() == Perspective.FIRST_PERSON, "Freecam did not restore the previous perspective");
+        context.runOnClient(client -> require(
+            client.chunkCullingEnabled == previousChunkCulling,
+            "Freecam did not restore the previous chunk-culling state"
+        ));
         assertHudAvailable(context, "Freecam disabled");
         ArcaneClient.LOGGER.info("[QA] Freecam end-to-end test passed");
     }
