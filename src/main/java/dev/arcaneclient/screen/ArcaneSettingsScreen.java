@@ -22,31 +22,28 @@ import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import org.jspecify.annotations.Nullable;
 
-/**
- * The Arcane Click GUI: one draggable window per category, a module row per feature, and nested
- * settings that open on right click. Everything on screen is a view over {@link ArcaneConfig}; the
- * scan, render, and input systems are untouched by this class.
- */
+/** Arcane's application-style control center. */
 @Environment(EnvType.CLIENT)
 public final class ArcaneSettingsScreen extends Screen {
-    private static final int WINDOW_WIDTH = 154;
-    private static final int HEADER_HEIGHT = 19;
-    private static final int MODULE_HEIGHT = 15;
-    private static final int NEST_INSET = 8;
-    private static final int NEST_PAD = 3;
-    private static final int BODY_PAD = 1;
-    private static final int TOP_BAR_HEIGHT = 27;
-    private static final int BOTTOM_BAR_HEIGHT = 20;
-    private static final int GAP = 7;
+    private static final int FRAME_MARGIN = 10;
+    private static final int FRAME_MAX_WIDTH = 760;
+    private static final int FRAME_MAX_HEIGHT = 430;
+    private static final int SIDEBAR_WIDTH = 116;
+    private static final int HEADER_HEIGHT = 50;
+    private static final int FOOTER_HEIGHT = 22;
+    private static final int CONTENT_PAD = 10;
+    private static final int PANEL_GAP = 9;
+    private static final int MODULE_ROW_HEIGHT = 39;
+    private static final int NAV_ROW_HEIGHT = 27;
     private static final int MACRO_COUNT = 4;
     private static final int MACRO_FIELD_WIDTH = 68;
-    private static final int BIND_KEY_WIDTH = 38;
-    private static final int MACRO_KEY_WIDTH = 28;
+    private static final int BIND_KEY_WIDTH = 48;
 
     private final Screen parent;
     private final ArcaneConfig config;
     private final List<GuiCategory> categories;
     private final List<TextFieldWidget> macroInputs = new ArrayList<>();
+    private final List<HitRegion> hitRegions = new ArrayList<>();
     private final Map<WrapKey, List<String>> wrapCache = new HashMap<>();
     private final boolean scannerWasEnabled;
 
@@ -56,17 +53,17 @@ public final class ArcaneSettingsScreen extends Screen {
     private String query = "";
     private String fpsLabel = "";
     private long nextFpsUpdateNanos;
-    private int openWindowBottom;
-
-    private @Nullable GuiCategory draggingCategory;
-    private int dragOffsetX;
-    private int dragOffsetY;
-    private boolean dragMoved;
+    private int frameX, frameY, frameWidth, frameHeight;
+    private int workspaceX, workspaceY, workspaceWidth, workspaceHeight;
+    private int listX, listY, listWidth, listHeight;
+    private int detailX, detailY, detailWidth, detailHeight;
+    private int listScroll, listMaxScroll, detailScroll, detailMaxScroll;
+    private GuiCategory selectedCategory;
+    private GuiModule selectedModule;
     private GuiSetting.@Nullable Slider draggingSlider;
     private int sliderTrackX;
     private int sliderTrackWidth;
     private @Nullable KeyBinding listeningFor;
-    private @Nullable GuiModule hoveredModule;
 
     public ArcaneSettingsScreen(Screen parent) {
         super(Text.literal("Arcane Client"));
@@ -74,18 +71,19 @@ public final class ArcaneSettingsScreen extends Screen {
         this.config = ArcaneClient.config();
         this.scannerWasEnabled = this.config.enabled;
         this.categories = ModuleCatalog.build(this.config, MinecraftClient.getInstance());
+        this.selectedCategory = this.categories.getFirst();
+        this.selectedModule = this.selectedCategory.modules().getFirst();
     }
 
     @Override
     protected void init() {
-        // A resize can change the GUI scale, which changes which font variant is sharpest.
         ArcaneFont.invalidate();
         this.uiFont = null;
         this.wrapCache.clear();
-        layoutWindows();
-
-        int searchWidth = searchWidth();
-        this.searchInput = new TextFieldWidget(font(), searchX(searchWidth), 11, searchWidth, 11, Text.literal("Search modules"));
+        layoutFrame();
+        int searchWidth = Math.clamp(this.workspaceWidth / 3, 116, 190);
+        int searchX = this.frameX + this.frameWidth - searchWidth - 14;
+        this.searchInput = new TextFieldWidget(font(), searchX, this.frameY + 18, searchWidth, 12, Text.literal("Search modules"));
         this.searchInput.setDrawsBackground(false);
         this.searchInput.setTextShadow(false);
         this.searchInput.setMaxLength(48);
@@ -93,7 +91,6 @@ public final class ArcaneSettingsScreen extends Screen {
         styleField(this.searchInput);
         this.searchInput.setText(this.searchText);
         this.searchInput.setChangedListener(this::updateFilter);
-        updateFilter(this.searchText);
         this.addDrawableChild(this.searchInput);
 
         this.macroInputs.clear();
@@ -110,118 +107,511 @@ public final class ArcaneSettingsScreen extends Screen {
             input.setVisible(false);
             this.macroInputs.add(this.addDrawableChild(input));
         }
+        updateFilter(this.searchText);
+        ensureSelection();
     }
 
-    // -----------------------------------------------------------------------------------------
-    // Layout
-    // -----------------------------------------------------------------------------------------
+    private void layoutFrame() {
+        this.frameWidth = Math.min(FRAME_MAX_WIDTH, Math.max(430, this.width - FRAME_MARGIN * 2));
+        this.frameHeight = Math.min(FRAME_MAX_HEIGHT, Math.max(260, this.height - FRAME_MARGIN * 2));
+        this.frameX = (this.width - this.frameWidth) / 2;
+        this.frameY = (this.height - this.frameHeight) / 2;
+        this.workspaceX = this.frameX + SIDEBAR_WIDTH;
+        this.workspaceY = this.frameY + HEADER_HEIGHT;
+        this.workspaceWidth = this.frameWidth - SIDEBAR_WIDTH;
+        this.workspaceHeight = this.frameHeight - HEADER_HEIGHT - FOOTER_HEIGHT;
+        int innerWidth = this.workspaceWidth - CONTENT_PAD * 2;
+        this.listWidth = Math.clamp(innerWidth * 43 / 100, 188, 260);
+        this.listX = this.workspaceX + CONTENT_PAD;
+        this.listY = this.workspaceY + CONTENT_PAD;
+        this.listHeight = this.workspaceHeight - CONTENT_PAD * 2;
+        this.detailX = this.listX + this.listWidth + PANEL_GAP;
+        this.detailY = this.listY;
+        this.detailWidth = Math.max(185, innerWidth - this.listWidth - PANEL_GAP);
+        this.detailHeight = this.listHeight;
+    }
 
-    private void layoutWindows() {
-        int total = this.categories.size();
-        int columns = Math.clamp((this.width - GAP) / (WINDOW_WIDTH + GAP), 1, total);
-        int rowWidth = columns * WINDOW_WIDTH + (columns - 1) * GAP;
-        int start = Math.max(2, (this.width - rowWidth) / 2);
-        int top = TOP_BAR_HEIGHT + GAP;
+    @Override
+    public void render(DrawContext graphics, int mouseX, int mouseY, float deltaTicks) {
+        ClickGuiColors theme = theme();
+        this.hitRegions.clear();
+        boolean[] macroDrawn = new boolean[MACRO_COUNT];
+        graphics.fill(0, 0, this.width, this.height, theme.backdrop());
+        drawFrame(graphics, theme);
+        drawSidebar(graphics, mouseX, mouseY, theme);
+        drawHeader(graphics, theme);
+        drawModuleList(graphics, mouseX, mouseY, theme);
+        drawInspector(graphics, mouseX, mouseY, theme, macroDrawn);
+        drawFooter(graphics, theme);
+        for (int slot = 0; slot < MACRO_COUNT; slot++) if (!macroDrawn[slot]) hideMacroInput(slot);
+        super.render(graphics, mouseX, mouseY, deltaTicks);
+    }
 
-        for (int index = 0; index < Math.min(columns, total); index++) {
+    private void drawFrame(DrawContext graphics, ClickGuiColors theme) {
+        RoundedGui.fill(graphics, this.frameX + 4, this.frameY + 6, this.frameWidth, this.frameHeight, 12, 0x62000000);
+        RoundedGui.fill(graphics, this.frameX, this.frameY, this.frameWidth, this.frameHeight, 12, theme.bar());
+        RoundedGui.fill(graphics, this.frameX + 1, this.frameY + 1, SIDEBAR_WIDTH - 1, this.frameHeight - 2, 11, theme.window());
+        graphics.fill(this.workspaceX, this.frameY + HEADER_HEIGHT, this.frameX + this.frameWidth, this.frameY + this.frameHeight - FOOTER_HEIGHT, theme.nest());
+        graphics.fill(this.workspaceX, this.frameY + 12, this.workspaceX + 1, this.frameY + this.frameHeight - 12, theme.outlineSoft());
+        graphics.fill(this.workspaceX + 12, this.workspaceY - 1, this.frameX + this.frameWidth - 12, this.workspaceY, theme.outlineSoft());
+    }
+
+    private void drawSidebar(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme) {
+        int brandX = this.frameX + 14;
+        int brandY = this.frameY + 13;
+        RoundedGui.fill(graphics, brandX, brandY, 22, 22, 7, theme.accent());
+        graphics.drawText(font(), ArcaneFont.text("A"), brandX + 7, brandY + 7, opaque(theme.bar()), false);
+        graphics.drawText(font(), ArcaneFont.text("ARCANE"), brandX + 29, brandY + 4, theme.text(), false);
+        graphics.drawText(font(), ArcaneFont.text("CLIENT"), brandX + 29, brandY + 14, theme.accentBright(), false);
+
+        int navY = this.frameY + 58;
+        graphics.drawText(font(), ArcaneFont.text("WORKSPACE"), brandX, navY, theme.faint(), false);
+        navY += 15;
+        for (int index = 0; index < this.categories.size(); index++) {
             GuiCategory category = this.categories.get(index);
-            category.moveTo(start + index * (WINDOW_WIDTH + GAP), top);
-            category.setOpen(true);
+            boolean selected = category == this.selectedCategory;
+            boolean hovered = contains(brandX - 5, navY, SIDEBAR_WIDTH - 18, NAV_ROW_HEIGHT - 3, mouseX, mouseY);
+            if (selected) {
+                RoundedGui.fill(graphics, brandX - 5, navY, SIDEBAR_WIDTH - 18, NAV_ROW_HEIGHT - 3, 7, theme.active());
+                RoundedGui.fill(graphics, brandX - 5, navY + 7, 3, NAV_ROW_HEIGHT - 17, 2, theme.accent());
+            } else if (hovered) {
+                RoundedGui.fill(graphics, brandX - 5, navY, SIDEBAR_WIDTH - 18, NAV_ROW_HEIGHT - 3, 7, theme.hover());
+            }
+            String number = String.format(Locale.ROOT, "%02d", index + 1);
+            int textY = navY + (NAV_ROW_HEIGHT - 3 - lineHeight()) / 2;
+            graphics.drawText(font(), ArcaneFont.text(number), brandX + 2, textY, selected ? theme.accentBright() : theme.faint(), false);
+            OrderedText label = ArcaneFont.trimmed(font(), titleCase(category.name()), SIDEBAR_WIDTH - 54);
+            graphics.drawText(font(), label, brandX + 24, textY, selected ? theme.text() : theme.muted(), false);
+            this.hitRegions.add(HitRegion.category(category, brandX - 5, navY, SIDEBAR_WIDTH - 18, NAV_ROW_HEIGHT - 3));
+            navY += NAV_ROW_HEIGHT;
         }
 
-        // Anything that will not fit across the screen is parked as a collapsed title the user can
-        // open or drag out, rather than being stacked on top of an already open window.
-        int parkedY = this.height - BOTTOM_BAR_HEIGHT - GAP - HEADER_HEIGHT;
-        int parkedCount = Math.max(0, total - columns);
-        int parkedRows = parkedCount == 0 ? 0 : (parkedCount + columns - 1) / columns;
-        this.openWindowBottom = parkedRows == 0
-            ? this.height - BOTTOM_BAR_HEIGHT - 4
-            : parkedY - (parkedRows - 1) * (HEADER_HEIGHT + 4) - GAP;
-        for (int index = columns; index < total; index++) {
-            GuiCategory category = this.categories.get(index);
-            int slot = index - columns;
-            category.moveTo(start + (slot % columns) * (WINDOW_WIDTH + GAP), parkedY - (slot / columns) * (HEADER_HEIGHT + 4));
-            category.setOpen(false);
+        if (this.frameHeight >= 310) {
+            int cardX = this.frameX + 10;
+            int cardY = this.frameY + this.frameHeight - 54;
+            RoundedGui.fill(graphics, cardX, cardY, SIDEBAR_WIDTH - 20, 39, 8, theme.header());
+            RoundedGui.fill(graphics, cardX + 9, cardY + 10, 7, 7, 4, theme.accent());
+            graphics.drawText(font(), ArcaneFont.text("SYSTEM ONLINE"), cardX + 21, cardY + 8, theme.text(), false);
+            graphics.drawText(font(), ArcaneFont.text(activeModuleCount() + " active modules"), cardX + 9, cardY + 22, theme.faint(), false);
         }
     }
 
-    /** Positions every row of one window and clips tall bodies into a scrollable viewport. */
-    private List<Row> layout(GuiCategory category) {
-        List<Row> rows = new ArrayList<>();
-        int x = category.x();
-        int y = category.y();
-        rows.add(new Row(RowKind.HEADER, category, null, null, x, y, HEADER_HEIGHT));
-
-        int contentHeight = HEADER_HEIGHT;
-        if (category.open()) {
-            for (GuiModule module : category.visible()) {
-                contentHeight += MODULE_HEIGHT;
-                if (!module.expanded() || !module.hasSettings()) continue;
-                contentHeight += descriptionHeight(module);
-                for (GuiSetting setting : module.settings()) contentHeight += setting.height();
-                contentHeight += NEST_PAD;
-            }
-            contentHeight += BODY_PAD;
-        }
-        int viewportHeight = category.open()
-            ? Math.min(contentHeight, fittedWindowHeight(category, maxWindowHeight(category)))
-            : HEADER_HEIGHT;
-        category.setLayoutHeights(contentHeight, viewportHeight);
-
-        if (category.open()) {
-            int rowY = y + HEADER_HEIGHT - category.scrollOffset();
-            for (GuiModule module : category.visible()) {
-                rows.add(new Row(RowKind.MODULE, category, module, null, x, rowY, MODULE_HEIGHT));
-                rowY += MODULE_HEIGHT;
-                if (!module.expanded() || !module.hasSettings()) continue;
-                int descriptionHeight = descriptionHeight(module);
-                rows.add(new Row(RowKind.DESCRIPTION, category, module, null, x, rowY, descriptionHeight));
-                rowY += descriptionHeight;
-                for (GuiSetting setting : module.settings()) {
-                    rows.add(new Row(RowKind.SETTING, category, module, setting, x, rowY, setting.height()));
-                    rowY += setting.height();
-                }
-                rows.add(new Row(RowKind.NEST_FOOT, category, module, null, x, rowY, NEST_PAD));
-                rowY += NEST_PAD;
-            }
-        }
-        return rows;
+    private void drawHeader(DrawContext graphics, ClickGuiColors theme) {
+        int x = this.workspaceX + 14;
+        int y = this.frameY + 11;
+        String categoryName = this.query.isEmpty() ? titleCase(this.selectedCategory.name()) : "Search results";
+        graphics.drawText(font(), ArcaneFont.text(categoryName), x, y, theme.text(), false);
+        String context = this.query.isEmpty()
+            ? this.selectedCategory.visible().size() + " modules · " + this.selectedCategory.enabledCount() + " active"
+            : visibleModuleCount() + " matches across Arcane";
+        graphics.drawText(font(), ArcaneFont.text(context), x, y + 15, theme.faint(), false);
+        int searchX = this.searchInput.getX();
+        int searchY = this.searchInput.getY();
+        int searchWidth = this.searchInput.getWidth();
+        boolean focused = this.searchInput.isFocused();
+        RoundedGui.fill(graphics, searchX - 25, searchY - 5, searchWidth + 31, 22, 8, focused ? theme.hover() : theme.header());
+        graphics.drawText(font(), ArcaneFont.text("⌕"), searchX - 17, searchY + 1, focused ? theme.accentBright() : theme.faint(), false);
+        if (focused) graphics.fill(searchX - 18, searchY + 15, searchX + searchWidth, searchY + 16, theme.accentDim());
     }
 
-    private int fittedWindowHeight(GuiCategory category, int maximumHeight) {
-        if (maximumHeight <= HEADER_HEIGHT) return HEADER_HEIGHT;
-        int available = maximumHeight - HEADER_HEIGHT - BODY_PAD;
-        int used = 0;
-        for (GuiModule module : category.visible()) {
-            if (used + MODULE_HEIGHT > available) break;
-            used += MODULE_HEIGHT;
-            if (!module.expanded() || !module.hasSettings()) continue;
+    private void drawModuleList(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme) {
+        RoundedGui.fill(graphics, this.listX, this.listY, this.listWidth, this.listHeight, 10, theme.window());
+        graphics.drawText(font(), ArcaneFont.text("MODULES"), this.listX + 12, this.listY + 10, theme.faint(), false);
+        List<ModuleEntry> entries = visibleEntries();
+        int viewportY = this.listY + 27;
+        int viewportHeight = this.listHeight - 34;
+        int contentHeight = entries.size() * MODULE_ROW_HEIGHT;
+        this.listMaxScroll = Math.max(0, contentHeight - viewportHeight);
+        this.listScroll = Math.clamp(this.listScroll, 0, this.listMaxScroll);
+        graphics.enableScissor(this.listX + 5, viewportY, this.listX + this.listWidth - 5, viewportY + viewportHeight);
+        int rowY = viewportY - this.listScroll;
+        for (ModuleEntry entry : entries) {
+            if (rowY + MODULE_ROW_HEIGHT >= viewportY && rowY <= viewportY + viewportHeight) drawModuleCard(graphics, entry, rowY, mouseX, mouseY, theme);
+            rowY += MODULE_ROW_HEIGHT;
+        }
+        graphics.disableScissor();
+        if (entries.isEmpty()) graphics.drawCenteredTextWithShadow(font(), ArcaneFont.text("No matching modules"), this.listX + this.listWidth / 2, this.listY + this.listHeight / 2, theme.faint());
+        drawScrollBar(graphics, this.listX + this.listWidth - 5, viewportY, viewportHeight, this.listScroll, this.listMaxScroll, contentHeight, theme);
+    }
 
-            int descriptionHeight = descriptionHeight(module);
-            if (used + descriptionHeight > available) break;
-            used += descriptionHeight;
-            boolean settingsFit = true;
+    private void drawModuleCard(DrawContext graphics, ModuleEntry entry, int y, int mouseX, int mouseY, ClickGuiColors theme) {
+        GuiModule module = entry.module();
+        int x = this.listX + 7;
+        int width = this.listWidth - 14;
+        int height = MODULE_ROW_HEIGHT - 5;
+        boolean selected = module == this.selectedModule;
+        boolean hovered = contains(x, y, width, height, mouseX, mouseY);
+        RoundedGui.fill(graphics, x, y, width, height, 8, selected ? theme.active() : hovered ? theme.hover() : theme.row());
+        if (selected) RoundedGui.fill(graphics, x, y + 9, 3, height - 18, 2, theme.accent());
+        int labelX = x + 11;
+        int labelY = y + 7;
+        int toggleReserve = module.toggleable() ? 37 : 10;
+        graphics.drawText(font(), ArcaneFont.trimmed(font(), module.name(), width - toggleReserve - 18), labelX, labelY, selected ? theme.text() : theme.muted(), false);
+        String meta = this.query.isEmpty() ? shortDescription(module.description(), width - 56) : titleCase(entry.category().name());
+        graphics.drawText(font(), ArcaneFont.trimmed(font(), meta, width - 56), labelX, labelY + 13, theme.faint(), false);
+        if (module.toggleable()) drawSwitch(graphics, x + width - 30, y + 11, module.enabled(), theme);
+        else if (module.valueLabel() != null) {
+            OrderedText value = ArcaneFont.trimmed(font(), module.valueLabel(), 48);
+            graphics.drawText(font(), value, x + width - font().getWidth(value) - 9, labelY + 13, theme.accentBright(), false);
+        }
+        int viewportTop = this.listY + 27;
+        int viewportBottom = this.listY + this.listHeight - 7;
+        if (y >= viewportTop && y + height <= viewportBottom) {
+            this.hitRegions.add(HitRegion.module(entry.category(), module, x, y, width, height));
+        }
+    }
+
+    private void drawInspector(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
+        RoundedGui.fill(graphics, this.detailX, this.detailY, this.detailWidth, this.detailHeight, 10, theme.window());
+        GuiModule module = this.selectedModule;
+        if (module == null) {
+            graphics.drawCenteredTextWithShadow(font(), ArcaneFont.text("Select a module"), this.detailX + this.detailWidth / 2, this.detailY + this.detailHeight / 2, theme.faint());
+            this.detailMaxScroll = 0;
+            return;
+        }
+        int pad = 13;
+        int contentX = this.detailX + pad;
+        int contentWidth = this.detailWidth - pad * 2;
+        List<String> description = wrap(module.description(), Math.max(70, contentWidth - 2));
+        int introHeight = 50 + description.size() * proseHeight();
+        int settingsHeight = module.hasSettings() ? 18 : 0;
+        for (GuiSetting setting : module.settings()) settingsHeight += settingHeight(setting) + 4;
+        int contentHeight = introHeight + settingsHeight + 12;
+        this.detailMaxScroll = Math.max(0, contentHeight - this.detailHeight);
+        this.detailScroll = Math.clamp(this.detailScroll, 0, this.detailMaxScroll);
+        graphics.enableScissor(this.detailX + 1, this.detailY + 1, this.detailX + this.detailWidth - 1, this.detailY + this.detailHeight - 1);
+        int y = this.detailY + 12 - this.detailScroll;
+        graphics.drawText(font(), ArcaneFont.text("MODULE SETTINGS"), contentX, y, theme.faint(), false);
+        y += 17;
+        graphics.drawText(font(), ArcaneFont.text(module.name()), contentX, y, theme.text(), false);
+        if (module.toggleable()) {
+            drawSwitch(graphics, this.detailX + this.detailWidth - 37, y - 2, module.enabled(), theme);
+            if (y - 6 >= this.detailY && y + 16 <= this.detailY + this.detailHeight) {
+                this.hitRegions.add(HitRegion.moduleToggle(module, this.detailX + this.detailWidth - 42, y - 6, 34, 22));
+            }
+        }
+        y += 17;
+        for (String line : description) {
+            graphics.drawText(font(), ArcaneFont.text(line), contentX, y, theme.muted(), false);
+            y += proseHeight();
+        }
+        y += 8;
+        if (!module.hasSettings()) {
+            RoundedGui.fill(graphics, contentX, y, contentWidth, 30, 8, theme.header());
+            graphics.drawText(font(), ArcaneFont.text("No additional configuration"), contentX + 10, y + 10, theme.faint(), false);
+        } else {
+            graphics.drawText(font(), ArcaneFont.text("CONFIGURATION"), contentX, y, theme.faint(), false);
+            y += 15;
             for (GuiSetting setting : module.settings()) {
-                if (used + setting.height() > available) {
-                    settingsFit = false;
-                    break;
-                }
-                used += setting.height();
+                int height = settingHeight(setting);
+                drawSetting(graphics, setting, contentX, y, contentWidth, height, mouseX, mouseY, theme, macroDrawn);
+                y += height + 4;
             }
-            if (!settingsFit || used + NEST_PAD > available) break;
-            used += NEST_PAD;
         }
-        return HEADER_HEIGHT + used + BODY_PAD;
+        graphics.disableScissor();
+        drawScrollBar(graphics, this.detailX + this.detailWidth - 5, this.detailY + 6, this.detailHeight - 12, this.detailScroll, this.detailMaxScroll, contentHeight, theme);
     }
 
-    private int maxWindowHeight(GuiCategory category) {
-        int screenBottom = this.height - BOTTOM_BAR_HEIGHT - 4;
-        int bottom = category.y() < this.openWindowBottom ? this.openWindowBottom : screenBottom;
-        return Math.max(HEADER_HEIGHT, bottom - category.y());
+    private void drawSetting(DrawContext graphics, GuiSetting setting, int x, int y, int width, int height, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
+        boolean hovered = contains(x, y, width, height, mouseX, mouseY);
+        RoundedGui.fill(graphics, x, y, width, height, 7, hovered && !(setting instanceof GuiSetting.Info) ? theme.hover() : theme.header());
+        int right = x + width - 10;
+        int textY = y + (setting instanceof GuiSetting.Slider ? 7 : (height - lineHeight()) / 2);
+        graphics.drawText(font(), ArcaneFont.text(setting.label()), x + 10, textY, theme.muted(), false);
+        switch (setting) {
+            case GuiSetting.Toggle toggle -> drawSwitch(graphics, right - 24, y + (height - 11) / 2, toggle.value(), theme);
+            case GuiSetting.ToggleSwatch toggle -> {
+                drawSwatch(graphics, right - 47, y + (height - 10) / 2, 15, toggle.color(), theme);
+                drawSwitch(graphics, right - 24, y + (height - 11) / 2, toggle.value(), theme);
+            }
+            case GuiSetting.Slider slider -> {
+                String display = slider.display();
+                graphics.drawText(font(), ArcaneFont.text(display), right - ArcaneFont.width(font(), display), textY, theme.text(), false);
+                int trackX = x + 10;
+                int trackWidth = width - 20;
+                int trackY = y + height - 8;
+                RoundedGui.fill(graphics, trackX, trackY, trackWidth, 3, 2, theme.outlineSoft());
+                int filled = Math.round(trackWidth * slider.fraction());
+                if (filled > 0) RoundedGui.fill(graphics, trackX, trackY, filled, 3, 2, theme.accent());
+                RoundedGui.fill(graphics, trackX + Math.clamp(filled - 3, 0, trackWidth - 6), trackY - 2, 6, 7, 3, theme.accentBright());
+            }
+            case GuiSetting.Swatch swatch -> drawSwatch(graphics, right - 28, y + (height - 10) / 2, 28, swatch.color(), theme);
+            case GuiSetting.Cycle cycle -> drawValuePill(graphics, right, y, height, cycle.value(), theme);
+            case GuiSetting.Bind bind -> drawKeyPill(graphics, right, y, height, bind.mapping(), theme, BIND_KEY_WIDTH);
+            case GuiSetting.Info info -> {
+                String value = info.value();
+                graphics.drawText(font(), ArcaneFont.text(value), right - ArcaneFont.width(font(), value), textY, theme.accentBright(), false);
+            }
+            case GuiSetting.Message message -> {
+                int fieldX = right - MACRO_FIELD_WIDTH - 39;
+                RoundedGui.fill(graphics, fieldX - 5, y + 6, MACRO_FIELD_WIDTH + 10, 16, 6, theme.window());
+                TextFieldWidget input = this.macroInputs.get(message.slot());
+                input.setX(fieldX);
+                input.setY(y + 9);
+                input.setVisible(y >= this.detailY && y + height <= this.detailY + this.detailHeight);
+                macroDrawn[message.slot()] = input.isVisible();
+                if (message.mapping() != null) drawKeyPill(graphics, right, y, height, message.mapping(), theme, 27);
+            }
+        }
+        if (y >= this.detailY && y + height <= this.detailY + this.detailHeight) {
+            this.hitRegions.add(HitRegion.setting(setting, x, y, width, height));
+        }
     }
 
-    private int descriptionHeight(GuiModule module) {
-        return 5 + wrap(module.description(), WINDOW_WIDTH - NEST_INSET - 16).size() * proseHeight() + 4;
+    private void drawFooter(DrawContext graphics, ClickGuiColors theme) {
+        int y = this.frameY + this.frameHeight - FOOTER_HEIGHT;
+        graphics.fill(this.workspaceX + 12, y, this.frameX + this.frameWidth - 12, y + 1, theme.outlineSoft());
+        int textY = y + (FOOTER_HEIGHT - lineHeight()) / 2;
+        String hint = this.listeningFor != null ? "Press a key · Esc clears the bind" : "Left click toggles · Right click configures · Middle click binds";
+        graphics.drawText(font(), ArcaneFont.text(hint), this.workspaceX + 14, textY, this.listeningFor != null ? theme.accentBright() : theme.faint(), false);
+        updateFpsLabel();
+        int right = this.frameX + this.frameWidth - 14;
+        graphics.drawText(font(), ArcaneFont.text(this.fpsLabel), right - ArcaneFont.width(font(), this.fpsLabel), textY, theme.muted(), false);
+    }
+
+    private void drawScrollBar(DrawContext graphics, int x, int y, int height, int offset, int maxOffset, int contentHeight, ClickGuiColors theme) {
+        if (maxOffset <= 0 || contentHeight <= 0) return;
+        int thumbHeight = Math.max(14, height * height / Math.max(height, contentHeight));
+        int travel = Math.max(0, height - thumbHeight);
+        int thumbY = y + travel * offset / maxOffset;
+        RoundedGui.fill(graphics, x, thumbY, 2, thumbHeight, 1, theme.accentDim());
+    }
+
+    private static void drawSwitch(DrawContext graphics, int x, int y, boolean enabled, ClickGuiColors theme) {
+        RoundedGui.fill(graphics, x, y, 24, 11, 6, enabled ? theme.accent() : theme.outlineSoft());
+        RoundedGui.fill(graphics, enabled ? x + 15 : x + 2, y + 2, 7, 7, 4, enabled ? opaque(theme.bar()) : theme.muted());
+    }
+
+    private void drawValuePill(DrawContext graphics, int right, int y, int height, String value, ClickGuiColors theme) {
+        OrderedText text = ArcaneFont.trimmed(font(), value, 74);
+        int textWidth = font().getWidth(text);
+        int width = Math.max(28, textWidth + 12);
+        int pillY = y + (height - 16) / 2;
+        RoundedGui.fill(graphics, right - width, pillY, width, 16, 6, theme.window());
+        graphics.drawText(font(), text, right - width + 6, pillY + 4, theme.accentBright(), false);
+    }
+
+    private void drawKeyPill(DrawContext graphics, int right, int y, int height, KeyBinding mapping, ClickGuiColors theme, int maxKeyWidth) {
+        boolean listening = this.listeningFor == mapping;
+        String raw = listening ? "..." : mapping.isUnbound() ? "—" : mapping.getBoundKeyLocalizedText().getString();
+        OrderedText key = ArcaneFont.trimmed(font(), raw, maxKeyWidth);
+        int keyWidth = font().getWidth(key);
+        int width = Math.max(24, keyWidth + 10);
+        int pillY = y + (height - 16) / 2;
+        RoundedGui.fill(graphics, right - width, pillY, width, 16, 6, listening ? theme.active() : theme.window());
+        graphics.drawText(font(), key, right - width + (width - keyWidth) / 2, pillY + 4, listening ? theme.text() : theme.muted(), false);
+    }
+
+    private static void drawSwatch(DrawContext graphics, int x, int y, int width, int color, ClickGuiColors theme) {
+        RoundedGui.fill(graphics, x, y, width, 10, 4, color | 0xFF000000);
+        RoundedGui.fill(graphics, x + 3, y + 2, Math.max(1, width - 6), 1, 1, theme.outlineSoft());
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        int amount = (int) Math.round(-verticalAmount * 24.0);
+        if (contains(this.listX, this.listY, this.listWidth, this.listHeight, mouseX, mouseY)) {
+            this.listScroll = Math.clamp(this.listScroll + amount, 0, this.listMaxScroll);
+            return true;
+        }
+        if (contains(this.detailX, this.detailY, this.detailWidth, this.detailHeight, mouseX, mouseY)) {
+            this.detailScroll = Math.clamp(this.detailScroll + amount, 0, this.detailMaxScroll);
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    @Override
+    public boolean mouseClicked(Click click, boolean doubled) {
+        if (this.listeningFor != null) {
+            setBinding(InputUtil.Type.MOUSE.createFromCode(click.button()));
+            return true;
+        }
+        int mouseX = (int) click.x();
+        int mouseY = (int) click.y();
+        int button = click.button();
+        if (button < 0 || button > 2) return super.mouseClicked(click, doubled);
+        for (int index = this.hitRegions.size() - 1; index >= 0; index--) {
+            HitRegion region = this.hitRegions.get(index);
+            if (!region.contains(mouseX, mouseY)) continue;
+            switch (region.kind()) {
+                case CATEGORY -> {
+                    selectCategory(region.category());
+                    setFocused(null);
+                    return true;
+                }
+                case MODULE -> {
+                    this.selectedCategory = region.category();
+                    this.selectedModule = region.module();
+                    this.detailScroll = 0;
+                    setFocused(null);
+                    if (button == 2) startListening(firstBind(region.module()));
+                    else if (button == 0 && region.module().toggleable()) region.module().toggle();
+                    return true;
+                }
+                case MODULE_TOGGLE -> {
+                    if (button == 0 && region.module().toggleable()) region.module().toggle();
+                    return true;
+                }
+                case SETTING -> {
+                    Boolean handled = handleSettingClick(region, click, doubled, mouseX, mouseY, button);
+                    if (handled != null) return handled;
+                }
+            }
+        }
+        return super.mouseClicked(click, doubled);
+    }
+
+    private @Nullable Boolean handleSettingClick(HitRegion region, Click click, boolean doubled, int mouseX, int mouseY, int button) {
+        GuiSetting setting = region.setting();
+        if (setting == null) return true;
+        if (setting instanceof GuiSetting.Message message) {
+            int right = region.x() + region.width() - 10;
+            int fieldX = right - MACRO_FIELD_WIDTH - 39;
+            if (mouseX >= fieldX - 5 && mouseX < fieldX + MACRO_FIELD_WIDTH + 5) return super.mouseClicked(click, doubled);
+            if (button == 0 && message.mapping() != null && mouseX >= right - 34) startListening(message.mapping());
+            return true;
+        }
+        if (button != 0) return true;
+        setFocused(null);
+        switch (setting) {
+            case GuiSetting.Toggle toggle -> toggle.toggle();
+            case GuiSetting.ToggleSwatch toggle -> {
+                int right = region.x() + region.width() - 10;
+                if (mouseX >= right - 52 && mouseX < right - 28) toggle.cycleColor();
+                else toggle.toggle();
+            }
+            case GuiSetting.Slider slider -> {
+                if (mouseY >= region.y() + region.height() - 13) {
+                    this.draggingSlider = slider;
+                    this.sliderTrackX = region.x() + 10;
+                    this.sliderTrackWidth = region.width() - 20;
+                    updateSlider(mouseX);
+                }
+            }
+            case GuiSetting.Swatch swatch -> swatch.cycleColor();
+            case GuiSetting.Cycle cycle -> cycle.next();
+            case GuiSetting.Bind bind -> startListening(bind.mapping());
+            case GuiSetting.Info ignored -> { }
+            case GuiSetting.Message ignored -> { }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+        if (this.draggingSlider != null) {
+            updateSlider((int) click.x());
+            return true;
+        }
+        return super.mouseDragged(click, offsetX, offsetY);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+        if (this.draggingSlider != null) {
+            this.draggingSlider = null;
+            return true;
+        }
+        return super.mouseReleased(click);
+    }
+
+    @Override
+    public boolean keyPressed(KeyInput input) {
+        if (this.listeningFor != null) {
+            if (input.key() == 256 || input.key() == 261 || input.key() == 259) setBinding(InputUtil.UNKNOWN_KEY);
+            else setBinding(InputUtil.fromKeyCode(input));
+            return true;
+        }
+        if (input.key() == 256 && this.searchInput != null && this.searchInput.isFocused() && !this.searchText.isEmpty()) {
+            this.searchInput.setText("");
+            this.searchInput.setFocused(false);
+            return true;
+        }
+        return super.keyPressed(input);
+    }
+
+    private void selectCategory(@Nullable GuiCategory category) {
+        if (category == null) return;
+        this.selectedCategory = category;
+        this.selectedModule = category.visible().isEmpty() ? null : category.visible().getFirst();
+        this.listScroll = 0;
+        this.detailScroll = 0;
+    }
+
+    private void ensureSelection() {
+        if (this.selectedCategory == null) this.selectedCategory = this.categories.getFirst();
+        if (!this.query.isEmpty() && this.selectedCategory.visible().isEmpty()) {
+            for (GuiCategory category : this.categories) if (!category.visible().isEmpty()) {
+                this.selectedCategory = category;
+                break;
+            }
+        }
+        if (this.selectedModule == null || !this.selectedCategory.visible().contains(this.selectedModule)) {
+            this.selectedModule = this.selectedCategory.visible().isEmpty() ? null : this.selectedCategory.visible().getFirst();
+            this.detailScroll = 0;
+        }
+    }
+
+    private List<ModuleEntry> visibleEntries() {
+        List<ModuleEntry> entries = new ArrayList<>();
+        if (this.query.isEmpty()) {
+            for (GuiModule module : this.selectedCategory.visible()) entries.add(new ModuleEntry(this.selectedCategory, module));
+            return entries;
+        }
+        for (GuiCategory category : this.categories) for (GuiModule module : category.visible()) entries.add(new ModuleEntry(category, module));
+        return entries;
+    }
+
+    private void updateFilter(String value) {
+        this.searchText = value;
+        this.query = value.trim().toLowerCase(Locale.ROOT);
+        for (GuiCategory category : this.categories) category.filter(this.query);
+        this.listScroll = 0;
+        ensureSelection();
+    }
+
+    private int visibleModuleCount() {
+        int count = 0;
+        for (GuiCategory category : this.categories) count += category.visible().size();
+        return count;
+    }
+
+    private int activeModuleCount() {
+        int active = 0;
+        for (GuiCategory category : this.categories) for (GuiModule module : category.modules()) if (module.enabled()) active++;
+        return active;
+    }
+
+    private void updateFpsLabel() {
+        long now = System.nanoTime();
+        if (now < this.nextFpsUpdateNanos && !this.fpsLabel.isEmpty()) return;
+        this.nextFpsUpdateNanos = now + 500_000_000L;
+        this.fpsLabel = this.client == null ? "— FPS" : this.client.getCurrentFps() + " FPS";
+    }
+
+    private void startListening(@Nullable KeyBinding mapping) {
+        if (mapping == null) return;
+        this.listeningFor = mapping;
+        for (TextFieldWidget input : this.macroInputs) input.setFocused(false);
+    }
+
+    private void setBinding(InputUtil.Key key) {
+        if (this.listeningFor == null) return;
+        this.listeningFor.setBoundKey(key);
+        this.listeningFor = null;
+        KeyBinding.updateKeysByCode();
+        this.client.options.write();
+    }
+
+    private void updateSlider(int mouseX) {
+        if (this.draggingSlider == null || this.sliderTrackWidth <= 0) return;
+        this.draggingSlider.setFraction((float) (mouseX - this.sliderTrackX) / this.sliderTrackWidth);
+    }
+
+    private static @Nullable KeyBinding firstBind(GuiModule module) {
+        for (GuiSetting setting : module.settings()) if (setting instanceof GuiSetting.Bind bind) return bind.mapping();
+        return null;
     }
 
     private List<String> wrap(String text, int maxWidth) {
@@ -236,783 +626,87 @@ public final class ArcaneSettingsScreen extends Screen {
             if (!line.isEmpty() && ArcaneFont.width(font(), candidate) > maxWidth) {
                 lines.add(line.toString());
                 line = new StringBuilder(word);
-            } else {
-                line = new StringBuilder(candidate);
-            }
+            } else line = new StringBuilder(candidate);
         }
-        if (!line.isEmpty()) {
-            lines.add(line.toString());
-        }
+        if (!line.isEmpty()) lines.add(line.toString());
         return List.copyOf(lines);
     }
 
-    // -----------------------------------------------------------------------------------------
-    // Rendering
-    // -----------------------------------------------------------------------------------------
-
-    @Override
-    public void render(DrawContext graphics, int mouseX, int mouseY, float deltaTicks) {
-        ClickGuiColors theme = theme();
-        this.hoveredModule = null;
-        boolean[] macroDrawn = new boolean[MACRO_COUNT];
-
-        graphics.fill(0, 0, this.width, this.height, theme.backdrop());
-
-        for (GuiCategory category : this.categories) {
-            layout(category);
-            clamp(category);
-            List<Row> rows = layout(category);
-            drawWindowBody(graphics, category, theme);
-            for (Row row : rows) {
-                if (row.kind() == RowKind.HEADER) {
-                    drawRow(graphics, row, mouseX, mouseY, theme, macroDrawn);
-                }
-            }
-            if (category.open() && category.lastHeight() > HEADER_HEIGHT) {
-                graphics.enableScissor(
-                    category.x(),
-                    category.y() + HEADER_HEIGHT,
-                    category.x() + WINDOW_WIDTH,
-                    category.y() + category.lastHeight()
-                );
-                for (Row row : rows) {
-                    if (row.kind() != RowKind.HEADER && rowVisible(row)) {
-                        drawRow(graphics, row, mouseX, mouseY, theme, macroDrawn);
-                    }
-                }
-                graphics.disableScissor();
-                drawScrollBar(graphics, category, theme);
-            }
-        }
-
-        for (int slot = 0; slot < MACRO_COUNT; slot++) {
-            if (!macroDrawn[slot]) {
-                hideMacroInput(slot);
-            }
-        }
-
-        drawTopBar(graphics, theme);
-        drawBottomBar(graphics, theme);
-        super.render(graphics, mouseX, mouseY, deltaTicks);
-        drawModuleTooltip(graphics, mouseX, mouseY, theme);
+    private String shortDescription(String description, int maxWidth) {
+        return description;
     }
 
-    private boolean rowVisible(Row row) {
-        int top = row.category().y() + HEADER_HEIGHT;
-        int bottom = row.category().y() + row.category().lastHeight();
-        return row.y() < bottom && row.y() + row.height() > top;
+    private static String titleCase(String value) {
+        String lower = value.toLowerCase(Locale.ROOT);
+        StringBuilder result = new StringBuilder(lower.length());
+        boolean upper = true;
+        for (int index = 0; index < lower.length(); index++) {
+            char character = lower.charAt(index);
+            result.append(upper ? Character.toUpperCase(character) : character);
+            upper = character == ' ';
+        }
+        return result.toString();
     }
 
-    private void drawScrollBar(DrawContext graphics, GuiCategory category, ClickGuiColors theme) {
-        if (category.maxScroll() <= 0) return;
-        int trackY = category.y() + HEADER_HEIGHT + 3;
-        int trackHeight = Math.max(8, category.lastHeight() - HEADER_HEIGHT - 6);
-        int visibleBody = category.lastHeight() - HEADER_HEIGHT;
-        int contentBody = Math.max(visibleBody, category.contentHeight() - HEADER_HEIGHT);
-        int thumbHeight = Math.max(8, trackHeight * visibleBody / contentBody);
-        int travel = Math.max(0, trackHeight - thumbHeight);
-        int thumbY = trackY + (category.maxScroll() == 0 ? 0 : travel * category.scrollOffset() / category.maxScroll());
-        graphics.fill(category.x() + WINDOW_WIDTH - 4, trackY, category.x() + WINDOW_WIDTH - 2, trackY + trackHeight, theme.outlineSoft());
-        graphics.fill(category.x() + WINDOW_WIDTH - 4, thumbY, category.x() + WINDOW_WIDTH - 2, thumbY + thumbHeight, theme.accent());
+    private static int settingHeight(GuiSetting setting) {
+        if (setting instanceof GuiSetting.Slider) return 34;
+        if (setting instanceof GuiSetting.Message) return 28;
+        return 23;
     }
 
-    private void drawWindowBody(DrawContext graphics, GuiCategory category, ClickGuiColors theme) {
-        int x = category.x();
-        int y = category.y();
-        int height = category.lastHeight();
-        if (category.open()) {
-            RoundedGui.fill(graphics, x + 2, y + 3, WINDOW_WIDTH, height, 7, 0x48000000);
-        }
-        RoundedGui.fill(graphics, x, y, WINDOW_WIDTH, height, 7, theme.window());
-        RoundedGui.fill(graphics, x + 11, y + 1, WINDOW_WIDTH - 22, 1, 1, theme.outlineSoft());
+    private static boolean contains(int x, int y, int width, int height, double mouseX, double mouseY) {
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 
-    private void drawRow(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
-        switch (row.kind()) {
-            case HEADER -> drawHeader(graphics, row, mouseX, mouseY, theme);
-            case MODULE -> drawModule(graphics, row, mouseX, mouseY, theme);
-            case DESCRIPTION -> drawDescription(graphics, row, theme);
-            case SETTING -> drawSetting(graphics, row, mouseX, mouseY, theme, macroDrawn);
-            case NEST_FOOT -> {
-                graphics.fill(row.x() + 1, row.y(), row.x() + WINDOW_WIDTH - 1, row.y() + row.height(), theme.nest());
-                graphics.fill(row.x() + 1, row.y(), row.x() + 3, row.y() + row.height(), theme.accentDim());
-            }
-        }
-    }
-
-    private void drawHeader(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme) {
-        GuiCategory category = row.category();
-        int x = row.x();
-        int y = row.y();
-        RoundedGui.fill(graphics, x + 3, y + 2, WINDOW_WIDTH - 6, HEADER_HEIGHT - 3, 5, theme.header());
-        if (row.contains(mouseX, mouseY)) {
-            RoundedGui.fill(graphics, x + 3, y + 2, WINDOW_WIDTH - 6, HEADER_HEIGHT - 3, 5, theme.outlineSoft());
-        }
-        graphics.fill(x + 1, y + HEADER_HEIGHT - 1, x + WINDOW_WIDTH - 1, y + HEADER_HEIGHT, category.open() ? theme.accentDim() : theme.outlineSoft());
-        RoundedGui.fill(graphics, x + 8, y + 6, 3, 7, 2, theme.accent());
-
-        int textY = y + (HEADER_HEIGHT - lineHeight()) / 2;
-        graphics.drawText(font(), ArcaneFont.text(category.name()), x + 16, textY, theme.text(), false);
-
-        if (category.toggleableCount() > 0) {
-            String badge = category.enabledCount() + "/" + category.toggleableCount();
-            graphics.drawText(font(), ArcaneFont.text(badge), x + WINDOW_WIDTH - 22 - ArcaneFont.width(font(), badge), textY, theme.faint(), false);
-        }
-        if (category.open()) {
-            drawCaretDown(graphics, x + WINDOW_WIDTH - 15, y + 9, theme.muted());
-        } else {
-            drawCaretRight(graphics, x + WINDOW_WIDTH - 14, y + 8, theme.muted());
-        }
-    }
-
-    private void drawModule(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme) {
-        GuiModule module = row.module();
-        if (module == null) {
-            return;
-        }
-        int x = row.x();
-        int y = row.y();
-        boolean hovered = row.contains(mouseX, mouseY);
-        boolean enabled = module.enabled();
-        if (hovered) {
-            this.hoveredModule = module;
-        }
-
-        int background = enabled
-            ? (hovered ? theme.activeHover() : theme.active())
-            : (hovered ? theme.hover() : theme.row());
-        RoundedGui.fill(graphics, x + 4, y + 1, WINDOW_WIDTH - 8, MODULE_HEIGHT - 2, 5, background);
-        if (enabled) {
-            RoundedGui.fill(graphics, x + 8, y + 5, 3, 5, 2, theme.accent());
-        }
-
-        int textY = y + (MODULE_HEIGHT - lineHeight()) / 2;
-        int right = x + WINDOW_WIDTH - 8;
-        if (module.hasSettings()) {
-            int caretColor = module.expanded() ? theme.accentBright() : enabled ? theme.text() : theme.faint();
-            if (module.expanded()) {
-                drawCaretDown(graphics, right - 5, y + 7, caretColor);
-            } else {
-                drawCaretRight(graphics, right - 4, y + 6, caretColor);
-            }
-            right -= 12;
-        }
-        String value = module.valueLabel();
-        int labelRight = right - 3;
-        if (value != null) {
-            int valueX = right - ArcaneFont.width(font(), value);
-            graphics.drawText(font(), ArcaneFont.text(value), valueX, textY, theme.accentBright(), false);
-            labelRight = valueX - 5;
-        }
-        int labelX = x + 14;
-        OrderedText label = ArcaneFont.trimmed(font(), module.name(), UiGeometry.labelWidth(labelX, labelRight));
-        graphics.drawText(font(), label, labelX, textY, enabled ? theme.text() : theme.muted(), false);
-    }
-
-    private void drawDescription(DrawContext graphics, Row row, ClickGuiColors theme) {
-        GuiModule module = row.module();
-        if (module == null) {
-            return;
-        }
-        int x = row.x();
-        int y = row.y();
-        graphics.fill(x + 1, y, x + WINDOW_WIDTH - 1, y + row.height(), theme.nest());
-        graphics.fill(x + 1, y, x + 3, y + row.height(), theme.accentDim());
-        int lineY = y + 5;
-        for (String line : wrap(module.description(), WINDOW_WIDTH - NEST_INSET - 16)) {
-            graphics.drawText(font(), ArcaneFont.text(line), x + NEST_INSET + 5, lineY, theme.faint(), false);
-            lineY += proseHeight();
-        }
-    }
-
-    private void drawSetting(DrawContext graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
-        GuiSetting setting = row.setting();
-        if (setting == null) {
-            return;
-        }
-        int x = row.x();
-        int y = row.y();
-        int height = row.height();
-        boolean hovered = row.contains(mouseX, mouseY);
-
-        graphics.fill(x + 1, y, x + WINDOW_WIDTH - 1, y + height, theme.nest());
-        graphics.fill(x + 1, y, x + 3, y + height, theme.accentDim());
-        if (hovered && !(setting instanceof GuiSetting.Info)) {
-            graphics.fill(x + NEST_INSET, y, x + WINDOW_WIDTH - 1, y + height, theme.hover());
-        }
-
-        int labelX = x + NEST_INSET + 5;
-        int right = x + WINDOW_WIDTH - 8;
-        int textY = y + (setting instanceof GuiSetting.Slider ? 3 : (height - lineHeight()) / 2);
-        graphics.drawText(font(), ArcaneFont.text(setting.label()), labelX, textY, theme.muted(), false);
-
-        switch (setting) {
-            case GuiSetting.Toggle toggle -> drawCheckbox(graphics, right - 9, y + (height - 9) / 2, toggle.value(), theme);
-            case GuiSetting.ToggleSwatch toggle -> {
-                drawSwatch(graphics, right - 33, y + (height - 9) / 2, 14, toggle.color(), theme);
-                drawCheckbox(graphics, right - 9, y + (height - 9) / 2, toggle.value(), theme);
-            }
-            case GuiSetting.Slider slider -> {
-                String display = slider.display();
-                graphics.drawText(font(), ArcaneFont.text(display), right - ArcaneFont.width(font(), display), textY, theme.text(), false);
-                int trackX = sliderTrackX(x);
-                int trackWidth = sliderTrackWidth();
-                int trackY = y + height - 9;
-                fillRounded(graphics, trackX, trackY, trackWidth, 3, theme.outlineSoft());
-                int filled = Math.round(trackWidth * slider.fraction());
-                if (filled > 0) {
-                    fillRounded(graphics, trackX, trackY, filled, 3, theme.accent());
-                }
-                fillRounded(graphics, trackX + Math.clamp(filled - 2, 0, trackWidth - 4), trackY - 2, 4, 7, theme.accentBright());
-            }
-            case GuiSetting.Swatch swatch -> drawSwatch(graphics, right - 22, y + (height - 9) / 2, 22, swatch.color(), theme);
-            case GuiSetting.Cycle cycle -> {
-                String value = cycle.value();
-                int valueWidth = ArcaneFont.width(font(), value);
-                graphics.drawText(font(), ArcaneFont.text(">"), right - 4, textY, theme.faint(), false);
-                graphics.drawText(font(), ArcaneFont.text(value), right - 8 - valueWidth, textY, theme.accentBright(), false);
-                graphics.drawText(font(), ArcaneFont.text("<"), right - 12 - valueWidth - ArcaneFont.width(font(), "<"), textY, theme.faint(), false);
-            }
-            case GuiSetting.Bind bind -> drawKeyPill(graphics, right, y, height, bind.mapping(), theme, BIND_KEY_WIDTH);
-            case GuiSetting.Info info -> {
-                String value = info.value();
-                graphics.drawText(font(), ArcaneFont.text(value), right - ArcaneFont.width(font(), value), textY, theme.accentBright(), false);
-            }
-            case GuiSetting.Message message -> {
-                int fieldX = macroFieldX(x);
-                fillRounded(graphics, fieldX - 3, y + 3, MACRO_FIELD_WIDTH + 6, 14, theme.window());
-                outlineRounded(graphics, fieldX - 3, y + 3, MACRO_FIELD_WIDTH + 6, 14, theme.outlineSoft());
-                TextFieldWidget input = this.macroInputs.get(message.slot());
-                input.setX(fieldX);
-                input.setY(y + 6);
-                input.setVisible(true);
-                macroDrawn[message.slot()] = true;
-                KeyBinding mapping = message.mapping();
-                if (mapping != null) {
-                    drawKeyPill(graphics, right, y, height, mapping, theme, MACRO_KEY_WIDTH);
-                }
-            }
-        }
-    }
-
-    private void drawKeyPill(DrawContext graphics, int right, int y, int height, KeyBinding mapping, ClickGuiColors theme, int maxKeyWidth) {
-        boolean listening = this.listeningFor == mapping;
-        String raw = listening ? "..." : mapping.isUnbound() ? "-" : mapping.getBoundKeyLocalizedText().getString();
-        OrderedText key = ArcaneFont.trimmed(font(), raw, maxKeyWidth);
-        int keyWidth = font().getWidth(key);
-        int width = Math.max(20, keyWidth + 8);
-        int pillY = y + (height - 12) / 2;
-        fillRounded(graphics, right - width, pillY, width, 12, listening ? theme.accentDim() : theme.window());
-        outlineRounded(graphics, right - width, pillY, width, 12, listening ? theme.accent() : theme.outlineSoft());
-        graphics.drawText(font(), key, right - width + (width - keyWidth) / 2, pillY + (12 - lineHeight()) / 2 + 1, listening ? theme.text() : theme.muted(), false);
-    }
-
-    private void drawTopBar(DrawContext graphics, ClickGuiColors theme) {
-        int barX = 6;
-        int barY = 5;
-        int barHeight = 22;
-        int textY = barY + (barHeight - lineHeight()) / 2;
-        RoundedGui.fill(graphics, barX + 8, textY - 1, 3, lineHeight() + 3, 2, theme.accent());
-        graphics.drawText(font(), ArcaneFont.text("ARCANE"), barX + 16, textY, theme.text(), false);
-        int clientX = barX + 18 + ArcaneFont.width(font(), "ARCANE");
-        graphics.drawText(font(), ArcaneFont.text("CLIENT"), clientX, textY, theme.accent(), false);
-
-        int searchWidth = searchWidth();
-        int searchX = searchX(searchWidth);
-        boolean focused = this.searchInput != null && this.searchInput.isFocused();
-        RoundedGui.fill(graphics, searchX - 5, barY + 3, searchWidth + 10, 17, 7, theme.window());
-        if (focused) {
-            RoundedGui.outlineOnly(graphics, searchX - 5, barY + 3, searchWidth + 10, 17, 7, theme.accentDim());
-        } else {
-            RoundedGui.fill(graphics, searchX + 4, barY + 4, searchWidth - 8, 1, 1, theme.outlineSoft());
-        }
-
-        if (this.width >= 520) {
-            updateFpsLabel();
-            String status = this.width >= 700
-                ? activeModuleCount() + " ACTIVE  ·  " + totalModuleCount() + " MODULES"
-                : totalModuleCount() + " MODULES";
-            int right = this.width - 14;
-            graphics.drawText(font(), ArcaneFont.text(this.fpsLabel), right - ArcaneFont.width(font(), this.fpsLabel), textY, theme.muted(), false);
-            right -= ArcaneFont.width(font(), this.fpsLabel) + 12;
-            graphics.drawText(font(), ArcaneFont.text(status), right - ArcaneFont.width(font(), status), textY, theme.accentBright(), false);
-        }
-    }
-
-    private void drawBottomBar(DrawContext graphics, ClickGuiColors theme) {
-        int y = this.height - BOTTOM_BAR_HEIGHT;
-        int textY = y + (BOTTOM_BAR_HEIGHT - lineHeight()) / 2;
-        String hint = this.listeningFor != null
-            ? (this.width >= 460 ? "Press a key or mouse button   Esc unbinds" : "Press input   Esc unbinds")
-            : (this.width >= 500 ? "LMB toggle   RMB settings   MMB bind   Drag titles" : "LMB toggle   RMB settings");
-        int hintWidth = ArcaneFont.width(font(), hint) + 14;
-        RoundedGui.fill(graphics, 7, y + 2, hintWidth, 16, 7, 0x38000000);
-        RoundedGui.fill(graphics, 6, y, hintWidth, 16, 7, theme.bar());
-        RoundedGui.fill(graphics, 14, y + 1, hintWidth - 16, 1, 1, theme.outlineSoft());
-        graphics.drawText(font(), ArcaneFont.text(hint), 13, textY, this.listeningFor != null ? theme.accent() : theme.muted(), false);
-
-        if (!this.query.isEmpty() && this.width >= 360) {
-            String results = visibleModuleCount() + " results";
-            int resultWidth = ArcaneFont.width(font(), results) + 14;
-            int resultX = this.width - resultWidth - 6;
-            RoundedGui.fill(graphics, resultX, y, resultWidth, 16, 7, theme.bar());
-            RoundedGui.fill(graphics, resultX + 8, y + 1, resultWidth - 16, 1, 1, theme.outlineSoft());
-            graphics.drawText(font(), ArcaneFont.text(results), resultX + 7, textY, theme.accentBright(), false);
-        }
-    }
-
-    private void drawModuleTooltip(DrawContext graphics, int mouseX, int mouseY, ClickGuiColors theme) {
-        GuiModule module = this.hoveredModule;
-        if (module == null || module.expanded() || this.draggingCategory != null) {
-            return;
-        }
-        List<String> lines = wrap(module.description(), 150);
-        int width = ArcaneFont.width(font(), module.name());
-        for (String line : lines) {
-            width = Math.max(width, ArcaneFont.width(font(), line));
-        }
-        width += 14;
-        int height = 13 + lines.size() * proseHeight() + 8;
-        int x = Math.min(mouseX + 12, this.width - width - 4);
-        int y = Math.min(mouseY + 12, this.height - height - BOTTOM_BAR_HEIGHT - 4);
-
-        fillRounded(graphics, x + 2, y + 2, width, height, 0x60000000);
-        fillRounded(graphics, x, y, width, height, theme.bar());
-        RoundedGui.fill(graphics, x + 9, y + 1, width - 18, 1, 1, theme.outlineSoft());
-        graphics.fill(x + 1, y + 1, x + 3, y + height - 1, theme.accent());
-        graphics.drawText(font(), ArcaneFont.text(module.name()), x + 8, y + 6, theme.text(), false);
-        int lineY = y + 9 + lineHeight();
-        for (String line : lines) {
-            graphics.drawText(font(), ArcaneFont.text(line), x + 8, lineY, theme.faint(), false);
-            lineY += proseHeight();
-        }
-    }
-
-    // -----------------------------------------------------------------------------------------
-    // Primitives
-    // -----------------------------------------------------------------------------------------
-
-    private static void fillRounded(DrawContext graphics, int x, int y, int width, int height, int color) {
-        RoundedGui.fill(graphics, x, y, width, height, 5, color);
-    }
-
-    private static void outlineRounded(DrawContext graphics, int x, int y, int width, int height, int color) {
-        RoundedGui.outlineOnly(graphics, x, y, width, height, 5, color);
-    }
-
-    private static void drawCaretRight(DrawContext graphics, int x, int y, int color) {
-        for (int step = 0; step < 3; step++) {
-            graphics.fill(x + step, y + step, x + step + 1, y + 5 - step, color);
-        }
-    }
-
-    private static void drawCaretDown(DrawContext graphics, int x, int y, int color) {
-        for (int step = 0; step < 3; step++) {
-            graphics.fill(x + step, y + step, x + 5 - step, y + step + 1, color);
-        }
-    }
-
-    private static void drawCheckbox(DrawContext graphics, int x, int y, boolean checked, ClickGuiColors theme) {
-        fillRounded(graphics, x, y, 9, 9, checked ? theme.accent() : theme.window());
-        outlineRounded(graphics, x, y, 9, 9, checked ? theme.accentBright() : theme.outlineSoft());
-        if (!checked) {
-            return;
-        }
-        int mark = theme.bar() | 0xFF000000;
-        graphics.fill(x + 2, y + 4, x + 3, y + 7, mark);
-        graphics.fill(x + 3, y + 5, x + 4, y + 8, mark);
-        graphics.fill(x + 4, y + 4, x + 5, y + 7, mark);
-        graphics.fill(x + 5, y + 3, x + 6, y + 6, mark);
-        graphics.fill(x + 6, y + 2, x + 7, y + 5, mark);
-    }
-
-    private static void drawSwatch(DrawContext graphics, int x, int y, int width, int color, ClickGuiColors theme) {
-        fillRounded(graphics, x, y, width, 9, color | 0xFF000000);
-        outlineRounded(graphics, x, y, width, 9, theme.outlineSoft());
-    }
-
-    // -----------------------------------------------------------------------------------------
-    // Input
-    // -----------------------------------------------------------------------------------------
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        for (int index = this.categories.size() - 1; index >= 0; index--) {
-            GuiCategory category = this.categories.get(index);
-            if (!category.open() || category.maxScroll() <= 0) continue;
-            if (mouseX < category.x() || mouseX >= category.x() + WINDOW_WIDTH) continue;
-            if (mouseY < category.y() + HEADER_HEIGHT || mouseY >= category.y() + category.lastHeight()) continue;
-            int amount = (int) Math.round(-verticalAmount * MODULE_HEIGHT);
-            category.scrollBy(amount == 0 ? (verticalAmount < 0.0 ? MODULE_HEIGHT : -MODULE_HEIGHT) : amount);
-            return true;
-        }
-        return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-    }
-
-    @Override
-    public boolean mouseClicked(Click click, boolean doubled) {
-        if (this.listeningFor != null) {
-            setBinding(InputUtil.Type.MOUSE.createFromCode(click.button()));
-            return true;
-        }
-
-        int mouseX = (int) click.x();
-        int mouseY = (int) click.y();
-        int button = click.button();
-        if (button < 0 || button > 2) {
-            return super.mouseClicked(click, doubled);
-        }
-
-        for (int index = this.categories.size() - 1; index >= 0; index--) {
-            GuiCategory category = this.categories.get(index);
-            for (Row row : layout(category)) {
-                if (!rowVisible(row) && row.kind() != RowKind.HEADER) continue;
-                if (!row.contains(mouseX, mouseY)) {
-                    continue;
-                }
-                Boolean delegated = handleRowClick(row, click, doubled, mouseX, mouseY, button);
-                if (delegated != null) {
-                    return delegated;
-                }
-            }
-        }
-        return super.mouseClicked(click, doubled);
-    }
-
-    /** Returns the click result, or {@code null} when the row ignores this button and drawing continues. */
-    private @Nullable Boolean handleRowClick(Row row, Click click, boolean doubled, int mouseX, int mouseY, int button) {
-        switch (row.kind()) {
-            case HEADER -> {
-                if (button != 0) {
-                    return true;
-                }
-                this.draggingCategory = row.category();
-                this.dragOffsetX = mouseX - row.category().x();
-                this.dragOffsetY = mouseY - row.category().y();
-                this.dragMoved = false;
-                return true;
-            }
-            case MODULE -> {
-                GuiModule module = row.module();
-                if (module == null) {
-                    return true;
-                }
-                setFocused(null);
-                if (button == 2) {
-                    startListening(firstBind(module));
-                    return true;
-                }
-                if (button == 1 || !module.toggleable()) {
-                    if (module.hasSettings()) {
-                        module.setExpanded(!module.expanded());
-                    }
-                    return true;
-                }
-                module.toggle();
-                return true;
-            }
-            case DESCRIPTION, NEST_FOOT -> {
-                return true;
-            }
-            case SETTING -> {
-                return handleSettingClick(row, click, doubled, mouseX, mouseY, button);
-            }
-        }
-        return true;
-    }
-
-    private @Nullable Boolean handleSettingClick(Row row, Click click, boolean doubled, int mouseX, int mouseY, int button) {
-        GuiSetting setting = row.setting();
-        if (setting == null) {
-            return true;
-        }
-        if (setting instanceof GuiSetting.Message message) {
-            int fieldX = macroFieldX(row.x());
-            if (mouseX >= fieldX - 3 && mouseX < fieldX + MACRO_FIELD_WIDTH + 3) {
-                return super.mouseClicked(click, doubled);
-            }
-            if (button == 0 && message.mapping() != null && mouseX >= row.x() + WINDOW_WIDTH - 48) {
-                startListening(message.mapping());
-            }
-            return true;
-        }
-        if (button != 0) {
-            return true;
-        }
-        setFocused(null);
-        switch (setting) {
-            case GuiSetting.Toggle toggle -> toggle.toggle();
-            case GuiSetting.ToggleSwatch toggle -> {
-                if (mouseX >= row.x() + WINDOW_WIDTH - 41 && mouseX < row.x() + WINDOW_WIDTH - 27) {
-                    toggle.cycleColor();
-                } else {
-                    toggle.toggle();
-                }
-            }
-            case GuiSetting.Slider slider -> {
-                if (mouseY >= row.y() + row.height() - 13) {
-                    this.draggingSlider = slider;
-                    this.sliderTrackX = sliderTrackX(row.x());
-                    this.sliderTrackWidth = sliderTrackWidth();
-                    updateSlider(mouseX);
-                }
-            }
-            case GuiSetting.Swatch swatch -> swatch.cycleColor();
-            case GuiSetting.Cycle cycle -> cycle.next();
-            case GuiSetting.Bind bind -> startListening(bind.mapping());
-            case GuiSetting.Info ignored -> {
-            }
-            case GuiSetting.Message ignored -> {
-            }
-        }
-        return true;
-    }
-
-    @Override
-    public boolean mouseDragged(Click click, double offsetX, double offsetY) {
-        if (this.draggingCategory != null) {
-            int newX = (int) click.x() - this.dragOffsetX;
-            int newY = (int) click.y() - this.dragOffsetY;
-            this.dragMoved |= Math.abs(newX - this.draggingCategory.x()) > 1 || Math.abs(newY - this.draggingCategory.y()) > 1;
-            this.draggingCategory.moveTo(newX, newY);
-            clamp(this.draggingCategory);
-            return true;
-        }
-        if (this.draggingSlider != null) {
-            updateSlider((int) click.x());
-            return true;
-        }
-        return super.mouseDragged(click, offsetX, offsetY);
-    }
-
-    @Override
-    public boolean mouseReleased(Click click) {
-        if (this.draggingCategory != null) {
-            if (!this.dragMoved) {
-                this.draggingCategory.toggleOpen();
-            }
-            this.draggingCategory = null;
-            return true;
-        }
-        if (this.draggingSlider != null) {
-            this.draggingSlider = null;
-            return true;
-        }
-        return super.mouseReleased(click);
-    }
-
-    @Override
-    public boolean keyPressed(KeyInput input) {
-        if (this.listeningFor != null) {
-            if (input.key() == 256 || input.key() == 261 || input.key() == 259) {
-                setBinding(InputUtil.UNKNOWN_KEY);
-            } else {
-                setBinding(InputUtil.fromKeyCode(input));
-            }
-            return true;
-        }
-        if (input.key() == 256 && this.searchInput != null && this.searchInput.isFocused() && !this.searchText.isEmpty()) {
-            this.searchInput.setText("");
-            this.searchInput.setFocused(false);
-            return true;
-        }
-        return super.keyPressed(input);
-    }
-
-    private void startListening(@Nullable KeyBinding mapping) {
-        if (mapping == null) {
-            return;
-        }
-        this.listeningFor = mapping;
-        for (int slot = 0; slot < MACRO_COUNT; slot++) {
-            this.macroInputs.get(slot).setFocused(false);
-        }
-    }
-
-    private void setBinding(InputUtil.Key key) {
-        if (this.listeningFor == null) {
-            return;
-        }
-        this.listeningFor.setBoundKey(key);
-        this.listeningFor = null;
-        KeyBinding.updateKeysByCode();
-        this.client.options.write();
-    }
-
-    private void updateSlider(int mouseX) {
-        if (this.draggingSlider == null || this.sliderTrackWidth <= 0) {
-            return;
-        }
-        this.draggingSlider.setFraction((float) (mouseX - this.sliderTrackX) / this.sliderTrackWidth);
-    }
-
-    private static @Nullable KeyBinding firstBind(GuiModule module) {
-        for (GuiSetting setting : module.settings()) {
-            if (setting instanceof GuiSetting.Bind bind) {
-                return bind.mapping();
-            }
-        }
-        return null;
-    }
-
-    // -----------------------------------------------------------------------------------------
-    // Search and status
-    // -----------------------------------------------------------------------------------------
-
-    private void updateFilter(String value) {
-        this.searchText = value;
-        this.query = value.trim().toLowerCase(Locale.ROOT);
-        for (GuiCategory category : this.categories) {
-            category.filter(this.query);
-        }
-    }
-
-    private int visibleModuleCount() {
-        int count = 0;
-        for (GuiCategory category : this.categories) {
-            count += category.visible().size();
-        }
-        return count;
-    }
-
-    private int activeModuleCount() {
-        int active = 0;
-        for (GuiCategory category : this.categories) {
-            for (GuiModule module : category.modules()) {
-                if (module.enabled()) {
-                    active++;
-                }
-            }
-        }
-        return active;
-    }
-
-    private int totalModuleCount() {
-        int count = 0;
-        for (GuiCategory category : this.categories) count += category.modules().size();
-        return count;
-    }
-
-    private void updateFpsLabel() {
-        long now = System.nanoTime();
-        if (now < this.nextFpsUpdateNanos && !this.fpsLabel.isEmpty()) {
-            return;
-        }
-        this.fpsLabel = this.client.getCurrentFps() + " FPS";
-        this.nextFpsUpdateNanos = now + 250_000_000L;
-    }
-
-    // -----------------------------------------------------------------------------------------
-    // Geometry helpers
-    // -----------------------------------------------------------------------------------------
-
-    private static int sliderTrackX(int windowX) {
-        return windowX + NEST_INSET + 5;
-    }
-
-    private static int sliderTrackWidth() {
-        return WINDOW_WIDTH - NEST_INSET - 18;
-    }
-
-    private static int macroFieldX(int windowX) {
-        return windowX + NEST_INSET + 17;
-    }
+    private static int opaque(int color) { return color | 0xFF000000; }
 
     private void hideMacroInput(int slot) {
+        if (slot < 0 || slot >= this.macroInputs.size()) return;
         TextFieldWidget input = this.macroInputs.get(slot);
-        if (!input.visible) {
-            return;
-        }
         input.setVisible(false);
         input.setFocused(false);
     }
 
-    private void clamp(GuiCategory category) {
-        category.clamp(this.width, WINDOW_WIDTH, HEADER_HEIGHT, TOP_BAR_HEIGHT + 4, this.height - BOTTOM_BAR_HEIGHT - 4);
-    }
-
-    private int searchWidth() {
-        return Math.clamp(this.width - 400, 104, 180);
-    }
-
-    private int searchX(int searchWidth) {
-        return (this.width - searchWidth) / 2;
-    }
-
-    private ClickGuiColors theme() {
-        return ClickGuiColors.resolve(this.config);
-    }
+    private ClickGuiColors theme() { return ClickGuiColors.resolve(this.config); }
 
     private TextRenderer font() {
-        if (this.uiFont == null) {
-            this.uiFont = ArcaneFont.renderer(this.client == null ? MinecraftClient.getInstance() : this.client);
-        }
+        if (this.uiFont == null) this.uiFont = ArcaneFont.renderer(MinecraftClient.getInstance());
         return this.uiFont;
     }
 
-    /** Text fields draw plain strings, so they need the style applied through a formatter. */
     private void styleField(TextFieldWidget input) {
-        input.addFormatter((value, offset) -> ArcaneFont.text(value).asOrderedText());
+        input.setEditableColor(theme().text());
+        input.setUneditableColor(theme().faint());
     }
 
-    private int lineHeight() {
-        return font().fontHeight;
-    }
+    private int lineHeight() { return font().fontHeight; }
+    private int proseHeight() { return lineHeight() + 3; }
 
-    /** Leading for wrapped prose, which needs a little more air than a single-line label. */
-    private int proseHeight() {
-        return font().fontHeight + 1;
-    }
-
-    public static boolean isOpen(MinecraftClient client) {
-        return client.currentScreen instanceof ArcaneSettingsScreen;
-    }
+    public static boolean isOpen(MinecraftClient client) { return client.currentScreen instanceof ArcaneSettingsScreen; }
 
     @Override
-    public void close() {
-        this.client.setScreen(this.parent);
-    }
+    public void close() { this.client.setScreen(this.parent); }
 
     @Override
     public void removed() {
         this.config.save();
         this.client.options.write();
-        if (!this.scannerWasEnabled && this.config.enabled) {
-            ArcaneClient.engine().queueNearby(this.client);
-        }
+        if (!this.scannerWasEnabled && this.config.enabled) ArcaneClient.engine().queueNearby(this.client);
         ArcaneClient.engine().settingsChanged(this.client);
     }
 
     @Override
-    public boolean shouldPause() {
-        return false;
-    }
+    public boolean shouldPause() { return false; }
 
-    @Environment(EnvType.CLIENT)
-    private record WrapKey(String text, int maxWidth) {
-    }
+    private enum RegionKind { CATEGORY, MODULE, MODULE_TOGGLE, SETTING }
+    private record WrapKey(String text, int maxWidth) { }
+    private record ModuleEntry(GuiCategory category, GuiModule module) { }
 
-    @Environment(EnvType.CLIENT)
-    private enum RowKind {
-        HEADER,
-        MODULE,
-        DESCRIPTION,
-        SETTING,
-        NEST_FOOT
-    }
-
-    @Environment(EnvType.CLIENT)
-    private record Row(
-        RowKind kind,
-        GuiCategory category,
-        @Nullable GuiModule module,
-        @Nullable GuiSetting setting,
-        int x,
-        int y,
-        int height
-    ) {
-        private boolean contains(int mouseX, int mouseY) {
-            return mouseX >= this.x && mouseX < this.x + WINDOW_WIDTH && mouseY >= this.y && mouseY < this.y + this.height;
-        }
+    private record HitRegion(RegionKind kind, @Nullable GuiCategory category, @Nullable GuiModule module, @Nullable GuiSetting setting, int x, int y, int width, int height) {
+        private static HitRegion category(GuiCategory category, int x, int y, int width, int height) { return new HitRegion(RegionKind.CATEGORY, category, null, null, x, y, width, height); }
+        private static HitRegion module(GuiCategory category, GuiModule module, int x, int y, int width, int height) { return new HitRegion(RegionKind.MODULE, category, module, null, x, y, width, height); }
+        private static HitRegion moduleToggle(GuiModule module, int x, int y, int width, int height) { return new HitRegion(RegionKind.MODULE_TOGGLE, null, module, null, x, y, width, height); }
+        private static HitRegion setting(GuiSetting setting, int x, int y, int width, int height) { return new HitRegion(RegionKind.SETTING, null, null, setting, x, y, width, height); }
+        private boolean contains(int mouseX, int mouseY) { return ArcaneSettingsScreen.contains(this.x, this.y, this.width, this.height, mouseX, mouseY); }
     }
 }

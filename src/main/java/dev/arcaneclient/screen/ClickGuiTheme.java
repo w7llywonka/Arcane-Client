@@ -6,7 +6,7 @@ import net.fabricmc.api.Environment;
 /** Accent palettes drawn over one neutral graphite foundation. */
 @Environment(EnvType.CLIENT)
 public enum ClickGuiTheme {
-    ARCANE("ARCANE", 0xFF9A8CFF, 0xFFC3BCFF, 0xFF6F63C9, 0xE639345E),
+    ARCANE("ARCANE", 0xFF69D993, 0xFFA4EABF, 0xFF3F9D64, 0xE6244933),
     FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
     ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440);
 
@@ -17,13 +17,13 @@ public enum ClickGuiTheme {
     private final int accentBright;
     private final int accentDim;
     private final int active;
-    private final int backdrop = 0x82000000;
-    private final int bar = 0xF5080D0B;
-    private final int window = 0xF40C1210;
-    private final int header = 0xF1161D1A;
-    private final int row = 0xED1A211E;
-    private final int nest = 0xEF141B18;
-    private final int outline = 0x5C395047;
+    private final int backdrop = 0x70000000;
+    private final int bar = 0xE8080D0B;
+    private final int window = 0xD80C1210;
+    private final int header = 0xD9161D1A;
+    private final int row = 0xD31A211E;
+    private final int nest = 0xD0141B18;
+    private final int outline = 0x4A395047;
     private final int text = 0xFFF4F4F5;
     private final int muted = 0xFFA1A1AA;
     private final int hover;
