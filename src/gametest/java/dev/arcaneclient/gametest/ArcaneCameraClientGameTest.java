@@ -106,6 +106,22 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
                 ((AbstractClientPlayerEntity) visualBody).getSkin().equals(client.player.getSkin()),
                 "Freecam visual body did not preserve the authenticated player skin"
             );
+
+            Vec3d groundedPosition = client.player.getEntityPos();
+            client.player.setPosition(
+                groundedPosition.x,
+                groundedPosition.y + 2.0,
+                groundedPosition.z
+            );
+            client.player.resetPosition();
+            FreecamController.tick(client);
+            require(
+                visualBody.getEntityPos().distanceTo(client.player.getEntityPos()) < POSITION_EPSILON,
+                "Freecam visual body hovered at the activation height instead of following the airborne player"
+            );
+            client.player.setPosition(groundedPosition);
+            client.player.resetPosition();
+            FreecamController.tick(client);
         });
         require(enabled.perspective() == Perspective.FIRST_PERSON, "Freecam did not retain first-person HUD rendering");
         assertHudAvailable(context, "Freecam enabled");
