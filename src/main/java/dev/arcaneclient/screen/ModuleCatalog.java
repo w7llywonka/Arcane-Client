@@ -70,8 +70,8 @@ public final class ModuleCatalog {
     private static List<GuiModule> baseFinding(ArcaneConfig config, ArcaneKeybinds keybinds) {
         GuiModule chunkFinder = GuiModule
             .toggle(
-                "Chunk Finder",
-                "Scores loaded chunks from the complete 1.6 and 1.8 evidence engine.",
+            "Chunk Finder",
+            "Scores loaded chunks from growth, cultivation, activity, and non-storage traces.",
                 () -> config.enabled,
                 value -> config.enabled = value
             )
@@ -86,7 +86,7 @@ public final class ModuleCatalog {
             .build();
 
         GuiModule stashFinder = GuiModule.toggle(
-            "Stash Finder", "Labels high-confidence storage clusters.", () -> config.stashAlerts, value -> config.stashAlerts = value
+            "Stash Finder", "Labels high-confidence activity clusters without using storage blocks.", () -> config.stashAlerts, value -> config.stashAlerts = value
         ).with(new GuiSetting.Info("Candidates", () -> Integer.toString(ArcaneClient.engine().stashCandidates().size()))).build();
 
         GuiModule chunkIntel = GuiModule.toggle(
@@ -95,7 +95,7 @@ public final class ModuleCatalog {
 
         GuiModule growthSignals = signalModule("Growth Signals", "Crop stages, farmland alignment, imported plants and cultivation evidence.", () -> config.farmSignals, value -> config.farmSignals = value);
         GuiModule buildTraces = signalModule("Build Traces", "Deliberate block placement and interaction patterns.", () -> config.playerBlockSignals, value -> config.playerBlockSignals = value);
-        GuiModule machineSignals = signalModule("Machine Signals", "Automation networks and functional block entities.", () -> config.machineSignals, value -> config.machineSignals = value);
+        GuiModule machineSignals = signalModule("Machine Signals", "Non-storage infrastructure and farm machinery.", () -> config.machineSignals, value -> config.machineSignals = value);
         GuiModule liveChanges = signalModule("Live Changes", "Observed block updates and repeated-scan changes.", () -> config.packetSignals, value -> config.packetSignals = value);
         GuiModule lightSignals = signalModule("Light Signals", "Unnatural light concealed in opaque terrain.", () -> config.lightSignals, value -> config.lightSignals = value);
         GuiModule entitySignals = signalModule("Entity Signals", "Persistent entity clusters with transient traffic filtered.", () -> config.entitySignals, value -> config.entitySignals = value);

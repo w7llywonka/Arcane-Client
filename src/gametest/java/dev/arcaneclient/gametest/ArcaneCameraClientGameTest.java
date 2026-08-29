@@ -9,6 +9,7 @@ import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.scan.ChunkScanner;
 import dev.arcaneclient.utility.ElytraAssistController;
 
+import java.util.ArrayList;
 import java.util.function.Function;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.TestInput;
@@ -21,6 +22,9 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.option.Perspective;
 import net.minecraft.client.util.InputUtil;
 
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
@@ -31,6 +35,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.chunk.WorldChunk;
 import org.lwjgl.glfw.GLFW;
 
@@ -52,6 +57,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             testFreelook(context);
             testModeSwitching(context);
             testElytraAssist(context);
+            testStorageExcludedFromScanner(context);
             testInterface(context);
             testScannerThroughput(context);
         } finally {
@@ -98,6 +104,54 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             benchmark.availableBlocks,
             benchmark.elapsedNanos / 1_000_000.0
         );
+    }
+
+    private static void testStorageExcludedFromScanner(ClientGameTestContext context) {
+        ArcaneClient.LOGGER.info("[QA] Starting storage-free Chunk Finder test");
+        context.runOnClient(client -> {
+            require(client.world != null && client.player != null, "storage exclusion test needs a loaded world");
+            WorldChunk chunk = client.world.getChunk(client.player.getChunkPos().x, client.player.getChunkPos().z);
+            ArrayList<BlockPos> positions = new ArrayList<>();
+            for (int y = client.world.getBottomY(); y <= client.world.getTopYInclusive() && positions.size() < 5; y++) {
+                for (int z = 1; z < 15 && positions.size() < 5; z++) {
+                    for (int x = 1; x < 15 && positions.size() < 5; x++) {
+                        BlockPos pos = new BlockPos(chunk.getPos().getStartX() + x, y, chunk.getPos().getStartZ() + z);
+                        if (client.world.getBlockState(pos).isAir()) positions.add(pos);
+                    }
+                }
+            }
+            require(positions.size() == 5, "storage exclusion test could not find five air blocks");
+
+            ChunkScanner scanner = new ChunkScanner();
+            int observerSectionY = ChunkSectionPos.getSectionCoord(client.player.getBlockY());
+            ChunkScanner.ChunkScanJob baselineJob = scanner.begin(client.world, chunk, 0L, observerSectionY, false);
+            while (!baselineJob.isComplete()) baselineJob.step(65_536);
+            int baselineScore = baselineJob.result().score();
+            BlockState[] previous = new BlockState[positions.size()];
+            Block[] storage = new Block[]{Blocks.CHEST, Blocks.BARREL, Blocks.HOPPER, Blocks.SHULKER_BOX, Blocks.FURNACE};
+            try {
+                for (int index = 0; index < positions.size(); index++) {
+                    previous[index] = client.world.getBlockState(positions.get(index));
+                    client.world.setBlockState(positions.get(index), storage[index].getDefaultState(), Block.NOTIFY_ALL);
+                }
+                ChunkScanner.ChunkScanJob storageJob = scanner.begin(client.world, chunk, 1L, observerSectionY, false);
+                while (!storageJob.isComplete()) storageJob.step(65_536);
+                require(storageJob.result().score() == baselineScore,
+                    "storage-only blocks changed the Chunk Finder score");
+                require(storageJob.result().reasons().stream().noneMatch(reason -> {
+                    String lower = reason.toLowerCase(java.util.Locale.ROOT);
+                    return lower.contains("storage") || lower.contains("chest") || lower.contains("barrel")
+                        || lower.contains("hopper") || lower.contains("shulker") || lower.contains("furnace");
+                }), "storage-only blocks leaked into Chunk Finder reasons");
+            } finally {
+                for (int index = 0; index < positions.size(); index++) {
+                    if (previous[index] != null) {
+                        client.world.setBlockState(positions.get(index), previous[index], Block.NOTIFY_ALL);
+                    }
+                }
+            }
+        });
+        ArcaneClient.LOGGER.info("[QA] Storage-free Chunk Finder test passed");
     }
 
     private static void testRapidCameraToggles(ClientGameTestContext context) {
