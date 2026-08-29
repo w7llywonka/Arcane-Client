@@ -8,9 +8,10 @@ import net.fabricmc.api.Environment;
 /** A draggable, collapsible module window. */
 @Environment(EnvType.CLIENT)
 public final class GuiCategory {
-    private static final int HEADER_FALLBACK = 19;
+    private static final int HEADER_FALLBACK = 17;
     private final String name;
     private final List<GuiModule> modules;
+    private final UiAnimation.Track headerHover = new UiAnimation.Track();
 
     private List<GuiModule> visible;
     private int x;
@@ -28,6 +29,11 @@ public final class GuiCategory {
 
     public String name() {
         return this.name;
+    }
+
+    /** The eased hover weight of this window's title bar, advanced once per drawn frame. */
+    public float headerFraction(boolean hovered, float deltaSeconds) {
+        return this.headerHover.advance(hovered, deltaSeconds, UiAnimation.HOVER_SPEED);
     }
 
     public List<GuiModule> modules() {

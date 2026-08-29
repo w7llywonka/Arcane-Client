@@ -18,6 +18,9 @@ public record ClickGuiColors(
     int nest,
     int outline,
     int outlineSoft,
+    int edge,
+    int sheen,
+    int track,
     int text,
     int muted,
     int faint
@@ -28,34 +31,38 @@ public record ClickGuiColors(
             return new ClickGuiColors(
                 base.accent(), base.accentBright(), base.accentDim(), base.active(), base.activeHover(),
                 base.backdrop(), base.bar(), base.window(), base.header(), base.row(), base.hover(),
-                base.nest(), base.outline(), base.outlineSoft(), base.text(), base.muted(), base.faint()
+                base.nest(), base.outline(), base.outlineSoft(), base.edge(), base.sheen(), base.track(),
+                base.text(), base.muted(), base.faint()
             );
         }
 
         int accent = opaque(config.uiAccentColor);
         int panel = opaque(config.uiPanelColor);
         int text = opaque(config.uiTextColor);
-        int row = withAlpha(mix(panel, text, 0.045f), 0xED);
-        int header = withAlpha(mix(panel, text, 0.030f), 0xF1);
-        int nest = withAlpha(mix(panel, text, 0.065f), 0xEF);
-        int outline = withAlpha(mix(panel, accent, 0.24f), 0x5C);
+        int row = withAlpha(mix(panel, text, 0.070f), 0xFF);
+        int header = withAlpha(mix(panel, text, 0.048f), 0xFF);
+        int nest = withAlpha(mix(panel, 0xFF000000, 0.45f), 0xFF);
+        int outline = withAlpha(mix(panel, accent, 0.24f), 0x74);
         int muted = mix(panel, text, 0.64f);
-        int active = withAlpha(mix(panel, accent, 0.34f), 0xE6);
+        int active = withAlpha(mix(panel, accent, 0.30f), 0xFF);
         return new ClickGuiColors(
             accent,
             mix(accent, text, 0.34f),
             mix(panel, accent, 0.62f),
             active,
-            withAlpha(mix(active, text, 0.15f), 0xEE),
-            0x82000000,
-            withAlpha(mix(panel, 0xFF000000, 0.16f), 0xF5),
-            withAlpha(panel, 0xF4),
+            withAlpha(mix(active, text, 0.13f), 0xFF),
+            withAlpha(mix(panel, 0xFF000000, 0.62f), 0xA6),
+            withAlpha(mix(panel, 0xFF000000, 0.22f), 0xFC),
+            withAlpha(panel, 0xFB),
             header,
             row,
-            withAlpha(mix(row, text, 0.09f), 0xF3),
+            withAlpha(mix(row, text, 0.10f), 0xFF),
             nest,
             outline,
-            withAlpha(mix(panel, accent, 0.15f), 0x32),
+            withAlpha(mix(panel, accent, 0.15f), 0x3C),
+            0x66000000,
+            withAlpha(text, 0x24),
+            withAlpha(mix(panel, text, 0.11f), 0xFF),
             text,
             muted,
             mix(panel, muted, 0.66f)
