@@ -58,7 +58,7 @@ public final class ArcaneCommands {
                     .then(ClientCommandManager.argument("chunks", IntegerArgumentType.integer(2, 24))
                         .executes(context -> radius(context.getSource(), IntegerArgumentType.getInteger(context, "chunks")))))
                 .then(ClientCommandManager.literal("speed")
-                    .then(ClientCommandManager.argument("intensity", IntegerArgumentType.integer(1, 8))
+                    .then(ClientCommandManager.argument("intensity", IntegerArgumentType.integer(1, 16))
                         .executes(context -> speed(context.getSource(), IntegerArgumentType.getInteger(context, "intensity")))))
                 .then(command("rescan", ArcaneCommands::rescan))
                 .then(command("clear", ArcaneCommands::clear));

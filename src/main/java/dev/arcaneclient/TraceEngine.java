@@ -11,6 +11,7 @@ import dev.arcaneclient.model.StashHeuristics;
 import dev.arcaneclient.model.TunnelSegment;
 import dev.arcaneclient.performance.PerformanceProfile;
 import dev.arcaneclient.scan.ChunkScanner;
+import dev.arcaneclient.scan.EvidenceHeuristics;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -92,7 +93,7 @@ public final class TraceEngine {
 
     public void onChunkLoad(ClientWorld world, WorldChunk chunk) {
         if (world == this.level && (this.config.enabled || this.config.tunnelEsp)) {
-            this.enqueue(chunk.getPos().x, chunk.getPos().z);
+            this.enqueue(chunk.getPos().x, chunk.getPos().z, true);
         }
     }
 
@@ -273,9 +274,17 @@ public final class TraceEngine {
     }
 
     private void enqueue(int x, int z) {
+        this.enqueue(x, z, false);
+    }
+
+    private void enqueue(int x, int z, boolean urgent) {
         TraceKey traceKey = this.key(x, z);
         if (!this.activeScanKeys.contains(traceKey) && this.queued.add(traceKey)) {
-            this.scanQueue.addLast(traceKey);
+            if (urgent) {
+                this.scanQueue.addFirst(traceKey);
+            } else {
+                this.scanQueue.addLast(traceKey);
+            }
         }
     }
 
@@ -364,17 +373,27 @@ public final class TraceEngine {
         }
         ChunkPos center = client.player.getChunkPos();
         int renderRadius = Math.max(32, this.config.scanRadius + 4);
-        ArrayList<ChunkMarker> markers = new ArrayList<ChunkMarker>();
-        ArrayList<ChunkMarker> scored = new ArrayList<ChunkMarker>();
+        ArrayList<ChunkMarker> raw = new ArrayList<ChunkMarker>();
         for (Map.Entry<TraceKey, ChunkTrace> entry : this.traces.entrySet()) {
             TraceKey traceKey = entry.getKey();
             if (!this.isCurrent(traceKey) || Math.abs(traceKey.x - center.x) > renderRadius || Math.abs(traceKey.z - center.z) > renderRadius) continue;
             ChunkMarker marker = this.marker(traceKey, entry.getValue());
             if (marker.score > 0) {
-                scored.add(marker);
+                raw.add(marker);
             }
-            if (marker.score < this.config.threshold) continue;
-            markers.add(marker);
+        }
+        HashMap<Long, ChunkMarker> rawIndex = new HashMap<>(Math.max(16, raw.size() * 4 / 3 + 1));
+        for (ChunkMarker marker : raw) {
+            rawIndex.putIfAbsent(chunkKey(marker.chunkX, marker.chunkZ), marker);
+        }
+        ArrayList<ChunkMarker> markers = new ArrayList<ChunkMarker>();
+        ArrayList<ChunkMarker> scored = new ArrayList<ChunkMarker>(raw.size());
+        for (ChunkMarker marker : raw) {
+            ChunkMarker regional = withRegionalGrowth(marker, rawIndex);
+            scored.add(regional);
+            if (regional.score >= this.config.threshold) {
+                markers.add(regional);
+            }
         }
         markers.sort(Comparator.comparingInt(ChunkMarker::score).reversed());
         scored.sort(Comparator.comparingInt(ChunkMarker::score).reversed());
@@ -387,6 +406,41 @@ public final class TraceEngine {
         int markerLimit = this.config.performanceProfile().markerTargetLimit();
         this.markerSnapshot = List.copyOf(markers.subList(0, Math.min(markerLimit, markers.size())));
         this.refreshStashSnapshot(scored, scoreIndex);
+    }
+
+    private static ChunkMarker withRegionalGrowth(ChunkMarker marker, Map<Long, ChunkMarker> byChunk) {
+        int centerGrowth = growthScore(marker);
+        int supporting = 0;
+        int strongest = 0;
+        for (int dz = -1; dz <= 1; ++dz) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                ChunkMarker neighbor = byChunk.get(chunkKey(marker.chunkX + dx, marker.chunkZ + dz));
+                if (neighbor == null) {
+                    continue;
+                }
+                int growth = growthScore(neighbor);
+                if (growth >= 3) {
+                    ++supporting;
+                    strongest = Math.max(strongest, growth);
+                }
+            }
+        }
+        int boost = EvidenceHeuristics.regionalGrowthBoost(centerGrowth, supporting, strongest);
+        if (boost <= 0) {
+            return marker;
+        }
+        ArrayList<String> reasons = new ArrayList<>(marker.reasons);
+        reasons.add("3x3 regional growth support");
+        return new ChunkMarker(marker.chunkX, marker.chunkZ, Math.min(100, marker.score + boost), marker.deepAnchor, reasons, marker.categoryBreakdown);
+    }
+
+    private static int growthScore(ChunkMarker marker) {
+        return marker.categoryBreakdown.getOrDefault(SignalCategory.NATURAL_GROWTH, 0)
+            + marker.categoryBreakdown.getOrDefault(SignalCategory.CULTIVATION, 0)
+            + marker.categoryBreakdown.getOrDefault(SignalCategory.LIVE_ACTIVITY, 0);
     }
 
     private void refreshStashSnapshot(List<ChunkMarker> scored, Map<Long, ChunkMarker> byChunk) {

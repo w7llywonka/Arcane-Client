@@ -70,4 +70,33 @@ public final class EvidenceHeuristics {
         }
         return Math.min(100, 25 + touchedSections * 10 + Math.min(40, nonzeroBytes / 64));
     }
+
+    public static int cultivatedKelpColumns(int longColumns, int alignedTops) {
+        if (longColumns < 8 || alignedTops * 100 < longColumns * 60) {
+            return 0;
+        }
+        return Math.min(180, 65 + longColumns * 7 + alignedTops * 3);
+    }
+
+    public static int cultivatedBerryPatch(int count, int maxRun, boolean rectangular, boolean nativeTaiga) {
+        int required = nativeTaiga ? 12 : 6;
+        if (count < required || maxRun < (nativeTaiga ? 6 : 4) || nativeTaiga && !rectangular) {
+            return 0;
+        }
+        return Math.min(150, 42 + count * 5 + maxRun * 3 + (rectangular ? 25 : 0));
+    }
+
+    public static int strippedGeode(int amethystShell, int calcite, int smoothBasalt, int budding, int buds) {
+        if (budding > 0 || amethystShell < 16 || calcite < 4 || smoothBasalt < 4 || buds > 2) {
+            return 0;
+        }
+        return Math.min(180, 85 + Math.min(40, amethystShell) + calcite + smoothBasalt);
+    }
+
+    public static int regionalGrowthBoost(int centerGrowth, int supportingNeighbors, int strongestNeighborGrowth) {
+        if (centerGrowth < 3 || supportingNeighbors <= 0 || strongestNeighborGrowth < 3) {
+            return 0;
+        }
+        return Math.min(16, 3 + supportingNeighbors * 3 + strongestNeighborGrowth / 4);
+    }
 }

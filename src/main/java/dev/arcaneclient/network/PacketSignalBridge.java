@@ -5,6 +5,7 @@ import dev.arcaneclient.model.BlockPosition;
 import dev.arcaneclient.model.ScanResult;
 import dev.arcaneclient.model.SignalCategory;
 import dev.arcaneclient.scan.EvidenceHeuristics;
+import dev.arcaneclient.scan.GrowthTransitions;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -85,17 +86,9 @@ public final class PacketSignalBridge {
         if (PacketSignalBridge.isPlayerFingerprint(newId, incoming)) {
             ArcaneClient.engine().recordLive(pos, SignalCategory.PLACED_BLOCK, 110, "placed fingerprint: " + newId + location);
         }
-        Integer oldAge = PacketSignalBridge.integerProperty(old, "age");
-        Integer newAge = PacketSignalBridge.integerProperty(incoming, "age");
-        if (oldAge != null && newAge != null && !oldAge.equals(newAge)) {
-            if (newAge < oldAge) {
-                ArcaneClient.engine().recordLive(pos, SignalCategory.LIVE_ACTIVITY, 100, "observed harvest or reset: " + oldId + location);
-            } else if (oldId.contains("amethyst") || oldId.contains("kelp") || oldId.contains("cave_vines")) {
-                ArcaneClient.engine().recordLive(pos, SignalCategory.NATURAL_GROWTH, 18, "observed growth transition: " + oldId + location);
-            }
-        }
-        if (oldAge != null && incoming.isAir() && oldAge > 0) {
-            ArcaneClient.engine().recordLive(pos, SignalCategory.LIVE_ACTIVITY, 120, "mature plant removed: " + oldId + location);
+        GrowthTransitions.GrowthEvent growth = GrowthTransitions.analyze(old, incoming);
+        if (growth != null) {
+            ArcaneClient.engine().recordLive(pos, growth.category(), growth.strength(), growth.reason() + location, 12000, 3);
         }
         for (String property : INTERACTION_PROPERTIES) {
             Object before = PacketSignalBridge.property(old, property);
@@ -282,12 +275,6 @@ public final class PacketSignalBridge {
 
     private static String path(Identifier id) {
         return id == null ? "unknown" : id.getPath();
-    }
-
-    private static Integer integerProperty(BlockState state, String name) {
-        Integer integer;
-        Object value = PacketSignalBridge.property(state, name);
-        return value instanceof Integer ? (integer = (Integer)value) : null;
     }
 
     private static Object property(BlockState state, String name) {

@@ -134,6 +134,52 @@ public final class ChunkScanner {
         }
     }
 
+    private static void emitGrowthGeometry(
+        ScanResult.Builder result,
+        ClientWorld level,
+        ActivityClassifier classifier,
+        Map<Integer, Grid> berryLayers,
+        KelpColumns kelp,
+        int amethystShell,
+        int calcite,
+        int smoothBasalt,
+        int buddingAmethyst,
+        int amethystBuds,
+        BlockPos geodeRepresentative
+    ) {
+        Grid berries = ChunkScanner.strongestGrid(berryLayers);
+        if (berries != null) {
+            boolean nativeTaiga = !classifier.isImportedPlant(level, berries.representative, "sweet_berry_bush");
+            int strength = EvidenceHeuristics.cultivatedBerryPatch(berries.count, berries.maxRun(), berries.isRectangular(), nativeTaiga);
+            if (strength > 0) {
+                result.addStatic(
+                    SignalCategory.CULTIVATION,
+                    ChunkScanner.modelPosition(berries.representative),
+                    "cultivated sweet-berry rows x" + berries.count,
+                    strength
+                );
+            }
+        }
+        int kelpStrength = EvidenceHeuristics.cultivatedKelpColumns(kelp.longColumns(), kelp.alignedLongColumns(level.getSeaLevel() - 1));
+        if (kelpStrength > 0) {
+            result.addStatic(
+                SignalCategory.CULTIVATION,
+                ChunkScanner.modelPosition(kelp.representative),
+                "aligned long kelp farm columns x" + kelp.longColumns(),
+                kelpStrength
+            );
+        }
+        int geodeStrength = EvidenceHeuristics.strippedGeode(amethystShell, calcite, smoothBasalt, buddingAmethyst, amethystBuds);
+        if (geodeStrength > 0 && geodeRepresentative != null) {
+            result.addStatic(
+                SignalCategory.INTERACTION,
+                ChunkScanner.modelPosition(geodeRepresentative),
+                "stripped amethyst geode shell",
+                geodeStrength
+            );
+        }
+    }
+
     private static Grid strongestGrid(Map<Integer, Grid> layers) {
         Grid best = null;
         for (Grid grid : layers.values()) {
@@ -247,13 +293,22 @@ public final class ChunkScanner {
             return;
         }
         ArrayList<Long> removed = new ArrayList<Long>();
-        for (long position : previous.stages.keySet()) {
-            if (current.containsKey(position)) continue;
-            removed.add(position);
+        ArrayList<Long> advanced = new ArrayList<Long>();
+        for (Map.Entry<Long, String> entry : previous.stages.entrySet()) {
+            String next = current.get(entry.getKey());
+            if (next == null) {
+                removed.add(entry.getKey());
+            } else if (GrowthTransitions.amethystRank(next) > GrowthTransitions.amethystRank(entry.getValue())) {
+                advanced.add(entry.getKey());
+            }
         }
         if (!removed.isEmpty() && removed.size() <= 4) {
             BlockPos position = BlockPos.fromLong((long)((Long)removed.getFirst()));
             result.addLive(SignalCategory.INTERACTION, ChunkScanner.modelPosition(position), "amethyst removed while the same chunk stayed loaded x" + removed.size(), Math.min(150, 65 + removed.size() * 20), tick, 12000);
+        }
+        if (!advanced.isEmpty()) {
+            BlockPos position = BlockPos.fromLong(advanced.getFirst());
+            result.addLive(SignalCategory.NATURAL_GROWTH, ChunkScanner.modelPosition(position), "amethyst stage advanced while loaded x" + advanced.size(), Math.min(90, 30 + advanced.size() * 12), tick, 12000);
         }
     }
 
@@ -420,6 +475,7 @@ public final class ChunkScanner {
         private final ScanResult.Builder builder = ScanResult.builder();
         private final EnumMap<ActivityClassifier.Signal, Aggregate> aggregates = new EnumMap<>(ActivityClassifier.Signal.class);
         private final Map<Integer, Grid> cropLayers = new HashMap<Integer, Grid>();
+        private final Map<Integer, Grid> berryLayers = new HashMap<Integer, Grid>();
         private final Map<Integer, Grid> farmlandLayers = new HashMap<Integer, Grid>();
         private final Map<Integer, Grid> flowingWaterLayers = new HashMap<Integer, Grid>();
         private final ArrayList<BlockPos> dripstone = new ArrayList<>();
@@ -429,6 +485,7 @@ public final class ChunkScanner {
         private final ArrayList<BlockPos> automationStorage = new ArrayList<>();
         private final ArrayList<BlockPos> crafters = new ArrayList<>();
         private final Map<Long, String> currentAmethyst = new HashMap<Long, String>();
+        private final KelpColumns kelpColumns = new KelpColumns();
         private final BlockPos.Mutable cursor = new BlockPos.Mutable();
         private final ChunkSection[] sections;
         private final int minX;
@@ -445,6 +502,12 @@ public final class ChunkScanner {
         private int strongestLeakedLight;
         private BlockPos lightRepresentative;
         private int generatedDeepStructureMarkers;
+        private int amethystShell;
+        private int calcite;
+        private int smoothBasalt;
+        private int buddingAmethyst;
+        private int amethystBuds;
+        private BlockPos geodeRepresentative;
         private ScanResult completed;
         private List<TunnelSegment> tunnels = List.of();
 
@@ -475,6 +538,10 @@ public final class ChunkScanner {
                     }
                     ++this.sectionIndex;
                     this.blockIndex = 0;
+                    continue;
+                }
+                if (this.blockIndex == 0 && this.tunnelVolume == null && !section.hasAny(ChunkScanner.this.classifier::isDetailedScanCandidate)) {
+                    ++this.sectionIndex;
                     continue;
                 }
                 int localX = this.blockIndex & 0xF;
@@ -538,6 +605,14 @@ public final class ChunkScanner {
                 grid.add(localX, localZ, (BlockPos)this.cursor);
                 grid.addGrowth(facts.growthBucket());
             }
+            if (facts.path().equals("sweet_berry_bush")) {
+                Grid grid = this.berryLayers.computeIfAbsent(y, ignored -> new Grid());
+                grid.add(localX, localZ, this.cursor);
+                grid.addGrowth(facts.growthBucket());
+            }
+            if (facts.path().equals("kelp") || facts.path().equals("kelp_plant")) {
+                this.kelpColumns.add(localX, localZ, y, facts.path().equals("kelp"), this.cursor);
+            }
             if (facts.farmland()) {
                 this.farmlandLayers.computeIfAbsent(y, ignored -> new Grid()).add(localX, localZ, (BlockPos)this.cursor);
             }
@@ -569,7 +644,22 @@ public final class ChunkScanner {
                 this.flowingWaterLayers.computeIfAbsent(y, ignored -> new Grid()).add(localX, localZ, (BlockPos)this.cursor);
             }
             if (facts.amethystStage()) {
-                this.currentAmethyst.put(this.cursor.asLong(), state.toString());
+                this.currentAmethyst.put(this.cursor.asLong(), facts.path());
+                if (facts.path().equals("budding_amethyst")) {
+                    ++this.buddingAmethyst;
+                } else {
+                    ++this.amethystBuds;
+                }
+                this.geodeRepresentative = this.cursor.toImmutable();
+            } else if (facts.path().equals("amethyst_block")) {
+                ++this.amethystShell;
+                this.geodeRepresentative = this.cursor.toImmutable();
+            } else if (facts.path().equals("calcite")) {
+                ++this.calcite;
+                this.geodeRepresentative = this.cursor.toImmutable();
+            } else if (facts.path().equals("smooth_basalt")) {
+                ++this.smoothBasalt;
+                this.geodeRepresentative = this.cursor.toImmutable();
             }
             if (facts.temporalStable()) {
                 this.stableHashes[this.sectionIndex] = ChunkScanner.mixHash(this.stableHashes[this.sectionIndex], this.blockIndex, facts.path().hashCode());
@@ -591,6 +681,19 @@ public final class ChunkScanner {
         private void finish() {
             ChunkScanner.emitBlockAggregates(this.builder, this.aggregates, this.generatedDeepStructureMarkers >= 2);
             ChunkScanner.emitFarmEvidence(this.builder, this.cropLayers, this.farmlandLayers);
+            ChunkScanner.emitGrowthGeometry(
+                this.builder,
+                this.level,
+                ChunkScanner.this.classifier,
+                this.berryLayers,
+                this.kelpColumns,
+                this.amethystShell,
+                this.calcite,
+                this.smoothBasalt,
+                this.buddingAmethyst,
+                this.amethystBuds,
+                this.geodeRepresentative
+            );
             if (this.importedPlants > 0) {
                 this.builder.addStatic(SignalCategory.CULTIVATION, ChunkScanner.modelPosition(this.importedRepresentative), "plants outside their native biome x" + this.importedPlants, Math.min(110, 30 + this.importedPlants * 5));
             }
@@ -732,6 +835,57 @@ public final class ChunkScanner {
                 }
             }
             return found;
+        }
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    private static final class KelpColumns {
+        private final short[] counts = new short[256];
+        private final short[] minY = new short[256];
+        private final short[] maxY = new short[256];
+        private final short[] topY = new short[256];
+        private BlockPos representative;
+
+        private KelpColumns() {
+            Arrays.fill(this.minY, Short.MAX_VALUE);
+            Arrays.fill(this.maxY, Short.MIN_VALUE);
+            Arrays.fill(this.topY, Short.MIN_VALUE);
+        }
+
+        private void add(int x, int z, int y, boolean top, BlockPos position) {
+            int index = z * 16 + x;
+            this.counts[index]++;
+            this.minY[index] = (short)Math.min(this.minY[index], y);
+            this.maxY[index] = (short)Math.max(this.maxY[index], y);
+            if (top) {
+                this.topY[index] = (short)y;
+            }
+            if (this.representative == null) {
+                this.representative = position.toImmutable();
+            }
+        }
+
+        private int longColumns() {
+            int total = 0;
+            for (int index = 0; index < this.counts.length; ++index) {
+                if (this.counts[index] >= 8 && this.maxY[index] - this.minY[index] + 1 == this.counts[index]) {
+                    ++total;
+                }
+            }
+            return total;
+        }
+
+        private int alignedLongColumns(int expectedTopY) {
+            int total = 0;
+            for (int index = 0; index < this.counts.length; ++index) {
+                if (this.counts[index] < 8 || this.maxY[index] - this.minY[index] + 1 != this.counts[index]) {
+                    continue;
+                }
+                if (Math.abs(this.topY[index] - expectedTopY) <= 1) {
+                    ++total;
+                }
+            }
+            return total;
         }
     }
 

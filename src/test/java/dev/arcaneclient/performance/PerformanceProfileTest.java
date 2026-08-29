@@ -20,7 +20,7 @@ final class PerformanceProfileTest {
         assertEquals(1_850_000L, PerformanceProfile.BALANCED.scanBudgetNanos(3));
         assertEquals(2_500_000L, PerformanceProfile.QUALITY.scanBudgetNanos(3));
 
-        for (int intensity = 1; intensity <= 8; intensity++) {
+        for (int intensity = 1; intensity <= 16; intensity++) {
             long highFps = PerformanceProfile.HIGH_FPS.scanBudgetNanos(intensity);
             long balanced = PerformanceProfile.BALANCED.scanBudgetNanos(intensity);
             long quality = PerformanceProfile.QUALITY.scanBudgetNanos(intensity);

@@ -4,6 +4,7 @@ import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
+import dev.arcaneclient.scan.ChunkScanner;
 
 import java.util.function.Function;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -20,6 +21,9 @@ import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.world.chunk.WorldChunk;
 import org.lwjgl.glfw.GLFW;
 
 @SuppressWarnings("UnstableApiUsage")
@@ -40,12 +44,51 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             testFreelook(context);
             testModeSwitching(context);
             testInterface(context);
+            testScannerThroughput(context);
         } finally {
             context.runOnClient(client -> {
                 FreecamController.disable(client);
                 FreelookController.disable(client);
             });
         }
+    }
+
+    private static void testScannerThroughput(ClientGameTestContext context) {
+        ScannerBenchmark benchmark = context.computeOnClient(client -> {
+            require(client.world != null && client.player != null, "scanner benchmark needs a loaded world");
+            ChunkScanner scanner = new ChunkScanner();
+            ChunkPos center = client.player.getChunkPos();
+            int observerSectionY = ChunkSectionPos.getSectionCoord(client.player.getBlockY());
+            int chunks = 0;
+            int visitedBlocks = 0;
+            int availableBlocks = 0;
+            long started = System.nanoTime();
+            for (int dz = -2; dz <= 2; ++dz) {
+                for (int dx = -2; dx <= 2; ++dx) {
+                    WorldChunk chunk = client.world.getChunkManager().getWorldChunk(center.x + dx, center.z + dz, false);
+                    if (chunk == null) {
+                        continue;
+                    }
+                    ChunkScanner.ChunkScanJob job = scanner.begin(client.world, chunk, 0L, observerSectionY, false);
+                    while (!job.isComplete()) {
+                        visitedBlocks += job.step(65_536);
+                    }
+                    availableBlocks += chunk.getSectionArray().length * 4_096;
+                    ++chunks;
+                }
+            }
+            return new ScannerBenchmark(chunks, visitedBlocks, availableBlocks, System.nanoTime() - started);
+        });
+        require(benchmark.chunks >= 9, "not enough loaded chunks for scanner benchmark");
+        require(benchmark.visitedBlocks * 2 < benchmark.availableBlocks, "palette prefilter failed to reject most ordinary terrain");
+        require(benchmark.elapsedNanos < 750_000_000L, "scanner benchmark exceeded 750 ms for " + benchmark.chunks + " chunks");
+        ArcaneClient.LOGGER.info(
+            "[QA] Scanner benchmark: {} chunks, {} of {} blocks visited in {} ms",
+            benchmark.chunks,
+            benchmark.visitedBlocks,
+            benchmark.availableBlocks,
+            benchmark.elapsedNanos / 1_000_000.0
+        );
     }
 
     private static void testRapidCameraToggles(ClientGameTestContext context) {
@@ -411,5 +454,8 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         Perspective perspective,
         boolean connectionOpen
     ) {
+    }
+
+    private record ScannerBenchmark(int chunks, int visitedBlocks, int availableBlocks, long elapsedNanos) {
     }
 }
