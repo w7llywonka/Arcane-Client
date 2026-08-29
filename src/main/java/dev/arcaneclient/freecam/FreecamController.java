@@ -7,7 +7,6 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.event.client.player.ClientPreAttackCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
-import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.option.Perspective;
@@ -36,7 +35,6 @@ public final class FreecamController {
         ClientPreAttackCallback.EVENT.register((client, player, clickCount) -> DetachedCameraInteraction.isActive());
         UseBlockCallback.EVENT.register((player, world, hand, hit) -> world.isClient() && FreecamController.isActive() ? ActionResult.FAIL : ActionResult.PASS);
         UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> world.isClient() && FreecamController.isActive() ? ActionResult.FAIL : ActionResult.PASS);
-        UseItemCallback.EVENT.register((player, world, hand) -> world.isClient() && FreecamController.isActive() ? ActionResult.FAIL : ActionResult.PASS);
     }
 
     public static boolean isActive() {
@@ -159,6 +157,14 @@ public final class FreecamController {
 
     public static float cameraPitch() {
         return cameraPitch;
+    }
+
+    static float playerYaw() {
+        return playerYaw;
+    }
+
+    static float playerPitch() {
+        return playerPitch;
     }
 
     public static Vec3d cameraPosition(float tickProgress) {

@@ -6,9 +6,8 @@ import net.fabricmc.api.Environment;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
 import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
 
-/** Last-line protection against detached-camera interactions escaping to a server. */
+/** Last-line protection against camera-origin block/entity targets escaping to a server. */
 @Environment(EnvType.CLIENT)
 public final class FreecamPacketGuard {
     private static long nextLogNanos;
@@ -22,8 +21,7 @@ public final class FreecamPacketGuard {
 
     static boolean isUnsafeInteractionType(Class<?> packetType) {
         return PlayerInteractEntityC2SPacket.class.isAssignableFrom(packetType)
-            || PlayerInteractBlockC2SPacket.class.isAssignableFrom(packetType)
-            || PlayerInteractItemC2SPacket.class.isAssignableFrom(packetType);
+            || PlayerInteractBlockC2SPacket.class.isAssignableFrom(packetType);
     }
 
     public static void logBlocked(Packet<?> packet) {

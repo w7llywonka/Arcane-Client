@@ -21,6 +21,8 @@ import net.minecraft.client.util.InputUtil;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -217,6 +219,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             client.interactionManager.attackEntity(client.player, visualBody);
             require(client.getCameraEntity() == client.player, "Freecam lost the player camera before interaction test");
         });
+        assertGoldenAppleUse(context, "Freecam");
         context.waitTicks(3);
         Snapshot afterInvalidAttack = snapshot(context);
         require(afterInvalidAttack.connectionOpen(), "client-only visual body attack escaped to the integrated server");
@@ -283,11 +286,8 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             client.gameRenderer.updateCrosshairTarget(1.0f);
             require(client.getCameraEntity() == client.player, "Freelook lost the real player camera before interaction test");
             require(client.targetedEntity != client.player, "Freelook targeted the local player");
-            MinecraftClientAccessor accessor = (MinecraftClientAccessor) client;
-            require(accessor.arcaneclient$getItemUseCooldown() == 0, "item-use cooldown was not ready before Freelook use test");
-            accessor.arcaneclient$doItemUse();
-            require(accessor.arcaneclient$getItemUseCooldown() == 4, "Freelook canceled vanilla item use");
         });
+        assertGoldenAppleUse(context, "Freelook");
         context.waitTicks(3);
         Snapshot afterInvalidAttack = snapshot(context);
         require(afterInvalidAttack.connectionOpen(), "Freelook interaction handling disconnected the client");
@@ -306,6 +306,24 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         require(disabled.perspective() == Perspective.FIRST_PERSON, "Freelook did not restore the previous perspective");
         assertHudAvailable(context, "Freelook disabled");
         ArcaneClient.LOGGER.info("[QA] Freelook end-to-end test passed");
+    }
+
+    private static void assertGoldenAppleUse(ClientGameTestContext context, String stage) {
+        context.runOnClient(client -> {
+            require(client.player != null, stage + " item-use test lost the player");
+            ItemStack previous = client.player.getInventory().getSelectedStack().copy();
+            try {
+                client.player.getInventory().setSelectedStack(new ItemStack(Items.GOLDEN_APPLE));
+                MinecraftClientAccessor accessor = (MinecraftClientAccessor) client;
+                accessor.arcaneclient$setItemUseCooldown(0);
+                accessor.arcaneclient$doItemUse();
+                require(accessor.arcaneclient$getItemUseCooldown() == 4, stage + " canceled vanilla item use");
+                require(client.player.isUsingItem(), stage + " did not start using a golden apple");
+            } finally {
+                client.player.stopUsingItem();
+                client.player.getInventory().setSelectedStack(previous);
+            }
+        });
     }
 
     private static void testModeSwitching(ClientGameTestContext context) {

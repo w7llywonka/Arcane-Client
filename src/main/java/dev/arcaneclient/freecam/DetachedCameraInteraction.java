@@ -8,6 +8,8 @@ import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 
@@ -21,6 +23,28 @@ public final class DetachedCameraInteraction {
 
     public static boolean isActive() {
         return FreecamController.isActive() || FreelookController.isActive();
+    }
+
+    public static HitResult itemUseTarget(MinecraftClient client) {
+        ClientPlayerEntity player = client.player;
+        if (player == null || client.world == null) {
+            return client.crosshairTarget;
+        }
+        float yaw = FreecamController.isActive() ? FreecamController.playerYaw() : player.getYaw();
+        float pitch = FreecamController.isActive() ? FreecamController.playerPitch() : player.getPitch();
+        Vec3d start = player.getEyePos();
+        Vec3d end = FreecamMining.rayEnd(start, yaw, pitch, player.getBlockInteractionRange());
+        if (FreecamController.isActive()) {
+            Vec3d direction = end.subtract(start);
+            return BlockHitResult.createMissed(end, Direction.getFacing(direction), BlockPos.ofFloored(end));
+        }
+        return client.world.raycast(new RaycastContext(
+            start,
+            end,
+            RaycastContext.ShapeType.OUTLINE,
+            RaycastContext.FluidHandling.NONE,
+            player
+        ));
     }
 
     static void tickMining(
