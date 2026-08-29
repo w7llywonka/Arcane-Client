@@ -19,6 +19,7 @@ import dev.arcaneclient.render.TunnelEspRenderer;
 import dev.arcaneclient.render.VisualController;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.utility.AutoToolController;
+import dev.arcaneclient.utility.ElytraAssistController;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -50,6 +51,7 @@ implements ClientModInitializer {
             FreecamController.disable(client);
             FreelookController.disable(client);
             AutoToolController.restore(client);
+            ElytraAssistController.reset();
             engine.onWorldChange(client, level);
         });
         ClientChunkEvents.CHUNK_LOAD.register(engine::onChunkLoad);
@@ -108,6 +110,7 @@ implements ClientModInitializer {
             ChatMacroController.tick(client);
             CombatController.tick(client);
             AutoTotemController.tick(client);
+            ElytraAssistController.tick(client);
             FreecamController.tick(client);
             FreelookController.tick(client);
             EspRenderer.tick(client);
