@@ -49,6 +49,29 @@ public final class ActivityClassifier {
         return facts;
     }
 
+    boolean isDetailedScanCandidate(BlockState state) {
+        if (state.isAir()) {
+            return false;
+        }
+        BlockFacts facts = this.facts(state);
+        if (facts.signal() != null || facts.crop() || facts.farmland() || facts.importedPlantCandidate()
+            || facts.pointedDripstone() || facts.cauldron() || facts.spawner() || facts.hopper()
+            || facts.automationStorage() || facts.crafter() || facts.flowingWater() || facts.amethystStage()
+            || state.getLuminance() > 0) {
+            return true;
+        }
+        return switch (facts.path()) {
+            case "amethyst_block", "calcite", "smooth_basalt", "reinforced_deepslate", "trial_spawner", "vault",
+                 "sculk_catalyst", "sculk_sensor", "sculk_shrieker", "sugar_cane" -> true;
+            default -> tunnelPassablePath(facts.path());
+        };
+    }
+
+    private static boolean tunnelPassablePath(String path) {
+        return path.endsWith("torch") || path.endsWith("wall_torch") || path.contains("rail")
+            || path.equals("redstone_wire") || path.equals("tripwire") || path.equals("ladder");
+    }
+
     Signal classifyBlock(BlockState state, String path) {
         if (path.endsWith("_leaves") && state.contains(Properties.PERSISTENT) && ((Boolean)state.get(Properties.PERSISTENT)).booleanValue()) {
             return Signal.PERSISTENT_LEAVES;

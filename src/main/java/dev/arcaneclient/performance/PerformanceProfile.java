@@ -54,7 +54,7 @@ public enum PerformanceProfile {
     }
 
     public long scanBudgetNanos(int intensity) {
-        return this.baseScanBudgetNanos + (long) Math.clamp(intensity, 1, 8) * this.scanBudgetPerIntensityNanos;
+        return this.baseScanBudgetNanos + (long) Math.clamp(intensity, 1, 16) * this.scanBudgetPerIntensityNanos;
     }
 
     public int snapshotRefreshTicks() {

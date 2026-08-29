@@ -24,7 +24,7 @@ import net.fabricmc.loader.api.FabricLoader;
 @Environment(value=EnvType.CLIENT)
 public final class ArcaneConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final int CURRENT_CONFIG_VERSION = 4;
+    private static final int CURRENT_CONFIG_VERSION = 5;
     public boolean enabled = true;
     public boolean overlay = true;
     public boolean hud = true;
@@ -102,7 +102,7 @@ public final class ArcaneConfig {
     public int tunnelThreeByThreeColor = -218115499;
     public int threshold = 35;
     public int scanRadius = 12;
-    public int chunksPerTick = 3;
+    public int chunksPerTick = 8;
     public int rescanSeconds = 30;
     public int uiTheme = 0;
     public int performanceProfile = 0;
@@ -151,6 +151,7 @@ public final class ArcaneConfig {
             int loadedConfigVersion = config.configVersion;
             boolean upgradedFeatureDefaults = loadedConfigVersion < 3;
             boolean upgradedSlowSwingAndInfo = loadedConfigVersion < 4;
+            boolean upgradedGrowthScanner = loadedConfigVersion < 5;
             if (upgradedFeatureDefaults) {
                 config.entityNameTags = true;
                 config.soundNotifications = true;
@@ -185,12 +186,15 @@ public final class ArcaneConfig {
                 config.infoPing = true;
                 config.infoBiome = true;
             }
-            if (upgradedFeatureDefaults || upgradedSlowSwingAndInfo) {
+            if (upgradedGrowthScanner && config.chunksPerTick == 3) {
+                config.chunksPerTick = 8;
+            }
+            if (upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner) {
                 config.configVersion = CURRENT_CONFIG_VERSION;
             }
 
             config.clamp();
-            if (upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo) {
+            if (upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner) {
                 config.save();
             }
             return config;
@@ -373,7 +377,7 @@ public final class ArcaneConfig {
     private void clamp() {
         this.threshold = Math.clamp((long)this.threshold, 0, 100);
         this.scanRadius = Math.clamp((long)this.scanRadius, 2, 24);
-        this.chunksPerTick = Math.clamp((long)this.chunksPerTick, 1, 8);
+        this.chunksPerTick = Math.clamp((long)this.chunksPerTick, 1, 16);
         this.rescanSeconds = Math.clamp((long)this.rescanSeconds, 10, 300);
         this.uiTheme = Math.clamp(this.uiTheme, 0, 2);
         this.performanceProfile = Math.clamp(this.performanceProfile, 0, 2);
