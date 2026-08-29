@@ -1,6 +1,7 @@
 package dev.arcaneclient.gametest;
 
 import dev.arcaneclient.ArcaneClient;
+import dev.arcaneclient.freecam.DetachedCameraInteraction;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.mixin.MinecraftClientAccessor;
@@ -23,6 +24,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
@@ -296,6 +299,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             require(client.getCameraEntity() == client.player, "Freelook lost the real player camera before interaction test");
             require(client.targetedEntity != client.player, "Freelook targeted the local player");
         });
+        assertFreelookAutoTool(context);
         assertGoldenAppleUse(context, "Freelook");
         context.waitTicks(3);
         Snapshot afterInvalidAttack = snapshot(context);
@@ -315,6 +319,56 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         require(disabled.perspective() == Perspective.FIRST_PERSON, "Freelook did not restore the previous perspective");
         assertHudAvailable(context, "Freelook disabled");
         ArcaneClient.LOGGER.info("[QA] Freelook end-to-end test passed");
+    }
+
+    private static void assertFreelookAutoTool(ClientGameTestContext context) {
+        context.runOnClient(client -> {
+            require(client.player != null && client.world != null, "Freelook Auto Tool test lost its world");
+            boolean previousAutoTool = ArcaneClient.config().autoTool;
+            boolean previousPreserveDurability = ArcaneClient.config().autoToolPreserveDurability;
+            float previousYaw = client.player.getYaw();
+            float previousPitch = client.player.getPitch();
+            int previousSlot = client.player.getInventory().getSelectedSlot();
+            ItemStack[] previousStacks = new ItemStack[5];
+            for (int slot = 0; slot < previousStacks.length; slot++) {
+                previousStacks[slot] = client.player.getInventory().getStack(slot).copy();
+            }
+            try {
+                ArcaneClient.config().autoTool = true;
+                ArcaneClient.config().autoToolPreserveDurability = false;
+                client.player.getInventory().setStack(0, new ItemStack(Items.STICK));
+                client.player.getInventory().setStack(1, new ItemStack(Items.DIAMOND_PICKAXE));
+                client.player.getInventory().setStack(2, new ItemStack(Items.DIAMOND_SHOVEL));
+                client.player.getInventory().setStack(3, new ItemStack(Items.DIAMOND_AXE));
+                client.player.getInventory().setStack(4, new ItemStack(Items.SHEARS));
+                client.player.getInventory().setSelectedSlot(0);
+                client.player.setPitch(89.9f);
+
+                HitResult target = DetachedCameraInteraction.itemUseTarget(client);
+                require(target instanceof BlockHitResult && target.getType() == HitResult.Type.BLOCK,
+                    "Freelook Auto Tool test could not aim at the floor");
+                client.options.attackKey.setPressed(true);
+                FreelookController.tick(client);
+                require(client.player.getInventory().getSelectedSlot() != 0,
+                    "Freelook mining bypassed Auto Tool selection");
+
+                client.options.attackKey.setPressed(false);
+                FreelookController.tick(client);
+                require(client.player.getInventory().getSelectedSlot() == 0,
+                    "Freelook Auto Tool did not restore the original slot");
+            } finally {
+                client.options.attackKey.setPressed(false);
+                DetachedCameraInteraction.stopMining(client);
+                for (int slot = 0; slot < previousStacks.length; slot++) {
+                    client.player.getInventory().setStack(slot, previousStacks[slot]);
+                }
+                client.player.getInventory().setSelectedSlot(previousSlot);
+                client.player.setYaw(previousYaw);
+                client.player.setPitch(previousPitch);
+                ArcaneClient.config().autoTool = previousAutoTool;
+                ArcaneClient.config().autoToolPreserveDurability = previousPreserveDurability;
+            }
+        });
     }
 
     private static void assertGoldenAppleUse(ClientGameTestContext context, String stage) {
