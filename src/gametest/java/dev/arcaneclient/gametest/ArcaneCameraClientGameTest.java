@@ -3,6 +3,7 @@ package dev.arcaneclient.gametest;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.freecam.FreelookController;
+import dev.arcaneclient.mixin.MinecraftClientAccessor;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.scan.ChunkScanner;
 
@@ -282,6 +283,10 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             client.gameRenderer.updateCrosshairTarget(1.0f);
             require(client.getCameraEntity() == client.player, "Freelook lost the real player camera before interaction test");
             require(client.targetedEntity != client.player, "Freelook targeted the local player");
+            MinecraftClientAccessor accessor = (MinecraftClientAccessor) client;
+            require(accessor.arcaneclient$getItemUseCooldown() == 0, "item-use cooldown was not ready before Freelook use test");
+            accessor.arcaneclient$doItemUse();
+            require(accessor.arcaneclient$getItemUseCooldown() == 4, "Freelook canceled vanilla item use");
         });
         context.waitTicks(3);
         Snapshot afterInvalidAttack = snapshot(context);

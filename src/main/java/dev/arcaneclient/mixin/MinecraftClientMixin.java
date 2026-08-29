@@ -1,6 +1,7 @@
 package dev.arcaneclient.mixin;
 
 import dev.arcaneclient.freecam.DetachedCameraInteraction;
+import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -35,6 +36,6 @@ public abstract class MinecraftClientMixin {
 
     @Inject(method = "doItemUse", at = @At("HEAD"), cancellable = true)
     private void arcaneclient$guardDetachedCameraItemUse(CallbackInfo ci) {
-        if (DetachedCameraInteraction.isActive()) ci.cancel();
+        if (FreecamController.isActive()) ci.cancel();
     }
 }

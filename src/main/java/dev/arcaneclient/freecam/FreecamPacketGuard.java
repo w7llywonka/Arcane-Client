@@ -17,7 +17,7 @@ public final class FreecamPacketGuard {
     }
 
     public static boolean shouldBlock(Packet<?> packet) {
-        return DetachedCameraInteraction.isActive() && isUnsafeInteractionType(packet.getClass());
+        return FreecamController.isActive() && isUnsafeInteractionType(packet.getClass());
     }
 
     static boolean isUnsafeInteractionType(Class<?> packetType) {
@@ -30,6 +30,6 @@ public final class FreecamPacketGuard {
         long now = System.nanoTime();
         if (now < nextLogNanos) return;
         nextLogNanos = now + 1_000_000_000L;
-        ArcaneClient.LOGGER.warn("Blocked unsafe {} while a detached camera was active", packet.getClass().getSimpleName());
+        ArcaneClient.LOGGER.warn("Blocked unsafe {} while Freecam was active", packet.getClass().getSimpleName());
     }
 }
