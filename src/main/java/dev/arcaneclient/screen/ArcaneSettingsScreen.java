@@ -158,14 +158,16 @@ public final class ArcaneSettingsScreen extends Screen {
         this.inspectorHeight = bodyHeight;
     }
 
+    /**
+     * In world the Click GUI stays a true overlay: no blur, no darkening, nothing drawn behind the
+     * panel. Legibility comes from the panel's own translucency instead. Outside a world there is
+     * no game to see, so the vanilla menu background still applies.
+     */
     @Override
     public void renderBackground(DrawContext graphics, int mouseX, int mouseY, float deltaTicks) {
         if (this.client == null || this.client.world == null) {
             super.renderBackground(graphics, mouseX, mouseY, deltaTicks);
-            return;
         }
-        applyBlur(graphics);
-        graphics.fill(0, 0, this.width, this.height, theme().backdrop());
     }
 
     @Override

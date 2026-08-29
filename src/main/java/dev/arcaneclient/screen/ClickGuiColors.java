@@ -10,7 +10,6 @@ public record ClickGuiColors(
     int accentDim,
     int active,
     int activeHover,
-    int backdrop,
     int bar,
     int window,
     int header,
@@ -28,7 +27,7 @@ public record ClickGuiColors(
         if (!config.customUiColors) {
             return new ClickGuiColors(
                 base.accent(), base.accentAlt(), base.accentBright(), base.accentDim(), base.active(), base.activeHover(),
-                base.backdrop(), base.bar(), base.window(), base.header(), base.row(), base.hover(),
+                base.bar(), base.window(), base.header(), base.row(), base.hover(),
                 base.nest(), base.outline(), base.outlineSoft(), base.text(), base.muted(), base.faint()
             );
         }
@@ -49,7 +48,6 @@ public record ClickGuiColors(
             mix(panel, accent, 0.62f),
             active,
             withAlpha(mix(active, text, 0.15f), 0xEE),
-            0x70000000,
             withAlpha(mix(panel, 0xFF000000, 0.16f), 0xE8),
             withAlpha(panel, 0xD8),
             header,

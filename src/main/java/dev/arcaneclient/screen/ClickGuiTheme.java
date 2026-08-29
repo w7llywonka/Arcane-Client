@@ -3,10 +3,14 @@ package dev.arcaneclient.screen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
-/** Accent palettes drawn over a shared surface foundation. */
+/**
+ * Accent palettes drawn over a shared surface foundation. Surfaces are deliberately translucent:
+ * the Click GUI dims nothing behind itself, so each panel carries its own legibility.
+ */
 @Environment(EnvType.CLIENT)
 public enum ClickGuiTheme {
-    /** Violet-to-cyan on midnight navy, the client's default look. */
+    /** Pure greyscale, the client's default look. Both accent stops match, so nothing gradients. */
+    MONO("MONO", Surface.INK, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFF8A8A8A, 0xE62E2E2E),
     KRYPTON("KRYPTON", Surface.MIDNIGHT, 0xFF7B2FFF, 0xFF00FFD1, 0xFF00FFD1, 0xFF5A2BB8, 0xE6241348),
     ARCANE("ARCANE", Surface.GRAPHITE, 0xFFCBFF4A, 0xFF9CFF2E, 0xFFE7FFA6, 0xFF7DA528, 0xE6354818),
     FROST("FROST", Surface.MIDNIGHT, 0xFF3D7DFF, 0xFF63E6FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
@@ -21,7 +25,6 @@ public enum ClickGuiTheme {
     private final int accentBright;
     private final int accentDim;
     private final int active;
-    private final int backdrop = 0x8A03060B;
     private final int hover;
     private final int activeHover;
     private final int outlineSoft;
@@ -48,7 +51,6 @@ public enum ClickGuiTheme {
     public int accentDim() { return this.accentDim; }
     public int active() { return this.active; }
     public int activeHover() { return this.activeHover; }
-    public int backdrop() { return this.backdrop; }
     public int bar() { return this.surface.bar(); }
     public int window() { return this.surface.window(); }
     public int header() { return this.surface.header(); }
@@ -75,6 +77,9 @@ public enum ClickGuiTheme {
 
     /** The neutral chrome an accent palette is painted over. */
     private record Surface(int bar, int window, int header, int row, int nest, int outline, int text, int muted) {
+        /** Neutral greyscale; every channel matches so the palette carries no hue at all. */
+        private static final Surface INK =
+            new Surface(0xDC000000, 0xCE060606, 0xC8101010, 0xC0161616, 0xC40A0A0A, 0x4CFFFFFF, 0xFFFFFFFF, 0xFFB0B0B0);
         /** Near-black with a cool blue cast. */
         private static final Surface MIDNIGHT =
             new Surface(0xF0030609, 0xE6070D1A, 0xE00B1424, 0xD40E1729, 0xD20A1220, 0x3A2E5C6E, 0xFFE8F0F8, 0xFF7A9AB5);

@@ -24,9 +24,9 @@ final class ClickGuiColorsTest {
     }
 
     @Test
-    void everyPresetThemeIsReachableFromTheConfigAndKryptonLeads() {
+    void everyPresetThemeIsReachableFromTheConfigAndMonoLeads() {
         assertEquals(ClickGuiTheme.count(), ArcaneConfig.UI_THEME_COUNT);
-        assertEquals(ClickGuiTheme.KRYPTON, ClickGuiTheme.fromConfig(0));
+        assertEquals(ClickGuiTheme.MONO, ClickGuiTheme.fromConfig(0));
         ArcaneConfig config = new ArcaneConfig();
         for (int index = 0; index < ClickGuiTheme.count(); index++) {
             config.uiTheme = index;
@@ -34,8 +34,33 @@ final class ClickGuiColorsTest {
             ClickGuiColors colors = ClickGuiColors.resolve(config);
             assertEquals(theme.accent(), colors.accent());
             assertEquals(theme.accentAlt(), colors.accentAlt());
-            assertNotEquals(colors.accent(), colors.accentAlt(), theme.label() + " needs a distinct gradient stop");
         }
+    }
+
+    @Test
+    void theDefaultThemeCarriesNoHueAtAll() {
+        ArcaneConfig config = new ArcaneConfig();
+        ClickGuiColors colors = ClickGuiColors.resolve(config);
+        int[] palette = {
+            colors.accent(), colors.accentAlt(), colors.accentBright(), colors.accentDim(),
+            colors.active(), colors.activeHover(), colors.bar(), colors.window(), colors.header(),
+            colors.row(), colors.hover(), colors.nest(), colors.outline(), colors.outlineSoft(),
+            colors.text(), colors.muted(), colors.faint()
+        };
+        for (int color : palette) {
+            int red = color >> 16 & 0xFF;
+            int green = color >> 8 & 0xFF;
+            int blue = color & 0xFF;
+            assertEquals(red, green, () -> "not greyscale: " + Integer.toHexString(color));
+            assertEquals(green, blue, () -> "not greyscale: " + Integer.toHexString(color));
+        }
+    }
+
+    @Test
+    void theDefaultThemeGradientsIntoItselfSoNothingSweeps() {
+        ClickGuiColors colors = ClickGuiColors.resolve(new ArcaneConfig());
+        assertEquals(colors.accent(), colors.accentAlt());
+        assertEquals(colors.accent(), RoundedGui.lerp(colors.accent(), colors.accentAlt(), 0.5f));
     }
 
     @Test

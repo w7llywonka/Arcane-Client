@@ -26,7 +26,7 @@ public final class ArcaneConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final int CURRENT_CONFIG_VERSION = 7;
     /** Preset Click GUI themes. Mirrors {@code ClickGuiTheme}, which is client-only. */
-    public static final int UI_THEME_COUNT = 4;
+    public static final int UI_THEME_COUNT = 5;
     public boolean enabled = true;
     public boolean overlay = true;
     public boolean hud = true;
