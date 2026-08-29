@@ -24,6 +24,30 @@ final class ClickGuiColorsTest {
     }
 
     @Test
+    void everyPresetThemeIsReachableFromTheConfigAndKryptonLeads() {
+        assertEquals(ClickGuiTheme.count(), ArcaneConfig.UI_THEME_COUNT);
+        assertEquals(ClickGuiTheme.KRYPTON, ClickGuiTheme.fromConfig(0));
+        ArcaneConfig config = new ArcaneConfig();
+        for (int index = 0; index < ClickGuiTheme.count(); index++) {
+            config.uiTheme = index;
+            ClickGuiTheme theme = ClickGuiTheme.fromConfig(index);
+            ClickGuiColors colors = ClickGuiColors.resolve(config);
+            assertEquals(theme.accent(), colors.accent());
+            assertEquals(theme.accentAlt(), colors.accentAlt());
+            assertNotEquals(colors.accent(), colors.accentAlt(), theme.label() + " needs a distinct gradient stop");
+        }
+    }
+
+    @Test
+    void customPalettesStillProduceASecondGradientStop() {
+        ArcaneConfig config = new ArcaneConfig();
+        config.customUiColors = true;
+        config.uiAccentColor = 0xFF12AB34;
+        ClickGuiColors colors = ClickGuiColors.resolve(config);
+        assertNotEquals(colors.accent(), colors.accentAlt());
+    }
+
+    @Test
     void rgbChannelEditingPreservesOtherChannels() {
         int edited = ArcaneConfig.withChannel(0xFF102030, 8, 0xAA);
         assertEquals(0xFF10AA30, edited);

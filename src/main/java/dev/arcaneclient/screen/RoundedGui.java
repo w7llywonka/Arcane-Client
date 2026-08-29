@@ -14,6 +14,8 @@ public final class RoundedGui {
     static final int SOURCE_BORDER = 32;
     static final int SOURCE_CENTER = TEXTURE_SIZE - SOURCE_BORDER * 2;
 
+    private static final int MAX_GRADIENT_BANDS = 24;
+
     private static final Identifier FILL_TEXTURE = ArcaneClient.id("textures/gui/rounded_fill.png");
     private static final Identifier OUTLINE_TEXTURE = ArcaneClient.id("textures/gui/rounded_outline.png");
 
@@ -28,6 +30,52 @@ public final class RoundedGui {
             return;
         }
         drawNineSlice(graphics, FILL_TEXTURE, x, y, width, height, safeRadius, color);
+    }
+
+    /**
+     * Fills a rounded rectangle with a linear two-stop gradient. The shape is redrawn once per band
+     * behind a scissor slice, so the rounded silhouette stays exact while the colour sweeps across.
+     */
+    public static void gradient(
+        DrawContext graphics,
+        int x,
+        int y,
+        int width,
+        int height,
+        int radius,
+        int from,
+        int to,
+        boolean horizontal
+    ) {
+        if (width <= 0 || height <= 0) return;
+        if (from == to) {
+            fill(graphics, x, y, width, height, radius, from);
+            return;
+        }
+        int span = horizontal ? width : height;
+        int bands = Math.clamp(span / 2, 2, MAX_GRADIENT_BANDS);
+        for (int band = 0; band < bands; band++) {
+            int start = span * band / bands;
+            int end = span * (band + 1) / bands;
+            if (end <= start) continue;
+            int color = lerp(from, to, (start + end - 1) * 0.5f / Math.max(1, span - 1));
+            if (horizontal) graphics.enableScissor(x + start, y, x + end, y + height);
+            else graphics.enableScissor(x, y + start, x + width, y + end);
+            fill(graphics, x, y, width, height, radius, color);
+            graphics.disableScissor();
+        }
+    }
+
+    /** Blends two ARGB colours, {@code amount} running 0 at {@code from} to 1 at {@code to}. */
+    public static int lerp(int from, int to, float amount) {
+        float value = Math.clamp(amount, 0.0f, 1.0f);
+        int result = 0;
+        for (int shift = 0; shift <= 24; shift += 8) {
+            int start = from >> shift & 0xFF;
+            int channel = Math.round(start + ((to >> shift & 0xFF) - start) * value);
+            result |= Math.clamp(channel, 0, 255) << shift;
+        }
+        return result;
     }
 
     public static void outline(

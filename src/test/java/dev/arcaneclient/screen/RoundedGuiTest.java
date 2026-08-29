@@ -18,6 +18,19 @@ final class RoundedGuiTest {
     }
 
     @Test
+    void gradientLerpWalksEveryChannelIncludingAlpha() {
+        assertEquals(0xFF7B2FFF, RoundedGui.lerp(0xFF7B2FFF, 0xFF00FFD1, 0.0f));
+        assertEquals(0xFF00FFD1, RoundedGui.lerp(0xFF7B2FFF, 0xFF00FFD1, 1.0f));
+        assertEquals(0x80808080, RoundedGui.lerp(0x00000000, 0xFFFFFFFF, 0.502f));
+    }
+
+    @Test
+    void gradientLerpClampsOutOfRangeAmounts() {
+        assertEquals(0xFF7B2FFF, RoundedGui.lerp(0xFF7B2FFF, 0xFF00FFD1, -3.0f));
+        assertEquals(0xFF00FFD1, RoundedGui.lerp(0xFF7B2FFF, 0xFF00FFD1, 4.0f));
+    }
+
+    @Test
     void sourceTextureKeepsAFourPixelStretchableCenter() {
         assertEquals(4, RoundedGui.SOURCE_CENTER);
         assertEquals(68, RoundedGui.SOURCE_BORDER * 2 + RoundedGui.SOURCE_CENTER);

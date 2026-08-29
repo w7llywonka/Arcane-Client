@@ -3,63 +3,62 @@ package dev.arcaneclient.screen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
-/** Accent palettes drawn over one neutral graphite foundation. */
+/** Accent palettes drawn over a shared surface foundation. */
 @Environment(EnvType.CLIENT)
 public enum ClickGuiTheme {
-    ARCANE("ARCANE", 0xFFCBFF4A, 0xFFE7FFA6, 0xFF7DA528, 0xE6354818),
-    FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
-    ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440);
+    /** Violet-to-cyan on midnight navy, the client's default look. */
+    KRYPTON("KRYPTON", Surface.MIDNIGHT, 0xFF7B2FFF, 0xFF00FFD1, 0xFF00FFD1, 0xFF5A2BB8, 0xE6241348),
+    ARCANE("ARCANE", Surface.GRAPHITE, 0xFFCBFF4A, 0xFF9CFF2E, 0xFFE7FFA6, 0xFF7DA528, 0xE6354818),
+    FROST("FROST", Surface.MIDNIGHT, 0xFF3D7DFF, 0xFF63E6FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
+    ROSE("ROSE", Surface.GRAPHITE, 0xFFF0567E, 0xFFFFA26B, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440);
 
     private static final ClickGuiTheme[] VALUES = values();
 
     private final String label;
+    private final Surface surface;
     private final int accent;
+    private final int accentAlt;
     private final int accentBright;
     private final int accentDim;
     private final int active;
-    private final int backdrop = 0x70000000;
-    private final int bar = 0xE8080D0B;
-    private final int window = 0xD80C1210;
-    private final int header = 0xD9161D1A;
-    private final int row = 0xD31A211E;
-    private final int nest = 0xD0141B18;
-    private final int outline = 0x4A395047;
-    private final int text = 0xFFF4F4F5;
-    private final int muted = 0xFFA1A1AA;
+    private final int backdrop = 0x8A03060B;
     private final int hover;
     private final int activeHover;
     private final int outlineSoft;
     private final int faint;
 
-    ClickGuiTheme(String label, int accent, int accentBright, int accentDim, int active) {
+    ClickGuiTheme(String label, Surface surface, int accent, int accentAlt, int accentBright, int accentDim, int active) {
         this.label = label;
+        this.surface = surface;
         this.accent = accent;
+        this.accentAlt = accentAlt;
         this.accentBright = accentBright;
         this.accentDim = accentDim;
         this.active = active;
-        this.hover = shade(this.row, 1.34f);
-        this.activeHover = shade(active, 1.15f);
-        this.outlineSoft = withAlpha(shade(this.outline, 0.74f), 0x32);
-        this.faint = shade(this.muted, 0.66f);
+        this.hover = shade(surface.row(), 1.42f);
+        this.activeHover = shade(active, 1.18f);
+        this.outlineSoft = withAlpha(surface.outline(), 0x24);
+        this.faint = shade(surface.muted(), 0.72f);
     }
 
     public String label() { return this.label; }
     public int accent() { return this.accent; }
+    public int accentAlt() { return this.accentAlt; }
     public int accentBright() { return this.accentBright; }
     public int accentDim() { return this.accentDim; }
     public int active() { return this.active; }
     public int activeHover() { return this.activeHover; }
     public int backdrop() { return this.backdrop; }
-    public int bar() { return this.bar; }
-    public int window() { return this.window; }
-    public int header() { return this.header; }
-    public int row() { return this.row; }
+    public int bar() { return this.surface.bar(); }
+    public int window() { return this.surface.window(); }
+    public int header() { return this.surface.header(); }
+    public int row() { return this.surface.row(); }
     public int hover() { return this.hover; }
-    public int nest() { return this.nest; }
-    public int outline() { return this.outline; }
+    public int nest() { return this.surface.nest(); }
+    public int outline() { return this.surface.outline(); }
     public int outlineSoft() { return this.outlineSoft; }
-    public int text() { return this.text; }
-    public int muted() { return this.muted; }
+    public int text() { return this.surface.text(); }
+    public int muted() { return this.surface.muted(); }
     public int faint() { return this.faint; }
 
     public ClickGuiTheme next() {
@@ -72,6 +71,16 @@ public enum ClickGuiTheme {
 
     public static int count() {
         return VALUES.length;
+    }
+
+    /** The neutral chrome an accent palette is painted over. */
+    private record Surface(int bar, int window, int header, int row, int nest, int outline, int text, int muted) {
+        /** Near-black with a cool blue cast. */
+        private static final Surface MIDNIGHT =
+            new Surface(0xF0030609, 0xE6070D1A, 0xE00B1424, 0xD40E1729, 0xD20A1220, 0x3A2E5C6E, 0xFFE8F0F8, 0xFF7A9AB5);
+        /** Neutral warm-free graphite. */
+        private static final Surface GRAPHITE =
+            new Surface(0xF00A0C0B, 0xE60E1211, 0xE0161D1A, 0xD41A211E, 0xD2141B18, 0x3A3E4C47, 0xFFF4F4F5, 0xFFA1A1AA);
     }
 
     private static int withAlpha(int color, int alpha) {

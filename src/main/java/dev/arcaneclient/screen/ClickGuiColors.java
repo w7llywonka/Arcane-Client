@@ -5,6 +5,7 @@ import dev.arcaneclient.ArcaneConfig;
 /** A resolved Click GUI palette, including fully custom RGB colors. */
 public record ClickGuiColors(
     int accent,
+    int accentAlt,
     int accentBright,
     int accentDim,
     int active,
@@ -26,7 +27,7 @@ public record ClickGuiColors(
         ClickGuiTheme base = ClickGuiTheme.fromConfig(config.uiTheme);
         if (!config.customUiColors) {
             return new ClickGuiColors(
-                base.accent(), base.accentBright(), base.accentDim(), base.active(), base.activeHover(),
+                base.accent(), base.accentAlt(), base.accentBright(), base.accentDim(), base.active(), base.activeHover(),
                 base.backdrop(), base.bar(), base.window(), base.header(), base.row(), base.hover(),
                 base.nest(), base.outline(), base.outlineSoft(), base.text(), base.muted(), base.faint()
             );
@@ -43,6 +44,7 @@ public record ClickGuiColors(
         int active = withAlpha(mix(panel, accent, 0.34f), 0xE6);
         return new ClickGuiColors(
             accent,
+            mix(accent, text, 0.52f),
             mix(accent, text, 0.34f),
             mix(panel, accent, 0.62f),
             active,
