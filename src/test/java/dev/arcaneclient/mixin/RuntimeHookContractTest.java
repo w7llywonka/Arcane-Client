@@ -12,8 +12,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Keyboard;
 import net.minecraft.client.network.ClientCommonNetworkHandler;
 import net.minecraft.client.Mouse;
+import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.input.MouseInput;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -39,6 +42,8 @@ final class RuntimeHookContractTest {
         method(ClientCommonNetworkHandler.class, "sendPacket", Packet.class);
         method(ClientConnection.class, "send", Packet.class, ChannelFutureListener.class, boolean.class);
         method(Mouse.class, "onMouseScroll", long.class, double.class, double.class);
+        method(Mouse.class, "onMouseButton", long.class, MouseInput.class, int.class);
+        method(Keyboard.class, "onKey", long.class, int.class, KeyInput.class);
     }
 
     @Test
@@ -60,6 +65,7 @@ final class RuntimeHookContractTest {
             assertTrue(names.contains("MouseMixin"));
             assertTrue(names.contains("MinecraftClientMixin"));
             assertTrue(names.contains("KeyboardInputMixin"));
+            assertTrue(names.contains("KeyboardMixin"));
         }
     }
 

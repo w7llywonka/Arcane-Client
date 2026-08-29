@@ -15,10 +15,12 @@ import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.option.Perspective;
+import net.minecraft.client.util.InputUtil;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Vec3d;
+import org.lwjgl.glfw.GLFW;
 
 @SuppressWarnings("UnstableApiUsage")
 public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
@@ -33,6 +35,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             context.getInput().resizeWindow(1280, 720);
             context.waitTicks(20);
             prepare(context);
+            testRapidCameraToggles(context);
             testFreecam(context);
             testFreelook(context);
             testModeSwitching(context);
@@ -43,6 +46,32 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
                 FreelookController.disable(client);
             });
         }
+    }
+
+    private static void testRapidCameraToggles(ClientGameTestContext context) {
+        ArcaneClient.LOGGER.info("[QA] Starting immediate camera input test");
+        TestInput input = context.getInput();
+
+        input.pressKey(ArcaneClient.keybinds().freecam());
+        require(FreecamController.isActive(), "Freecam raw press did not activate immediately");
+        input.pressKey(ArcaneClient.keybinds().freecam());
+        require(!FreecamController.isActive(), "Freecam rapid second press was lost");
+
+        context.runOnClient(client -> {
+            ArcaneClient.keybinds().freelook().setBoundKey(
+                InputUtil.Type.KEYSYM.createFromCode(GLFW.GLFW_KEY_F4)
+            );
+            KeyBinding.updateKeysByCode();
+        });
+        input.pressKey(GLFW.GLFW_KEY_F4);
+        require(FreelookController.isActive(), "Freelook raw press did not activate immediately");
+        input.pressKey(GLFW.GLFW_KEY_F4);
+        require(!FreelookController.isActive(), "Freelook rapid second press was lost");
+        context.runOnClient(client -> {
+            ArcaneClient.keybinds().freelook().setBoundKey(InputUtil.UNKNOWN_KEY);
+            KeyBinding.updateKeysByCode();
+        });
+        ArcaneClient.LOGGER.info("[QA] Immediate camera input test passed");
     }
 
     private static void prepare(ClientGameTestContext context) {

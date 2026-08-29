@@ -186,14 +186,20 @@ public final class ModuleCatalog {
 
     private static List<GuiModule> render(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
         GuiModule radar = GuiModule.toggle("Base Radar", "Nearby scored-chunk grid.", () -> config.hud, value -> config.hud = value).build();
-        GuiModule freecam = GuiModule.toggle("Freecam", "Smooth detached flight; wheel changes speed and mining uses body reach.", FreecamController::isActive, value -> {
-            if (value != FreecamController.isActive()) FreecamController.toggle(client);
+        GuiModule freecam = GuiModule.toggle("Freecam", "Detached flight with instant controls; mining stays locked to your starting aim.", FreecamController::isActive, value -> {
+            if (value != FreecamController.isActive()) {
+                FreecamController.toggle(client);
+                closeCameraMenu(client);
+            }
         })
             .with(new GuiSetting.Slider("Speed", () -> config.freecamSpeed, value -> config.freecamSpeed = value, 1, 20, ""))
             .with(new GuiSetting.Toggle("Directional mining", () -> config.freecamMining, value -> config.freecamMining = value))
             .with(new GuiSetting.Bind("Bind", keybinds.freecam())).build();
         GuiModule freelook = GuiModule.toggle("Freelook", "Orbit around your real skin while movement and mining keep using your actual aim.", FreelookController::isActive, value -> {
-            if (value != FreelookController.isActive()) FreelookController.toggle(client);
+            if (value != FreelookController.isActive()) {
+                FreelookController.toggle(client);
+                closeCameraMenu(client);
+            }
         }).with(new GuiSetting.Bind("Bind", keybinds.freelook())).build();
         GuiModule fullbright = GuiModule.toggle("Fullbright", "Applies full client-side night-vision brightness.", () -> config.fullbright, value -> config.fullbright = value).build();
         GuiModule hurtCam = GuiModule.toggle("No Hurt Cam", "Removes the damage tilt without changing damage feedback.", () -> config.noHurtCam, value -> config.noHurtCam = value).build();
@@ -203,6 +209,10 @@ public final class ModuleCatalog {
         GuiModule clean = GuiModule.toggle("Clean Capture", "Hides Arcane overlays for screenshots and recordings.", () -> config.cleanCapture, value -> config.cleanCapture = value)
             .with(new GuiSetting.Bind("Bind", keybinds.cleanCapture())).build();
         return List.of(radar, freecam, freelook, fullbright, hurtCam, zoom, clean);
+    }
+
+    private static void closeCameraMenu(MinecraftClient client) {
+        if (client.currentScreen instanceof ArcaneSettingsScreen) client.setScreen(null);
     }
 
     private static List<GuiModule> utility(ArcaneConfig config, ArcaneKeybinds keybinds) {
