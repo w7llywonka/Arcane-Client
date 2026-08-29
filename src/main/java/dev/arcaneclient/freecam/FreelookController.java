@@ -22,6 +22,11 @@ public final class FreelookController {
         return active;
     }
 
+    /** True when vanilla should leave the third-person orbit at its full distance through blocks. */
+    public static boolean ignoresCameraCollision() {
+        return active && ArcaneClient.config().freelookThroughWalls;
+    }
+
 
     public static void toggle(MinecraftClient client) {
         if (isActive()) disable(client); else enable(client);

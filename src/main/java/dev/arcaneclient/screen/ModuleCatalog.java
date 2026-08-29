@@ -200,7 +200,9 @@ public final class ModuleCatalog {
                 FreelookController.toggle(client);
                 closeCameraMenu(client);
             }
-        }).with(new GuiSetting.Bind("Bind", keybinds.freelook())).build();
+        })
+            .with(new GuiSetting.Toggle("Through walls", () -> config.freelookThroughWalls, value -> config.freelookThroughWalls = value))
+            .with(new GuiSetting.Bind("Bind", keybinds.freelook())).build();
         GuiModule fullbright = GuiModule.toggle("Fullbright", "Applies full client-side night-vision brightness.", () -> config.fullbright, value -> config.fullbright = value).build();
         GuiModule hurtCam = GuiModule.toggle("No Hurt Cam", "Removes the damage tilt without changing damage feedback.", () -> config.noHurtCam, value -> config.noHurtCam = value).build();
         GuiModule zoom = GuiModule.toggle("Zoom", "Hold the zoom key for a configurable smooth FOV reduction.", () -> config.zoom, value -> config.zoom = value)

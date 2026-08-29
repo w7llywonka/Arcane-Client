@@ -192,11 +192,15 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
     private static void testFreelook(ClientGameTestContext context) {
         ArcaneClient.LOGGER.info("[QA] Starting Freelook end-to-end test");
         Snapshot bodyStart = snapshot(context);
+        ArcaneClient.config().freelookThroughWalls = true;
         context.runOnClient(FreelookController::enable);
         context.waitTicks(2);
 
         Snapshot enabled = snapshot(context);
         require(FreelookController.isActive(), "Freelook did not activate");
+        require(FreelookController.ignoresCameraCollision(), "Freelook through-walls setting did not bypass camera collision");
+        ArcaneClient.config().freelookThroughWalls = false;
+        require(!FreelookController.ignoresCameraCollision(), "Freelook camera collision did not react to its module setting immediately");
         require(!FreecamController.hasVisualBody(), "Freelook created a duplicate player instead of rendering the real skin");
         require(enabled.cameraIsPlayer(), "Freelook replaced the player camera entity and broke movement/HUD state");
         require(enabled.perspective() == Perspective.THIRD_PERSON_BACK, "Freelook did not use third-person orbit rendering");

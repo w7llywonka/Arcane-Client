@@ -78,6 +78,7 @@ public final class ArcaneConfig {
     public boolean soundNotifications = true;
     public boolean streamerMode = false;
     public boolean freecamMining = true;
+    public boolean freelookThroughWalls = false;
     public boolean customUiColors = false;
     public boolean farmSignals = true;
     public boolean playerBlockSignals = true;
