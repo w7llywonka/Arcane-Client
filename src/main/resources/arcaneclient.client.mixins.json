@@ -10,6 +10,7 @@
     "EntityMixin",
     "FontManagerAccessor",
     "GameRendererMixin",
+    "KeyboardMixin",
     "KeyboardInputMixin",
     "LivingEntityMixin",
     "MinecraftClientAccessor",
