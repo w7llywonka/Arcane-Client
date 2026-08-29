@@ -113,6 +113,10 @@ public final class FreecamController {
         }
 
         if (client.getCameraEntity() != player) client.setCameraEntity(player);
+        // The real player still receives gravity and server corrections while movement input is
+        // detached. Keep the rendered copy on that authoritative position so it cannot hover at
+        // the activation coordinate after the player lands or is moved by the server.
+        FreecamVisualBody.sync(player);
 
         player.setSprinting(false);
         double forward = axis(client.options.forwardKey.isPressed(), client.options.backKey.isPressed());
