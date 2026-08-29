@@ -12,18 +12,21 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.option.Perspective;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.util.ActionResult;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
 
 /** Smooth detached camera with server-valid directional mining from the player's body. */
 @Environment(EnvType.CLIENT)
 public final class FreecamController {
-    private static ArmorStandEntity camera;
+    private static boolean active;
     private static Perspective previousPerspective = Perspective.FIRST_PERSON;
     private static float playerYaw;
     private static float playerPitch;
+    private static float cameraYaw;
+    private static float cameraPitch;
+    private static Vec3d previousPosition = Vec3d.ZERO;
+    private static Vec3d position = Vec3d.ZERO;
     private static Vec3d velocity = Vec3d.ZERO;
 
     private FreecamController() {
@@ -37,7 +40,7 @@ public final class FreecamController {
     }
 
     public static boolean isActive() {
-        return camera != null;
+        return active;
     }
 
     public static boolean hasVisualBody() {
@@ -58,38 +61,32 @@ public final class FreecamController {
 
     public static void enable(MinecraftClient client) {
         ClientPlayerEntity player = client.player;
-        if (camera != null || player == null || client.world == null) return;
+        if (active || player == null || client.world == null) return;
         FreelookController.disable(client);
         AutoToolController.restore(client);
         playerYaw = player.getYaw();
         playerPitch = player.getPitch();
+        cameraYaw = playerYaw;
+        cameraPitch = playerPitch;
         previousPerspective = client.options.getPerspective();
-        camera = new ArmorStandEntity((World) client.world, player.getX(), player.getY(), player.getZ());
-        DetachedCameraPose.initialize(
-            camera,
-            player.getX(),
-            player.getEyeY() - camera.getStandingEyeHeight(),
-            player.getZ(),
-            playerYaw,
-            playerPitch
-        );
-        camera.setInvisible(true);
-        camera.setNoGravity(true);
-        camera.noClip = true;
+        position = player.getEyePos();
+        previousPosition = position;
+        active = true;
         FreecamVisualBody.spawn(client, player);
         velocity = Vec3d.ZERO;
         DetachedCameraInteraction.stopMining(client);
         client.options.setPerspective(Perspective.FIRST_PERSON);
-        client.setCameraEntity((Entity) camera);
+        client.setCameraEntity(player);
         ArcaneClient.LOGGER.info("Freecam enabled");
     }
 
     public static void disable(MinecraftClient client) {
         DetachedCameraInteraction.stopMining(client);
-        if (camera == null) {
+        if (!active) {
             FreecamVisualBody.remove();
             return;
         }
+        active = false;
         FreecamVisualBody.remove();
         if (client.player != null) {
             client.player.setYaw(playerYaw);
@@ -101,18 +98,21 @@ public final class FreecamController {
             client.setCameraEntity(null);
         }
         client.options.setPerspective(previousPerspective);
-        camera = null;
+        previousPosition = Vec3d.ZERO;
+        position = Vec3d.ZERO;
         velocity = Vec3d.ZERO;
         ArcaneClient.LOGGER.info("Freecam disabled");
     }
 
     public static void tick(MinecraftClient client) {
         ClientPlayerEntity player = client.player;
-        if (camera == null) return;
-        if (player == null || client.world == null || camera.getEntityWorld() != client.world) {
+        if (!active) return;
+        if (player == null || client.world == null) {
             disable(client);
             return;
         }
+
+        if (client.getCameraEntity() != player) client.setCameraEntity(player);
 
         player.setSprinting(false);
         double forward = axis(client.options.forwardKey.isPressed(), client.options.backKey.isPressed());
@@ -121,35 +121,49 @@ public final class FreecamController {
         boolean moving = forward != 0.0 || sideways != 0.0 || vertical != 0.0;
         Vec3d target = Vec3d.ZERO;
         if (moving) {
-            Vec3d direction = FreecamNavigation.direction(camera.getYaw(), forward, sideways, vertical);
+            Vec3d direction = FreecamNavigation.direction(cameraYaw, forward, sideways, vertical);
             double speed = ArcaneClient.config().freecamSpeed / 10.0;
             if (client.options.sprintKey.isPressed()) speed *= 3.0;
             target = direction.multiply(speed);
         }
         velocity = FreecamMotion.step(velocity, target, moving);
-        DetachedCameraPose.advance(
-            camera,
-            camera.getX() + velocity.x,
-            camera.getY() + velocity.y,
-            camera.getZ() + velocity.z
-        );
+        previousPosition = position;
+        position = position.add(velocity);
         DetachedCameraInteraction.tickMining(
             client,
             player,
-            camera.getYaw(),
-            camera.getPitch(),
+            cameraYaw,
+            cameraPitch,
             ArcaneClient.config().freecamMining
         );
     }
 
     /** Receives vanilla's sensitivity-adjusted mouse deltas and rotates only the detached camera. */
     public static boolean changeLookDirection(double cursorDeltaX, double cursorDeltaY) {
-        if (camera == null) return false;
+        if (!active) return false;
         CameraRotation.Angles next = CameraRotation.apply(
-            camera.getYaw(), camera.getPitch(), cursorDeltaX, cursorDeltaY
+            cameraYaw, cameraPitch, cursorDeltaX, cursorDeltaY
         );
-        DetachedCameraPose.rotate(camera, next.yaw(), next.pitch());
+        cameraYaw = next.yaw();
+        cameraPitch = next.pitch();
         return true;
+    }
+
+    public static float cameraYaw() {
+        return cameraYaw;
+    }
+
+    public static float cameraPitch() {
+        return cameraPitch;
+    }
+
+    public static Vec3d cameraPosition(float tickProgress) {
+        double progress = Math.clamp(tickProgress, 0.0f, 1.0f);
+        return new Vec3d(
+            MathHelper.lerp(progress, previousPosition.x, position.x),
+            MathHelper.lerp(progress, previousPosition.y, position.y),
+            MathHelper.lerp(progress, previousPosition.z, position.z)
+        );
     }
 
     /** Consumes the wheel only while freecam is active and persists the selected speed. */

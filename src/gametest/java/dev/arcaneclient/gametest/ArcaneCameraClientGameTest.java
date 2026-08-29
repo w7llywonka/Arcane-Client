@@ -1,7 +1,6 @@
 package dev.arcaneclient.gametest;
 
 import dev.arcaneclient.ArcaneClient;
-import dev.arcaneclient.freecam.DetachedCameraPose;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
@@ -18,6 +17,7 @@ import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.option.Perspective;
 
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Vec3d;
 
 @SuppressWarnings("UnstableApiUsage")
@@ -68,7 +68,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
 
         Snapshot enabled = snapshot(context);
         require(FreecamController.isActive(), "Freecam did not activate");
-        require(!enabled.cameraIsPlayer(), "Freecam did not install a detached camera entity");
+        require(enabled.cameraIsPlayer(), "Freecam replaced the player camera entity and broke the hotbar");
         require(FreecamController.hasVisualBody(), "Freecam did not create the visible stationary body");
         context.runOnClient(client -> {
             Entity visualBody = FreecamController.visualBodyEntity();
@@ -126,14 +126,11 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             require(!visualBody.isAttackable(), "Freecam visual body was attackable");
             require(!visualBody.isInteractable(), "Freecam visual body was interactable");
             client.interactionManager.attackEntity(client.player, visualBody);
-
-            Entity detachedCamera = client.getCameraEntity();
-            require(detachedCamera != null && detachedCamera != client.player, "Freecam camera disappeared before interaction test");
-            client.interactionManager.attackEntity(client.player, detachedCamera);
+            require(client.getCameraEntity() == client.player, "Freecam lost the player camera before interaction test");
         });
         context.waitTicks(3);
         Snapshot afterInvalidAttack = snapshot(context);
-        require(afterInvalidAttack.connectionOpen(), "client-only camera attack escaped to the integrated server");
+        require(afterInvalidAttack.connectionOpen(), "client-only visual body attack escaped to the integrated server");
         require(FreecamController.isActive(), "Freecam was lost after guarded camera interaction");
 
         context.runOnClient(FreecamController::disable);
@@ -156,7 +153,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         Snapshot enabled = snapshot(context);
         require(FreelookController.isActive(), "Freelook did not activate");
         require(!FreecamController.hasVisualBody(), "Freelook created a duplicate player instead of rendering the real skin");
-        require(!enabled.cameraIsPlayer(), "Freelook did not install an orbit camera");
+        require(enabled.cameraIsPlayer(), "Freelook replaced the player camera entity and broke movement/HUD state");
         require(enabled.perspective() == Perspective.THIRD_PERSON_BACK, "Freelook did not use third-person orbit rendering");
         assertAnchored(enabled, "Freelook activation");
         assertHudAvailable(context, "Freelook enabled");
@@ -191,17 +188,12 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
 
         context.runOnClient(client -> {
             client.gameRenderer.updateCrosshairTarget(1.0f);
-            require(
-                client.targetedEntity == null || client.targetedEntity != client.getCameraEntity(),
-                "Freelook camera became a crosshair target"
-            );
-            Entity detachedCamera = client.getCameraEntity();
-            require(detachedCamera != null && detachedCamera != client.player, "Freelook camera disappeared before interaction test");
-            client.interactionManager.attackEntity(client.player, detachedCamera);
+            require(client.getCameraEntity() == client.player, "Freelook lost the real player camera before interaction test");
+            require(client.targetedEntity != client.player, "Freelook targeted the local player");
         });
         context.waitTicks(3);
         Snapshot afterInvalidAttack = snapshot(context);
-        require(afterInvalidAttack.connectionOpen(), "Freelook client-only entity attack escaped to the integrated server");
+        require(afterInvalidAttack.connectionOpen(), "Freelook interaction handling disconnected the client");
         require(FreelookController.isActive(), "Freelook was lost after guarded camera interaction");
 
         context.runOnClient(FreelookController::disable);
@@ -248,23 +240,20 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
 
     private static void faceBody(ClientGameTestContext context) {
         context.runOnClient(client -> {
-            Entity camera = client.getCameraEntity();
             Vec3d bodyEye = client.player.getEyePos();
-            DetachedCameraPose.advance(
-                camera,
-                bodyEye.x,
-                bodyEye.y + 0.75 - camera.getStandingEyeHeight(),
-                bodyEye.z + 4.0
-            );
-            Vec3d offset = bodyEye.subtract(camera.getEyePos());
+            net.minecraft.client.render.Camera renderedCamera = client.gameRenderer.getCamera();
+            Vec3d offset = bodyEye.subtract(renderedCamera.getCameraPos());
             double horizontal = Math.sqrt(offset.x * offset.x + offset.z * offset.z);
             float yaw = (float) Math.toDegrees(Math.atan2(-offset.x, offset.z));
             float pitch = (float) Math.toDegrees(Math.atan2(-offset.y, horizontal));
-            DetachedCameraPose.rotate(camera, yaw, pitch);
+            FreecamController.changeLookDirection(
+                (yaw - FreecamController.cameraYaw()) / 0.15,
+                (pitch - FreecamController.cameraPitch()) / 0.15
+            );
             Perspective perspective = client.options.getPerspective();
             client.gameRenderer.getCamera().update(
                 client.world,
-                camera,
+                client.player,
                 !perspective.isFirstPerson(),
                 perspective.isFrontView(),
                 1.0f
@@ -277,9 +266,9 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             net.minecraft.client.render.Camera renderedCamera = client.gameRenderer.getCamera();
             double alignment = renderedBodyAlignment(client);
             ArcaneClient.LOGGER.info(
-                "[QA] Camera entity yaw {} pitch {}; rendered camera at {} yaw {} pitch {}; body alignment {}",
-                client.getCameraEntity().getYaw(),
-                client.getCameraEntity().getPitch(),
+                "[QA] Freecam pose yaw {} pitch {}; rendered camera at {} yaw {} pitch {}; body alignment {}",
+                FreecamController.cameraYaw(),
+                FreecamController.cameraPitch(),
                 renderedCamera.getCameraPos(),
                 renderedCamera.getYaw(),
                 renderedCamera.getPitch(),
@@ -302,15 +291,16 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
     }
 
     private static void assertAnchored(Snapshot snapshot, String stage) {
-        require(Math.abs(snapshot.cameraPos().x - snapshot.playerPos().x) < POSITION_EPSILON, stage + " drifted on X");
-        require(Math.abs(snapshot.cameraPos().z - snapshot.playerPos().z) < POSITION_EPSILON, stage + " drifted on Z");
-        require(Math.abs(snapshot.cameraPos().y - snapshot.playerPos().y) < 2.0, stage + " drifted vertically");
+        double orbitDistance = snapshot.cameraPos().distanceTo(snapshot.playerPos());
+        require(orbitDistance > 1.0 && orbitDistance < 6.0, stage + " was not a player-anchored third-person orbit");
     }
 
     private static void assertHudAvailable(ClientGameTestContext context, String stage) {
         context.runOnClient(client -> {
             require(!client.options.hudHidden, stage + " hid the HUD/hotbar");
             require(client.currentScreen == null, stage + " left a screen covering the hotbar");
+            require(client.getCameraEntity() instanceof PlayerEntity, stage + " made InGameHud.getCameraPlayer return null");
+            require(client.getCameraEntity() == client.player, stage + " detached HUD state from the real inventory");
         });
     }
 
@@ -325,14 +315,21 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             require(client.world != null, "world disappeared during camera test");
             Entity camera = client.getCameraEntity();
             require(camera != null, "camera entity disappeared during camera test");
+            net.minecraft.client.render.Camera renderedCamera = client.gameRenderer.getCamera();
+            float controllerYaw = FreecamController.isActive()
+                ? FreecamController.cameraYaw()
+                : FreelookController.isActive() ? FreelookController.cameraYaw() : camera.getYaw();
+            float controllerPitch = FreecamController.isActive()
+                ? FreecamController.cameraPitch()
+                : FreelookController.isActive() ? FreelookController.cameraPitch() : camera.getPitch();
             boolean open = client.getNetworkHandler() != null && client.getNetworkHandler().getConnection().isOpen();
             return new Snapshot(
-                new Vec3d(camera.getX(), camera.getY(), camera.getZ()),
+                renderedCamera.getCameraPos(),
                 new Vec3d(client.player.getX(), client.player.getY(), client.player.getZ()),
-                camera.getYaw(),
-                camera.getPitch(),
-                client.gameRenderer.getCamera().getYaw(),
-                client.gameRenderer.getCamera().getPitch(),
+                controllerYaw,
+                controllerPitch,
+                renderedCamera.getYaw(),
+                renderedCamera.getPitch(),
                 client.player.getYaw(),
                 client.player.getPitch(),
                 client.player.getId(),
