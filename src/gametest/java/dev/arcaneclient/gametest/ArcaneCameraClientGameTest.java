@@ -8,6 +8,7 @@ import dev.arcaneclient.mixin.MinecraftClientAccessor;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.scan.ChunkScanner;
 import dev.arcaneclient.utility.ElytraAssistController;
+import dev.arcaneclient.utility.RelogController;
 
 import java.util.ArrayList;
 import java.util.function.Function;
@@ -58,6 +59,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             testModeSwitching(context);
             testElytraAssist(context);
             testStorageExcludedFromScanner(context);
+            testRelogSingleplayerGuard(context);
             testInterface(context);
             testScannerThroughput(context);
         } finally {
@@ -529,6 +531,20 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         context.runOnClient(client -> client.setScreen(null));
         context.waitTicks(2);
         ArcaneClient.LOGGER.info("[QA] Arcane interface visual test passed");
+    }
+
+    private static void testRelogSingleplayerGuard(ClientGameTestContext context) {
+        ArcaneClient.LOGGER.info("[QA] Starting Relog singleplayer guard test");
+        context.runOnClient(client -> require(
+            RelogController.relog(client) == RelogController.Result.MULTIPLAYER_ONLY,
+            "Relog must not disconnect an integrated singleplayer world"
+        ));
+        context.waitTicks(2);
+        context.runOnClient(client -> require(
+            client.world != null && client.player != null && client.isInSingleplayer(),
+            "Relog singleplayer guard changed the active world"
+        ));
+        ArcaneClient.LOGGER.info("[QA] Relog singleplayer guard test passed");
     }
 
     private static void faceBody(ClientGameTestContext context) {
