@@ -20,6 +20,7 @@ import dev.arcaneclient.render.VisualController;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.utility.AutoToolController;
 import dev.arcaneclient.utility.ElytraAssistController;
+import dev.arcaneclient.utility.RelogController;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -59,6 +60,11 @@ implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (keybinds.settings().wasPressed()) {
                 client.setScreen((Screen)new ArcaneSettingsScreen(client.currentScreen));
+            }
+            while (keybinds.relog().wasPressed()) {
+                RelogController.Result result = RelogController.relog(client);
+                if (result == RelogController.Result.STARTED) return;
+                ArcaneClient.actionbar(client, result.message());
             }
             while (keybinds.scanner().wasPressed()) {
                 boolean bl = ArcaneClient.config.enabled = !ArcaneClient.config.enabled;

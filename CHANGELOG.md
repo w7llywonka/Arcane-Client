@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 2.8.1+mc1.21.11
+
+- Added a configurable Relog keybind that cleanly leaves and immediately rejoins the current multiplayer server without a chat command.
+- Added singleplayer, Realms, invalid-address, and rapid-repeat guards around reconnect attempts.
+
 ## 2.3.7+mc1.21.11
 
 - Made Freelook render the real local player directly so the authenticated skin, animation, equipment, and hotbar remain intact.

@@ -20,15 +20,15 @@ import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.KeyBinding;
 
-/** Builds and validates Arcane's exact 43-module Click GUI catalog. */
+/** Builds and validates Arcane's exact 44-module Click GUI catalog. */
 @Environment(EnvType.CLIENT)
 public final class ModuleCatalog {
-    public static final int EXPECTED_MODULE_COUNT = 43;
+    public static final int EXPECTED_MODULE_COUNT = 44;
     private static final List<String> REQUIRED_MODULE_NAMES = List.of(
         "Auto Totem", "Auto Sprint", "Auto Eat", "Health Alert", "Armor Alert", "Hit Sound", "Swing Speed", "Combat HUD",
         "Storage ESP", "Item ESP", "Tunnel ESP", "Chunk Tiles", "ESP Debug", "Player ESP", "Mob ESP", "Projectile ESP", "Crystal ESP", "Entity Tracers", "Hole ESP",
         "Base Radar", "Freecam", "Freelook", "Fullbright", "No Hurt Cam", "Zoom", "Clean Capture",
-        "Performance", "Interface", "Info HUD", "Sound Notifications", "Streamer Mode",
+        "Performance", "Interface", "Info HUD", "Sound Notifications", "Streamer Mode", "Relog",
         "Elytra Assist", "Auto Tool", "Chat Macros",
         "Chunk Finder", "Growth Signals", "Build Traces", "Machine Signals", "Live Changes", "Light Signals", "Entity Signals", "Stash Finder", "Chunk Intel"
     );
@@ -52,7 +52,7 @@ public final class ModuleCatalog {
             for (GuiModule module : category.modules()) actualNames.add(module.name());
         }
         if (count != EXPECTED_MODULE_COUNT || !actualNames.equals(REQUIRED_MODULE_NAMES)) {
-            throw new IllegalStateException("Arcane module catalog does not match the exact 43-module product contract: " + actualNames);
+            throw new IllegalStateException("Arcane module catalog does not match the exact 44-module product contract: " + actualNames);
         }
         return categories;
     }
@@ -275,7 +275,10 @@ public final class ModuleCatalog {
         GuiModule sounds = GuiModule.toggle("Sound Notifications", "Master volume for combat and safety notification tones.", () -> config.soundNotifications, value -> config.soundNotifications = value)
             .with(new GuiSetting.Slider("Volume", () -> config.notificationVolume, value -> config.notificationVolume = value, 0, 100, "%")).build();
         GuiModule streamer = GuiModule.toggle("Streamer Mode", "Redacts coordinates and player names from Arcane overlays.", () -> config.streamerMode, value -> config.streamerMode = value).build();
-        return List.of(performance, interfaceModule, infoHud, sounds, streamer);
+        GuiModule relog = GuiModule.value("Relog", "Leaves and instantly rejoins the current multiplayer server from one keybind.", () -> "READY")
+            .with(new GuiSetting.Bind("Bind", keybinds.relog()))
+            .build();
+        return List.of(performance, interfaceModule, infoHud, sounds, streamer, relog);
     }
 
     private static GuiSetting.Slider channel(
