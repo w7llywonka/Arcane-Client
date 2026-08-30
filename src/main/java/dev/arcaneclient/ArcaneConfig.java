@@ -25,6 +25,8 @@ import net.fabricmc.loader.api.FabricLoader;
 public final class ArcaneConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final int CURRENT_CONFIG_VERSION = 7;
+    /** Preset Click GUI themes. Mirrors {@code ClickGuiTheme}, which is client-only. */
+    public static final int UI_THEME_COUNT = 5;
     public boolean enabled = true;
     public boolean overlay = true;
     public boolean hud = true;
@@ -395,7 +397,7 @@ public final class ArcaneConfig {
         this.scanRadius = Math.clamp((long)this.scanRadius, 2, 24);
         this.chunksPerTick = Math.clamp((long)this.chunksPerTick, 1, 16);
         this.rescanSeconds = Math.clamp((long)this.rescanSeconds, 10, 300);
-        this.uiTheme = Math.clamp(this.uiTheme, 0, 2);
+        this.uiTheme = Math.clamp(this.uiTheme, 0, UI_THEME_COUNT - 1);
         this.performanceProfile = Math.clamp(this.performanceProfile, 0, 2);
         this.configVersion = CURRENT_CONFIG_VERSION;
         this.freecamSpeed = Math.clamp(this.freecamSpeed, 1, 20);
