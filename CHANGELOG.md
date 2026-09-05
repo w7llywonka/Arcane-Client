@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 2.9.2+mc1.21.11
+
+- Publish the current public client source, including DEV 10's built-in two-second Relog, camera and utility changes, grounded chunk tiles, dropped-item nametags and interface improvements.
+- Include the public ARCLoader 1.2.3 source and tests. Its build bundles the client compiled from this repository, not an opaque checked-in client binary.
+- Add release fingerprints, update-behavior documentation and an offline recursive JAR-content comparison tool.
+- Preserve the existing historical website and legacy directories; exclude credentials, signing secrets and the private DEV access service.
+
 ## 2.8.1+mc1.21.11
 
 - Added a configurable Relog keybind that cleanly leaves and immediately rejoins the current multiplayer server without a chat command.

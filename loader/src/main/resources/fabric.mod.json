@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "arcaneloader",
+  "version": "${version}",
+  "name": "ARCLoader",
+  "description": "Loads its bundled Arcane Client and atomically self-updates as one signed Fabric mod.",
+  "authors": [
+    "Arcane Client"
+  ],
+  "contact": {
+    "homepage": "https://arcaneclient.shop"
+  },
+  "license": "All-Rights-Reserved",
+  "icon": "arcane-icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.arcane.loader.ArcaneFabricLoader"
+    ]
+  },
+  "jars": [
+    {
+      "file": "${embeddedClientPath}"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~1.21.11",
+    "java": ">=21",
+    "arcaneclient": ">=2.9.2"
+  }
+}

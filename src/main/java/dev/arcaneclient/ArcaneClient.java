@@ -6,21 +6,28 @@ import dev.arcaneclient.ArcaneKeybinds;
 import dev.arcaneclient.chat.ChatMacroController;
 import dev.arcaneclient.combat.AutoTotemController;
 import dev.arcaneclient.combat.CombatController;
+import dev.arcaneclient.combat.CombatAutomationController;
 import dev.arcaneclient.command.ArcaneCommands;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.render.EspRenderer;
 import dev.arcaneclient.render.EntityEspRenderer;
 import dev.arcaneclient.render.ItemEspRenderer;
-import dev.arcaneclient.render.StashLabelRenderer;
+import dev.arcaneclient.render.ActivityClusterLabelRenderer;
 import dev.arcaneclient.render.ArcaneHud;
 import dev.arcaneclient.render.TraceRenderer;
 import dev.arcaneclient.render.TunnelEspRenderer;
-import dev.arcaneclient.render.VisualController;
+import dev.arcaneclient.render.WorldIntelRenderer;
+import dev.arcaneclient.render.WaypointStore;
+import dev.arcaneclient.movement.MovementAssistController;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
+import dev.arcaneclient.screen.ArcaneWelcomeScreen;
 import dev.arcaneclient.utility.AutoToolController;
+import dev.arcaneclient.utility.AdvancedHudController;
 import dev.arcaneclient.utility.ElytraAssistController;
+import dev.arcaneclient.utility.QualityOfLifeController;
 import dev.arcaneclient.utility.RelogController;
+import dev.arcaneclient.utility.SafetyController;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -29,6 +36,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -49,21 +57,47 @@ implements ClientModInitializer {
         engine = new TraceEngine(config);
         keybinds = new ArcaneKeybinds();
         ClientWorldEvents.AFTER_CLIENT_WORLD_CHANGE.register((client, level) -> {
+            RelogController.onWorldChange(level);
             FreecamController.disable(client);
             FreelookController.disable(client);
             AutoToolController.restore(client);
+            CombatController.reset(client);
+            AutoTotemController.reset();
+            CombatAutomationController.reset(client);
             ElytraAssistController.reset();
+            QualityOfLifeController.onWorldChange(client, level);
+            MovementAssistController.reset(client);
+            EntityEspRenderer.reset();
+            ItemEspRenderer.reset();
+            ActivityClusterLabelRenderer.reset();
+            WorldIntelRenderer.onWorldChange(level);
+            SafetyController.reset();
+            ArcaneHud.reset();
+            AdvancedHudController.reset();
             engine.onWorldChange(client, level);
         });
         ClientChunkEvents.CHUNK_LOAD.register(engine::onChunkLoad);
         ClientChunkEvents.CHUNK_UNLOAD.register(engine::onChunkUnload);
+        ClientChunkEvents.CHUNK_LOAD.register(WorldIntelRenderer::onChunkLoad);
+        ClientChunkEvents.CHUNK_UNLOAD.register(WorldIntelRenderer::onChunkUnload);
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (RelogController.tick(client)) {
+                // Don't replay presses from the countdown after the new world loads.
+                while (keybinds.relog().wasPressed()) { }
+                return;
+            }
+            if (config.welcomeNoticeVersion < ArcaneWelcomeScreen.NOTICE_VERSION
+                && client.currentScreen instanceof TitleScreen titleScreen) {
+                config.welcomeNoticeVersion = ArcaneWelcomeScreen.NOTICE_VERSION;
+                config.save();
+                client.setScreen(new ArcaneWelcomeScreen(titleScreen));
+                return;
+            }
             while (keybinds.settings().wasPressed()) {
                 client.setScreen((Screen)new ArcaneSettingsScreen(client.currentScreen));
             }
             while (keybinds.relog().wasPressed()) {
                 RelogController.Result result = RelogController.relog(client);
-                if (result == RelogController.Result.STARTED) return;
                 ArcaneClient.actionbar(client, result.message());
             }
             while (keybinds.scanner().wasPressed()) {
@@ -113,19 +147,39 @@ implements ClientModInitializer {
                 config.save();
                 ArcaneClient.actionbar(client, "Item ESP " + (ArcaneClient.config.itemEsp ? "on" : "off"));
             }
+            while (keybinds.waypoint().wasPressed()) {
+                if (client.player == null || client.world == null) continue;
+                if (!config.waypoints) {
+                    ArcaneClient.actionbar(client, "Enable Waypoints before adding a marker");
+                    continue;
+                }
+                java.util.Set<String> names = WaypointStore.current(client).stream()
+                    .map(point -> point.name().toLowerCase(java.util.Locale.ROOT))
+                    .collect(java.util.stream.Collectors.toSet());
+                int next = 1;
+                while (names.contains(("Waypoint " + next).toLowerCase(java.util.Locale.ROOT))) next++;
+                WaypointStore.Waypoint waypoint = WaypointStore.add(client, "Waypoint " + next, client.player.getBlockPos());
+                ArcaneClient.actionbar(client, "Saved " + waypoint.name());
+            }
             ChatMacroController.tick(client);
             CombatController.tick(client);
             AutoTotemController.tick(client);
             ElytraAssistController.tick(client);
+            CombatAutomationController.tick(client);
+            QualityOfLifeController.tick(client);
+            MovementAssistController.tick(client);
+            SafetyController.tick(client);
+            ArcaneHud.tick(client);
+            AdvancedHudController.tick(client);
             FreecamController.tick(client);
             FreelookController.tick(client);
             EspRenderer.tick(client);
             EntityEspRenderer.tick(client);
             ItemEspRenderer.tick(client);
-            VisualController.tick(client);
+            WorldIntelRenderer.tick(client);
             engine.tick(client);
             TunnelEspRenderer.tick();
-            StashLabelRenderer.tick(client);
+            ActivityClusterLabelRenderer.tick(client);
         });
         ArcaneCommands.register();
         CombatController.register();
@@ -135,8 +189,10 @@ implements ClientModInitializer {
         EntityEspRenderer.register();
         ItemEspRenderer.register();
         TunnelEspRenderer.register();
-        StashLabelRenderer.register();
+        ActivityClusterLabelRenderer.register();
+        WorldIntelRenderer.register();
         ArcaneHud.register();
+        AdvancedHudController.register();
         LOGGER.info("Arcane Client initialized for Minecraft 1.21.11");
     }
 

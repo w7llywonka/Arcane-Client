@@ -6,7 +6,10 @@
   "environment": "client",
   "entrypoints": {
     "fabric-client-gametest": [
-      "dev.arcaneclient.gametest.ArcaneCameraClientGameTest"
+      "dev.arcaneclient.gametest.DevUiClientGameTest",
+      "dev.arcaneclient.gametest.ArcaneCameraClientGameTest",
+      "dev.arcaneclient.gametest.ChunkScannerClientGameTest",
+      "dev.arcaneclient.gametest.RelogClientGameTest"
     ]
   },
   "depends": {

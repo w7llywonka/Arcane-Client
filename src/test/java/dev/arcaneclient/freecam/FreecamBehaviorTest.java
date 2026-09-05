@@ -11,8 +11,10 @@ final class FreecamBehaviorTest {
     void scrollChangesSpeedOneClampedStepAtATime() {
         assertEquals(9, FreecamSpeed.adjust(8, 1.0));
         assertEquals(7, FreecamSpeed.adjust(8, -1.0));
-        assertEquals(20, FreecamSpeed.adjust(20, 1.0));
+        assertEquals(75, FreecamSpeed.adjust(75, 1.0));
         assertEquals(1, FreecamSpeed.adjust(1, -1.0));
+        assertEquals(75, FreecamSpeed.adjust(500, 0.0));
+        assertEquals(7.5, FreecamSpeed.blocksPerTick(75), 0.000001);
     }
 
     @Test

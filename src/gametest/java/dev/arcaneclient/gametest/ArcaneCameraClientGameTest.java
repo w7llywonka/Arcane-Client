@@ -5,6 +5,8 @@ import dev.arcaneclient.freecam.DetachedCameraInteraction;
 import dev.arcaneclient.freecam.FreecamController;
 import dev.arcaneclient.freecam.FreelookController;
 import dev.arcaneclient.mixin.MinecraftClientAccessor;
+import dev.arcaneclient.render.EspRenderer;
+import dev.arcaneclient.render.WorldIntelRenderer;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.scan.ChunkScanner;
 import dev.arcaneclient.utility.ElytraAssistController;
@@ -59,6 +61,8 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             testModeSwitching(context);
             testElytraAssist(context);
             testStorageExcludedFromScanner(context);
+            testStorageEspLayerSwitch(context);
+            testWorldIntelSearch(context);
             testRelogSingleplayerGuard(context);
             testInterface(context);
             testScannerThroughput(context);
@@ -154,6 +158,106 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             }
         });
         ArcaneClient.LOGGER.info("[QA] Storage-free Chunk Finder test passed");
+    }
+
+    private static void testStorageEspLayerSwitch(ClientGameTestContext context) {
+        ArcaneClient.LOGGER.info("[QA] Starting Storage ESP render-buffer regression test");
+        StorageEspState previous = context.computeOnClient(client -> {
+            require(client.world != null && client.player != null, "Storage ESP test needs a loaded world");
+            BlockPos origin = client.player.getBlockPos();
+            BlockPos target = null;
+            for (int y = 1; y <= 5 && target == null; y++) {
+                for (int z = -3; z <= 3 && target == null; z++) {
+                    for (int x = -3; x <= 3; x++) {
+                        BlockPos candidate = origin.add(x, y, z);
+                        if (client.world.getBlockState(candidate).isAir()) {
+                            target = candidate.toImmutable();
+                            break;
+                        }
+                    }
+                }
+            }
+            require(target != null, "Storage ESP test could not find a nearby air block");
+            StorageEspState state = new StorageEspState(
+                target,
+                client.world.getBlockState(target),
+                ArcaneClient.config().esp,
+                ArcaneClient.config().performanceProfile
+            );
+            client.world.setBlockState(target, Blocks.CHEST.getDefaultState(), Block.NOTIFY_ALL);
+            ArcaneClient.config().esp = true;
+            ArcaneClient.config().performanceProfile = 2;
+            return state;
+        });
+        try {
+            context.waitTicks(5);
+            context.runOnClient(client -> require(
+                EspRenderer.targetCount() > 0,
+                "Storage ESP did not discover the regression-test chest"
+            ));
+        } finally {
+            context.runOnClient(client -> {
+                if (client.world != null) {
+                    client.world.setBlockState(previous.pos(), previous.state(), Block.NOTIFY_ALL);
+                }
+                ArcaneClient.config().esp = previous.esp();
+                ArcaneClient.config().performanceProfile = previous.performanceProfile();
+            });
+            context.waitTicks(2);
+        }
+        ArcaneClient.LOGGER.info("[QA] Storage ESP render-buffer regression test passed");
+    }
+
+    private static void testWorldIntelSearch(ClientGameTestContext context) {
+        ArcaneClient.LOGGER.info("[QA] Starting bounded Search index test");
+        SearchState previous = context.computeOnClient(client -> {
+            require(client.world != null && client.player != null, "Search test needs a loaded world");
+            BlockPos origin = client.player.getBlockPos();
+            BlockPos target = null;
+            for (int y = 1; y <= 6 && target == null; y++) {
+                for (int z = -4; z <= 4 && target == null; z++) {
+                    for (int x = -4; x <= 4; x++) {
+                        BlockPos candidate = origin.add(x, y, z);
+                        if (client.world.getBlockState(candidate).isAir()) {
+                            target = candidate.toImmutable();
+                            break;
+                        }
+                    }
+                }
+            }
+            require(target != null, "Search test could not find a nearby air block");
+            SearchState state = new SearchState(
+                target,
+                client.world.getBlockState(target),
+                ArcaneClient.config().searchEsp,
+                ArcaneClient.config().portalEsp,
+                ArcaneClient.config().searchEspRange
+            );
+            client.world.setBlockState(target, Blocks.BEACON.getDefaultState(), Block.NOTIFY_ALL);
+            ArcaneClient.config().searchEsp = true;
+            ArcaneClient.config().portalEsp = false;
+            ArcaneClient.config().searchEspRange = 16;
+            WorldIntelRenderer.onWorldChange(client.world);
+            WorldIntelRenderer.onChunkLoad(client.world, client.world.getChunk(target.getX() >> 4, target.getZ() >> 4));
+            return state;
+        });
+        try {
+            context.waitTicks(8);
+            context.runOnClient(client -> {
+                require(WorldIntelRenderer.searchTargetCount() > 0, "Search index did not discover the beacon");
+                require(WorldIntelRenderer.queuedChunkCount() == 0, "Search index did not drain its bounded queue");
+            });
+        } finally {
+            context.runOnClient(client -> {
+                if (client.world != null) client.world.setBlockState(previous.pos(), previous.state(), Block.NOTIFY_ALL);
+                ArcaneClient.config().searchEsp = previous.searchEsp();
+                ArcaneClient.config().portalEsp = previous.portalEsp();
+                ArcaneClient.config().searchEspRange = previous.searchRange();
+                WorldIntelRenderer.onWorldChange(client.world);
+            });
+            context.waitTicks(2);
+        }
+        ArcaneClient.LOGGER.info("[QA] Bounded Search index test passed");
     }
 
     private static void testRapidCameraToggles(ClientGameTestContext context) {
@@ -539,6 +643,10 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             RelogController.relog(client) == RelogController.Result.MULTIPLAYER_ONLY,
             "Relog must not disconnect an integrated singleplayer world"
         ));
+        context.runOnClient(client -> require(
+            !RelogController.isPending(),
+            "Relog must not schedule a reconnect from an integrated singleplayer world"
+        ));
         context.waitTicks(2);
         context.runOnClient(client -> require(
             client.world != null && client.player != null && client.isInSingleplayer(),
@@ -674,5 +782,16 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
     }
 
     private record ScannerBenchmark(int chunks, int visitedBlocks, int availableBlocks, long elapsedNanos) {
+    }
+
+    private record StorageEspState(
+        BlockPos pos,
+        BlockState state,
+        boolean esp,
+        int performanceProfile
+    ) {
+    }
+
+    private record SearchState(BlockPos pos, BlockState state, boolean searchEsp, boolean portalEsp, int searchRange) {
     }
 }

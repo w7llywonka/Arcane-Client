@@ -12,7 +12,7 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.Language;
 
-/** Picks the bundled Sora font Arcane's interface draws with. */
+/** Picks the bundled Barlow Condensed font for compact interface panels. */
 @Environment(EnvType.CLIENT)
 public final class ArcaneFont {
     private static final int MAX_OVERSAMPLE = 6;
@@ -43,7 +43,10 @@ public final class ArcaneFont {
     }
 
     public static OrderedText trimmed(TextRenderer renderer, String value, int maxWidth) {
-        return Language.getInstance().reorder(renderer.trimToWidth(text(value), maxWidth));
+        if (width(renderer, value) <= maxWidth) return text(value).asOrderedText();
+        int available = Math.max(0, maxWidth - width(renderer, "…"));
+        String prefix = renderer.trimToWidth(text(value), available).getString();
+        return text(prefix + "…").asOrderedText();
     }
 
     public static Style style() {

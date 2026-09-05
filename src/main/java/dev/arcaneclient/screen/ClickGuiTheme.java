@@ -6,9 +6,12 @@ import net.fabricmc.api.Environment;
 /** Accent palettes drawn over one neutral graphite foundation. */
 @Environment(EnvType.CLIENT)
 public enum ClickGuiTheme {
-    ARCANE("ARCANE", 0xFFCBFF4A, 0xFFE7FFA6, 0xFF7DA528, 0xE6354818),
+    ARCANE("ARCANE", 0xFF8DBDCE, 0xFFBDE9ED, 0xFF426978, 0xFF202D35),
     FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
-    ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440);
+    ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440),
+    EMBER("EMBER", 0xFFFFA24A, 0xFFFFD1A3, 0xFFB66A27, 0xE6603719),
+    AETHER("AETHER", 0xFF45E2D5, 0xFFA8FFF7, 0xFF278E88, 0xE61B5350),
+    ULTRAVIOLET("ULTRAVIOLET", 0xFFB594FF, 0xFFD9CAFF, 0xFF7459BA, 0xE640315F);
 
     private static final ClickGuiTheme[] VALUES = values();
 
@@ -18,14 +21,14 @@ public enum ClickGuiTheme {
     private final int accentDim;
     private final int active;
     private final int backdrop = 0x70000000;
-    private final int bar = 0xE8080D0B;
-    private final int window = 0xD80C1210;
-    private final int header = 0xD9161D1A;
-    private final int row = 0xD31A211E;
-    private final int nest = 0xD0141B18;
-    private final int outline = 0x4A395047;
+    private final int bar = 0xFF17191F;
+    private final int window = 0xFF17191F;
+    private final int header = 0xFF17191F;
+    private final int row = 0xFF17191F;
+    private final int nest = 0xFF11141A;
+    private final int outline = 0xFF414C55;
     private final int text = 0xFFF4F4F5;
-    private final int muted = 0xFFA1A1AA;
+    private final int muted = 0xFFB8C0BE;
     private final int hover;
     private final int activeHover;
     private final int outlineSoft;
@@ -39,8 +42,8 @@ public enum ClickGuiTheme {
         this.active = active;
         this.hover = shade(this.row, 1.34f);
         this.activeHover = shade(active, 1.15f);
-        this.outlineSoft = withAlpha(shade(this.outline, 0.74f), 0x32);
-        this.faint = shade(this.muted, 0.66f);
+        this.outlineSoft = withAlpha(shade(this.outline, 0.72f), 0x28);
+        this.faint = shade(this.muted, 0.82f);
     }
 
     public String label() { return this.label; }

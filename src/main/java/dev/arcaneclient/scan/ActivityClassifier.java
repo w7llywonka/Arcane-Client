@@ -67,6 +67,13 @@ public final class ActivityClassifier {
         };
     }
 
+    public static boolean isCobbledDeepslateTrailPath(String path) {
+        return path.equals("cobbled_deepslate")
+            || path.equals("cobbled_deepslate_stairs")
+            || path.equals("cobbled_deepslate_slab")
+            || path.equals("cobbled_deepslate_wall");
+    }
+
     private static boolean tunnelPassablePath(String path) {
         return path.endsWith("torch") || path.endsWith("wall_torch") || path.contains("rail")
             || path.equals("redstone_wire") || path.equals("tripwire") || path.equals("ladder");

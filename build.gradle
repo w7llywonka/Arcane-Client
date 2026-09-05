@@ -31,6 +31,11 @@ fabricApi {
 	}
 }
 
+// Reconnect tests close real sockets while packet handlers are in flight.
+// Fabric's optional test-only packet synchronizer cannot track that teardown;
+// exercise normal asynchronous networking instead (does not affect shipped JARs).
+loom.runs.clientGameTest.vmArg '-Dfabric.client.gametest.disableNetworkSynchronizer=true'
+
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
@@ -47,12 +52,14 @@ dependencies {
 processResources {
 	def version = project.version
 	inputs.property "version", version
-	from("third-party/Sora-OFL.txt") {
+	from(["third-party/Sora-OFL.txt", "third-party/BarlowCondensed-OFL.txt"]) {
 		into "META-INF/licenses/arcaneclient"
 	}
 
 	filesMatching("fabric.mod.json") {
-		expand "version": version
+		expand "version": version,
+			"clientName": version.toString().contains("-dev.") ? "Arcane Client DEV" : "Arcane Client",
+			"clientDescription": "Growth-based scanning, camera controls and utility modules for Minecraft."
 	}
 }
 

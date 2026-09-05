@@ -22,6 +22,10 @@ public final class ArcaneKeybinds {
     private final KeyBinding itemEsp;
     private final KeyBinding settings;
     private final KeyBinding relog;
+    private final KeyBinding autoWalk;
+    private final KeyBinding autoSneak;
+    private final KeyBinding coordinateClipboard;
+    private final KeyBinding waypoint;
     private final List<KeyBinding> chatMacros;
 
     public ArcaneKeybinds() {
@@ -38,6 +42,10 @@ public final class ArcaneKeybinds {
         this.itemEsp = ArcaneKeybinds.register("key.arcaneclient.item_esp", 299, category);
         this.settings = ArcaneKeybinds.register("key.arcaneclient.settings", 344, category);
         this.relog = ArcaneKeybinds.register("key.arcaneclient.relog", -1, category);
+        this.autoWalk = ArcaneKeybinds.register("key.arcaneclient.auto_walk", -1, category);
+        this.autoSneak = ArcaneKeybinds.register("key.arcaneclient.auto_sneak", -1, category);
+        this.coordinateClipboard = ArcaneKeybinds.register("key.arcaneclient.coordinate_clipboard", -1, category);
+        this.waypoint = ArcaneKeybinds.register("key.arcaneclient.waypoint", -1, category);
         this.chatMacros = List.of(ArcaneKeybinds.register("key.arcaneclient.chat_macro_1", -1, category), ArcaneKeybinds.register("key.arcaneclient.chat_macro_2", -1, category), ArcaneKeybinds.register("key.arcaneclient.chat_macro_3", -1, category), ArcaneKeybinds.register("key.arcaneclient.chat_macro_4", -1, category));
     }
 
@@ -87,6 +95,22 @@ public final class ArcaneKeybinds {
 
     public KeyBinding relog() {
         return this.relog;
+    }
+
+    public KeyBinding autoWalk() {
+        return this.autoWalk;
+    }
+
+    public KeyBinding autoSneak() {
+        return this.autoSneak;
+    }
+
+    public KeyBinding coordinateClipboard() {
+        return this.coordinateClipboard;
+    }
+
+    public KeyBinding waypoint() {
+        return this.waypoint;
     }
 
     public List<KeyBinding> chatMacros() {

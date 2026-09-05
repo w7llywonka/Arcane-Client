@@ -3,6 +3,8 @@ package dev.arcaneclient.utility;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.freecam.FreecamController;
+import dev.arcaneclient.inventory.InventoryActionScheduler;
+import dev.arcaneclient.inventory.InventoryAutomationSupport;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -49,6 +51,7 @@ public final class ElytraAssistController {
             if (!config.elytraAssist || !player.isGliding()) {
                 boostCooldown = 0;
                 missingRocketsLatched = false;
+                releaseHotbarLease(InventoryActionScheduler.shared());
             }
             return;
         }
@@ -69,6 +72,8 @@ public final class ElytraAssistController {
         }
 
         missingRocketsLatched = false;
+        long tick = InventoryAutomationSupport.tick(player);
+        if (!acquireHotbarLease(InventoryActionScheduler.shared(), tick)) return;
         int previousSlot = player.getInventory().getSelectedSlot();
         boolean changedSlot = hand == Hand.MAIN_HAND && rocketSlot != previousSlot;
         try {
@@ -88,6 +93,7 @@ public final class ElytraAssistController {
     public static void reset() {
         boostCooldown = 0;
         missingRocketsLatched = false;
+        releaseHotbarLease(InventoryActionScheduler.shared());
     }
 
     public static int cooldownTicks() {
@@ -121,5 +127,18 @@ public final class ElytraAssistController {
         if (client.getNetworkHandler() != null) {
             client.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(slot));
         }
+    }
+
+    static boolean acquireHotbarLease(InventoryActionScheduler scheduler, long tick) {
+        return scheduler.tryAcquire(
+            InventoryActionScheduler.Owner.ELYTRA_ASSIST,
+            InventoryActionScheduler.Channel.HOTBAR_SELECTION,
+            tick,
+            1
+        );
+    }
+
+    static void releaseHotbarLease(InventoryActionScheduler scheduler) {
+        scheduler.releaseAll(InventoryActionScheduler.Owner.ELYTRA_ASSIST);
     }
 }

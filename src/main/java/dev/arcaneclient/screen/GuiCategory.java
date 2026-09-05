@@ -8,7 +8,8 @@ import net.fabricmc.api.Environment;
 /** A draggable, collapsible module window. */
 @Environment(EnvType.CLIENT)
 public final class GuiCategory {
-    private static final int HEADER_FALLBACK = 19;
+    /** Smallest supported title rail at the maximum density setting. */
+    private static final int HEADER_FALLBACK = 16;
     private final String name;
     private final List<GuiModule> modules;
 

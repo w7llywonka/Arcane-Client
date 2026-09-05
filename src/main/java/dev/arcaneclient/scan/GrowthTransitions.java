@@ -20,15 +20,25 @@ public final class GrowthTransitions {
     }
 
     static GrowthEvent analyze(String beforeId, Map<String, Object> before, String afterId, Map<String, Object> after) {
+        if (ScannerStorageFilter.isStoragePath(beforeId) || ScannerStorageFilter.isStoragePath(afterId)) {
+            return null;
+        }
         int oldAmethyst = amethystRank(beforeId);
         int newAmethyst = amethystRank(afterId);
         if (oldAmethyst >= 0 || newAmethyst >= 0) {
-            if (newAmethyst > oldAmethyst) {
-                return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 38, "amethyst stage advanced: " + afterId, Family.AMETHYST);
-            }
-            if (oldAmethyst >= 0 && newAmethyst < 0) {
-                return new GrowthEvent(SignalCategory.LIVE_ACTIVITY, 145, "amethyst growth removed", Family.AMETHYST);
-            }
+            // Shard stages remain available to Amethyst ESP, but amethyst is not
+            // activity evidence for Chunk Finder.
+            return null;
+        }
+
+        Family revealedFamily = revealedGrowthFamily(afterId, after);
+        if (isObfuscationMask(beforeId) && revealedFamily != null) {
+            return new GrowthEvent(
+                SignalCategory.NATURAL_GROWTH,
+                34,
+                "masked growth state revealed: " + afterId,
+                revealedFamily
+            );
         }
 
         Integer oldAge = integer(before, "age");
@@ -94,7 +104,7 @@ public final class GrowthTransitions {
         return null;
     }
 
-    static int amethystRank(String id) {
+    public static int amethystRank(String id) {
         return switch (id) {
             case "small_amethyst_bud" -> 0;
             case "medium_amethyst_bud" -> 1;
@@ -111,6 +121,21 @@ public final class GrowthTransitions {
     private static boolean isVerticalCrop(String id) {
         return id.equals("bamboo") || id.equals("bamboo_sapling") || id.equals("cactus") || id.equals("sugar_cane")
             || id.startsWith("weeping_vines") || id.startsWith("twisting_vines");
+    }
+
+    private static boolean isObfuscationMask(String id) {
+        return switch (id) {
+            case "stone", "deepslate", "tuff", "andesite", "diorite", "granite", "calcite", "smooth_basalt" -> true;
+            default -> false;
+        };
+    }
+
+    private static Family revealedGrowthFamily(String id, Map<String, Object> properties) {
+        if (id.equals("sweet_berry_bush")) return Family.BERRY;
+        if (isKelp(id)) return Family.KELP;
+        if (id.startsWith("cave_vines")) return Family.CAVE_VINE;
+        if (isVerticalCrop(id)) return Family.VERTICAL_PLANT;
+        return integer(properties, "age") != null ? Family.CROP : null;
     }
 
     private static Map<String, Object> properties(BlockState state) {

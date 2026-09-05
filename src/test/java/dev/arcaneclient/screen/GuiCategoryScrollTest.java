@@ -24,4 +24,16 @@ final class GuiCategoryScrollTest {
         category.setLayoutHeights(60, 80);
         assertEquals(0, category.scrollOffset());
     }
+
+    @Test
+    void denseCategoryStillSupportsLargeModuleLists() {
+        GuiCategory category = new GuiCategory("HUD", List.of());
+        int denseHeader = 16;
+        int denseRows = 32 * 12;
+        category.setLayoutHeights(denseHeader + denseRows, 280);
+
+        assertEquals(120, category.maxScroll());
+        category.scrollBy(12 * 7);
+        assertEquals(84, category.scrollOffset());
+    }
 }

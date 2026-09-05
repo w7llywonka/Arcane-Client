@@ -1,0 +1,131 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'dev.arcane'
+version = '1.2.3+mc1.21.11'
+
+def embeddedClientFile = layout.projectDirectory.file(
+    '../build/libs/arcane-client-2.9.2+mc1.21.11.jar'
+)
+def embeddedClientPath = "META-INF/jars/${embeddedClientFile.asFile.name}"
+def loaderVersion = version.toString()
+
+repositories {
+    maven {
+        name = 'Fabric'
+        url = 'https://maven.fabricmc.net/'
+    }
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = 'dev.arcane.loader.ArcaneLoader'
+}
+
+dependencies {
+    compileOnly 'net.fabricmc:fabric-loader:0.19.3'
+    testImplementation 'net.fabricmc:fabric-loader:0.19.3'
+    testImplementation platform('org.junit:junit-bom:5.12.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+processResources {
+    inputs.property 'version', loaderVersion
+    inputs.property 'embeddedClientPath', embeddedClientPath
+    filesMatching('fabric.mod.json') {
+        expand version: loaderVersion, embeddedClientPath: embeddedClientPath
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.named('jar') {
+    archiveFileName = 'ARCLoader.jar'
+    inputs.file(embeddedClientFile)
+    from(embeddedClientFile) {
+        into 'META-INF/jars'
+    }
+    manifest {
+        attributes 'Main-Class': application.mainClass.get()
+    }
+}
+
+tasks.register('verifyDistributionJar') {
+    dependsOn tasks.named('jar')
+    inputs.file(tasks.named('jar').flatMap { it.archiveFile })
+
+    doLast {
+        def archive = tasks.named('jar').get().archiveFile.get().asFile
+        assert archive.name == 'ARCLoader.jar':
+            'The public loader filename must remain ARCLoader.jar'
+        new java.util.zip.ZipFile(archive).withCloseable { outer ->
+            def manifestEntry = outer.getEntry('META-INF/MANIFEST.MF')
+            assert manifestEntry != null: 'Distribution is missing META-INF/MANIFEST.MF'
+            def manifest = new java.util.jar.Manifest(outer.getInputStream(manifestEntry))
+            assert manifest.mainAttributes.getValue('Main-Class') == 'dev.arcane.loader.ArcaneLoader':
+                'Distribution no longer has the standalone desktop entrypoint'
+
+            def metadataEntry = outer.getEntry('fabric.mod.json')
+            assert metadataEntry != null: 'Distribution is missing root fabric.mod.json'
+            def metadata = new groovy.json.JsonSlurper().parse(outer.getInputStream(metadataEntry))
+            assert metadata.id == 'arcaneloader': 'Unexpected outer Fabric mod id'
+            assert metadata.name == 'ARCLoader': 'Unexpected outer Fabric mod display name'
+            assert metadata.version == loaderVersion: 'Unexpected outer Fabric mod version'
+            assert metadata.jars*.file == [embeddedClientPath]:
+                'fabric.mod.json does not declare the embedded Arcane Client JAR'
+            assert metadata.depends.arcaneclient == '>=2.9.2':
+                'The loader must require the bundled Arcane Client version or newer'
+
+            def nestedEntry = outer.getEntry(embeddedClientPath)
+            assert nestedEntry != null: "Distribution is missing ${embeddedClientPath}"
+
+            String nestedMetadataText = null
+            boolean hasClientEntrypoint = false
+            boolean hasClientMixins = false
+            new java.util.zip.ZipInputStream(outer.getInputStream(nestedEntry)).withCloseable { nested ->
+                java.util.zip.ZipEntry entry
+                while ((entry = nested.nextEntry) != null) {
+                    if (entry.name == 'fabric.mod.json') {
+                        nestedMetadataText = new String(nested.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+                    } else if (entry.name == 'dev/arcaneclient/ArcaneClient.class') {
+                        hasClientEntrypoint = true
+                    } else if (entry.name == 'arcaneclient.client.mixins.json') {
+                        hasClientMixins = true
+                    }
+                }
+            }
+
+            assert nestedMetadataText != null: 'Embedded client is not a Fabric mod'
+            def nestedMetadata = new groovy.json.JsonSlurper().parseText(nestedMetadataText)
+            assert nestedMetadata.id == 'arcaneclient': 'Unexpected embedded Fabric mod id'
+            assert nestedMetadata.version == '2.9.2+mc1.21.11': 'Unexpected embedded client version'
+            assert hasClientEntrypoint: 'Embedded client entrypoint class is missing'
+            assert hasClientMixins: 'Embedded client mixin configuration is missing'
+
+            assert outer.entries().toList().findAll {
+                it.name.startsWith('arcane-client-') && it.name.endsWith('.jar')
+            }.isEmpty(): 'Arcane Client must only exist as a nested JAR, never as a loose top-level mod'
+        }
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyDistributionJar')
+}
+
+tasks.register('signRelease', JavaExec) {
+    dependsOn classes
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.arcane.loader.ReleaseSigner'
+}

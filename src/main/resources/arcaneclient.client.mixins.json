@@ -7,15 +7,22 @@
     "ClientCommonNetworkHandlerMixin",
     "ClientConnectionMixin",
     "ClientPacketListenerMixin",
+    "ClientPlayerInteractionManagerMixin",
     "EntityMixin",
     "FontManagerAccessor",
+    "FrustumMixin",
     "GameRendererMixin",
+    "InGameHudMixin",
+    "InGameOverlayRendererMixin",
     "KeyboardMixin",
     "KeyboardInputMixin",
+    "KeyBindingAccessor",
     "LivingEntityMixin",
+    "LightmapTextureManagerMixin",
     "MinecraftClientAccessor",
     "MinecraftClientMixin",
-    "MouseMixin"
+    "MouseMixin",
+    "WorldRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -137,7 +137,7 @@ public final class FreecamController {
         Vec3d target = Vec3d.ZERO;
         if (moving) {
             Vec3d direction = FreecamNavigation.direction(cameraYaw, forward, sideways, vertical);
-            double speed = ArcaneClient.config().freecamSpeed / 10.0;
+            double speed = FreecamSpeed.blocksPerTick(ArcaneClient.config().freecamSpeed);
             if (client.options.sprintKey.isPressed()) speed *= 3.0;
             target = direction.multiply(speed);
         }

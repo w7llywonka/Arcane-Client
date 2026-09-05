@@ -2,6 +2,8 @@ package dev.arcaneclient.combat;
 
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.combat.AutoTotemSlots;
+import dev.arcaneclient.inventory.InventoryActionScheduler;
+import dev.arcaneclient.inventory.InventoryAutomationSupport;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -25,14 +27,18 @@ public final class AutoTotemController {
     public static void tick(MinecraftClient client) {
         if (!ArcaneClient.config().autoTotem) {
             acknowledgementTicks = 0;
+            InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
             return;
         }
         ClientPlayerEntity player = client.player;
         if (player == null || client.interactionManager == null || player.isSpectator()) {
+            acknowledgementTicks = 0;
+            InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
             return;
         }
         if (player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
             acknowledgementTicks = 0;
+            InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
             return;
         }
         if (client.currentScreen instanceof HandledScreen && !(client.currentScreen instanceof InventoryScreen) && !(client.currentScreen instanceof CreativeInventoryScreen)) {
@@ -47,10 +53,24 @@ public final class AutoTotemController {
         }
         int inventoryIndex = AutoTotemController.findTotem(player);
         if (inventoryIndex < 0) {
+            InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
+            return;
+        }
+        if (!InventoryActionScheduler.shared().tryAcquire(
+            InventoryActionScheduler.Owner.AUTO_TOTEM,
+            InventoryActionScheduler.Channel.INVENTORY_CLICK,
+            InventoryAutomationSupport.tick(player),
+            ACK_TIMEOUT_TICKS
+        )) {
             return;
         }
         client.interactionManager.clickSlot(player.playerScreenHandler.syncId, AutoTotemSlots.inventoryMenuSlot(inventoryIndex), 40, SlotActionType.SWAP, (PlayerEntity)player);
-        acknowledgementTicks = 20;
+        acknowledgementTicks = ACK_TIMEOUT_TICKS;
+    }
+
+    public static void reset() {
+        acknowledgementTicks = 0;
+        InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
     }
 
     private static int findTotem(ClientPlayerEntity player) {

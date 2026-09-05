@@ -4,6 +4,7 @@ import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.model.BlockPosition;
 import dev.arcaneclient.model.ScanResult;
 import dev.arcaneclient.model.SignalCategory;
+import dev.arcaneclient.scan.ActivityClassifier;
 import dev.arcaneclient.scan.EvidenceHeuristics;
 import dev.arcaneclient.scan.GrowthTransitions;
 import dev.arcaneclient.scan.ScannerStorageFilter;
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.Set;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.client.MinecraftClient;
@@ -59,18 +61,20 @@ public final class PacketSignalBridge {
                 result.addStatic(SignalCategory.BLOCK_ENTITY, PacketSignalBridge.at(pos), "raw packet " + id, strength);
             }
         });
-        int litBytes = 0;
-        Iterator iterator = packet.getLightData().getBlockNibbles().iterator();
-        while (iterator.hasNext()) {
-            byte[] data;
-            for (byte value : data = (byte[])iterator.next()) {
-                if (value == 0) continue;
-                ++litBytes;
+        if (ArcaneClient.engine().recordsConcealedLight()) {
+            int litBytes = 0;
+            Iterator iterator = packet.getLightData().getBlockNibbles().iterator();
+            while (iterator.hasNext()) {
+                byte[] data;
+                for (byte value : data = (byte[])iterator.next()) {
+                    if (value == 0) continue;
+                    ++litBytes;
+                }
             }
-        }
-        if (litBytes > 16) {
-            BlockPosition center = new BlockPosition(packet.getChunkX() * 16 + 8, client.world.getBottomY() + 32, packet.getChunkZ() * 16 + 8);
-            result.addStatic(SignalCategory.LIGHT_LEAK, center, "separate block-light payload", Math.min(12, 2 + litBytes / 128));
+            if (litBytes > 16) {
+                BlockPosition center = new BlockPosition(packet.getChunkX() * 16 + 8, client.world.getBottomY() + 32, packet.getChunkZ() * 16 + 8);
+                result.addStatic(SignalCategory.LIGHT_LEAK, center, "separate block-light payload", Math.min(12, 2 + litBytes / 128));
+            }
         }
         ArcaneClient.engine().mergeStatic(packet.getChunkX(), packet.getChunkZ(), result.build());
     }
@@ -89,6 +93,8 @@ public final class PacketSignalBridge {
         if (ScannerStorageFilter.isStoragePath(oldId) || ScannerStorageFilter.isStoragePath(newId)) {
             return;
         }
+        ArcaneClient.engine().recordAmethystState(pos, oldId, newId);
+        ArcaneClient.engine().recordCobbledDeepslateState(pos, oldId, newId);
         String location = PacketSignalBridge.hiddenSuffix(client, pos);
         if (PacketSignalBridge.isPlayerFingerprint(newId, incoming)) {
             ArcaneClient.engine().recordLive(pos, SignalCategory.PLACED_BLOCK, 110, "placed fingerprint: " + newId + location);
@@ -97,13 +103,16 @@ public final class PacketSignalBridge {
         if (growth != null) {
             ArcaneClient.engine().recordLive(pos, growth.category(), growth.strength(), growth.reason() + location, 12000, 3);
         }
+        boolean automationChanged = false;
         for (String property : INTERACTION_PROPERTIES) {
             Object before = PacketSignalBridge.property(old, property);
             Object after = PacketSignalBridge.property(incoming, property);
             if (before == null || after == null || before.equals(after)) continue;
+            automationChanged = true;
             ArcaneClient.engine().recordLive(pos, SignalCategory.INTERACTION, 90, "state change " + newId + "[" + property + "]" + location, 9600, 4);
             break;
         }
+        ArcaneClient.engine().recordAllowedBlockUpdate(pos, growth, automationChanged);
     }
 
     public static void onSectionBlockUpdate(ChunkDeltaUpdateS2CPacket packet) {
@@ -130,6 +139,7 @@ public final class PacketSignalBridge {
         if (ScannerStorageFilter.isStoragePath(id)) return;
         int strength = id.contains("piston") || id.contains("note_block") ? 140 : 65;
         ArcaneClient.engine().recordLive(packet.getPos(), SignalCategory.INTERACTION, strength, "block event: " + id);
+        ArcaneClient.engine().recordAllowedBlockUpdate(packet.getPos(), null, true);
     }
 
     public static void onBlockBreaking(BlockBreakingProgressS2CPacket packet) {
@@ -149,10 +159,10 @@ public final class PacketSignalBridge {
             return;
         }
         BlockPos pos = BlockPos.ofFloored((double)packet.getX(), (double)packet.getY(), (double)packet.getZ());
+        String id = packet.getSound().getKey().map(key -> key.getValue().getPath()).orElse("");
         if (PacketSignalBridge.nearLocalPlayer(client, pos)) {
             return;
         }
-        String id = packet.getSound().getKey().map(key -> key.getValue().getPath()).orElse("");
         if (INTERACTION_SOUNDS.contains(id) || id.contains("door.open") || id.contains("trapdoor.open") || id.contains("fence_gate.open")) {
             ArcaneClient.engine().recordLive(pos, SignalCategory.INTERACTION, 70, "server sound: " + id, 3600, 10);
         }
@@ -176,10 +186,23 @@ public final class PacketSignalBridge {
 
     public static void onLevelEvent(WorldEventS2CPacket packet) {
         MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || packet.isGlobal() || PacketSignalBridge.nearLocalPlayer(client, packet.getPos())) {
+        if (client == null || packet.isGlobal()) {
             return;
         }
         int type = packet.getEventId();
+        if (type == 2001) {
+            BlockState broken = Block.getStateFromRawId(packet.getData());
+            String id = PacketSignalBridge.blockId(broken);
+            if (GrowthTransitions.amethystRank(id) >= 0) {
+                ArcaneClient.engine().recordAmethystBreak(packet.getPos(), id);
+            }
+            if (ActivityClassifier.isCobbledDeepslateTrailPath(id)) {
+                ArcaneClient.engine().recordCobbledDeepslateHint(packet.getPos(), 90);
+            }
+        }
+        if (PacketSignalBridge.nearLocalPlayer(client, packet.getPos())) {
+            return;
+        }
         if (type == 1030 || type == 1042 || type == 1044 || type == 1500 || type == 1502 || type == 2012 || type == 3003 || type == 3004 || type == 3005) {
             ArcaneClient.engine().recordLive(packet.getPos(), SignalCategory.INTERACTION, 75, "server level event " + type, 3600, 10);
         }
@@ -187,7 +210,7 @@ public final class PacketSignalBridge {
 
     public static void onLightUpdate(LightUpdateS2CPacket packet) {
         MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || client.world == null) {
+        if (client == null || client.world == null || !ArcaneClient.engine().recordsConcealedLight()) {
             return;
         }
         if (client.player == null) {

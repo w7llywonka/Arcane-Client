@@ -5,21 +5,27 @@ import net.fabricmc.api.Environment;
 
 @Environment(value=EnvType.CLIENT)
 public final class BlockEntityEspClassifier {
+    /** Fully deepslate terrain begins below zero; Y=0 and above are never debug targets. */
+    public static final int DEEPSLATE_LEVEL_Y = 0;
     public static final int DEBUG_COLOR = -218103809;
 
     private BlockEntityEspClassifier() {
     }
 
-    public static int color(String id, boolean storageEsp, boolean debugEsp) {
-        int storageColor = BlockEntityEspClassifier.storageColor(id);
-        if (storageEsp && storageColor != 0) {
-            return storageColor;
-        }
-        return debugEsp ? -218103809 : 0;
+    public static int color(String id) {
+        return BlockEntityEspClassifier.storageColor(id);
     }
 
     public static boolean isStorageTarget(String id) {
         return BlockEntityEspClassifier.storageColor(id) != 0;
+    }
+
+    public static int debugColor(int blockY) {
+        return isBelowDeepslateLevel(blockY) ? DEBUG_COLOR : 0;
+    }
+
+    public static boolean isBelowDeepslateLevel(int blockY) {
+        return blockY < DEEPSLATE_LEVEL_Y;
     }
 
     public static boolean isContainerTarget(String id) {
@@ -30,12 +36,6 @@ public final class BlockEntityEspClassifier {
     }
 
     private static int storageColor(String id) {
-        if (id.equals("mob_spawner") || id.equals("trial_spawner") || id.equals("vault")) {
-            return -218152880;
-        }
-        if (id.equals("beacon") || id.equals("ender_chest") || id.equals("end_gateway")) {
-            return -218147352;
-        }
         if (id.contains("chest") || id.equals("barrel") || id.contains("shulker") || id.endsWith("shelf")) {
             return -230627073;
         }

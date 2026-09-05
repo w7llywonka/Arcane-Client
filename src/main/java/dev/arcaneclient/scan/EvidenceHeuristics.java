@@ -43,6 +43,13 @@ public final class EvidenceHeuristics {
         return Math.min(180, 70 + villagerCount * 15 + totalLevels * 5);
     }
 
+    public static int pennedAnimalCluster(int maxSameType, int totalAnimals) {
+        if (maxSameType < 6 || totalAnimals < 8) {
+            return 0;
+        }
+        return Math.min(120, 30 + maxSameType * 6 + totalAnimals * 3);
+    }
+
     public static int standaloneLightUpdate(int touchedSections, int nonzeroBytes) {
         if (touchedSections <= 0 || nonzeroBytes < 0) {
             return 0;
@@ -77,5 +84,20 @@ public final class EvidenceHeuristics {
             return 0;
         }
         return Math.min(16, 3 + supportingNeighbors * 3 + strongestNeighborGrowth / 4);
+    }
+
+    public static int harvestRhythm(int uniquePositions, int maxAxisRun, long spanTicks, int repeatedBursts) {
+        if (uniquePositions < 6 || maxAxisRun < 4 || spanTicks < 0L || spanTicks > 100L) return 0;
+        return Math.min(220, 70 + uniquePositions * 6 + maxAxisRun * 5 + Math.min(40, repeatedBursts * 10));
+    }
+
+    public static int automationCadence(int transitions, int uniquePositions, long spanTicks) {
+        if (transitions < 5 || uniquePositions < 3 || spanTicks < 0L || spanTicks > 120L) return 0;
+        return Math.min(200, 55 + transitions * 9 + uniquePositions * 7);
+    }
+
+    public static int growthChronicle(int transitions, int uniquePositions, long spanTicks) {
+        if (transitions < 4 || uniquePositions < 2 || spanTicks < 20L || spanTicks > 2400L) return 0;
+        return Math.min(120, 25 + transitions * 5 + uniquePositions * 4);
     }
 }

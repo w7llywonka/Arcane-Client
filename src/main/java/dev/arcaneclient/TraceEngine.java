@@ -3,15 +3,23 @@ package dev.arcaneclient;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.model.BlockPosition;
+import dev.arcaneclient.model.ChunkIntel;
 import dev.arcaneclient.model.ChunkTrace;
+import dev.arcaneclient.model.CobbledDeepslateTrailHeuristics;
+import dev.arcaneclient.model.EvidenceFamily;
+import dev.arcaneclient.model.ScanEvidence;
 import dev.arcaneclient.model.ScanResult;
 import dev.arcaneclient.model.ScoreSummary;
 import dev.arcaneclient.model.SignalCategory;
 import dev.arcaneclient.model.StashHeuristics;
 import dev.arcaneclient.model.TunnelSegment;
+import dev.arcaneclient.model.WorldObservation;
 import dev.arcaneclient.performance.PerformanceProfile;
 import dev.arcaneclient.scan.ChunkScanner;
-import dev.arcaneclient.scan.EvidenceHeuristics;
+import dev.arcaneclient.scan.ActivityClassifier;
+import dev.arcaneclient.scan.EvidenceCorrelator;
+import dev.arcaneclient.scan.GrowthTransitions;
+import dev.arcaneclient.scan.ScanScheduling;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -23,6 +31,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -41,29 +50,44 @@ public final class TraceEngine {
     private static final int LIVE_DECAY_TICKS = 9600;
     private static final int SCAN_SLICE_BLOCKS = 2048;
     private static final int MAX_SCAN_SLICES_PER_TICK = 128;
-    private static final int MAX_STASH_LABELS = 24;
+    private static final int MAX_ACTIVITY_CLUSTERS = 24;
+    private static final int MAX_WORLD_OBSERVATIONS = 2048;
     private final ArcaneConfig config;
     private final ChunkScanner scanner = new ChunkScanner();
+    private final EvidenceCorrelator correlator = new EvidenceCorrelator();
     private final LinkedHashMap<TraceKey, ChunkTrace> traces = new LinkedHashMap<>();
-    private final ArrayDeque<TraceKey> scanQueue = new ArrayDeque<>();
-    private final Set<TraceKey> queued = new HashSet<TraceKey>();
+    private final PriorityQueue<QueuedScan> scanQueue;
+    private final Map<TraceKey, QueuedScan> queued = new HashMap<>();
     private final ArrayDeque<ActiveScan> activeScans = new ArrayDeque<>();
     private final Set<TraceKey> activeScanKeys = new HashSet<TraceKey>();
     private final Map<TraceKey, Integer> scannedChunks = new HashMap<TraceKey, Integer>();
     private final Map<EventKey, Long> eventCooldowns = new HashMap<EventKey, Long>();
+    private final Map<TraceKey, DirtyChunk> dirtyChunks = new HashMap<TraceKey, DirtyChunk>();
     private final Map<TraceKey, List<TunnelSegment>> tunnelSegments = new HashMap<TraceKey, List<TunnelSegment>>();
+    private final Map<TraceKey, List<WorldObservation>> worldObservationChunks = new HashMap<>();
+    private final LinkedHashMap<LiveWorldKey, TimedWorldObservation> liveWorldObservations = new LinkedHashMap<>();
+    private final Map<TraceKey, List<BlockPosition>> cobbledTrailCandidateChunks = new HashMap<>();
+    private final LinkedHashMap<LiveWorldKey, TimedWorldObservation> liveTrailCandidates = new LinkedHashMap<>();
     private long tick;
+    private long queueSequence;
     private String session = "menu";
     private String dimension = "unknown";
     private @Nullable ClientWorld level;
+    private int priorityCenterX = Integer.MIN_VALUE;
+    private int priorityCenterZ = Integer.MIN_VALUE;
+    private int priorityDirectionX;
+    private int priorityDirectionZ;
     private volatile List<ChunkMarker> markerSnapshot = List.of();
+    private volatile List<ChunkTile> tileSnapshot = List.of();
     private volatile Map<Long, ChunkMarker> scoreIndexSnapshot = Map.of();
     private volatile int flaggedMarkerCount;
     private volatile List<TunnelSegment> tunnelSnapshot = List.of();
-    private volatile List<StashCandidate> stashSnapshot = List.of();
+    private volatile List<ActivityClusterCandidate> activityClusterSnapshot = List.of();
+    private volatile List<WorldObservation> worldObservationSnapshot = List.of();
 
     public TraceEngine(ArcaneConfig config) {
         this.config = config;
+        this.scanQueue = new PriorityQueue<>(this::compareQueuedScans);
     }
 
     public void onWorldChange(MinecraftClient client, @Nullable ClientWorld newLevel) {
@@ -75,12 +99,25 @@ public final class TraceEngine {
         this.activeScanKeys.clear();
         this.scannedChunks.clear();
         this.eventCooldowns.clear();
+        this.dirtyChunks.clear();
+        this.correlator.reset();
         this.tunnelSegments.clear();
+        this.worldObservationChunks.clear();
+        this.liveWorldObservations.clear();
+        this.cobbledTrailCandidateChunks.clear();
+        this.liveTrailCandidates.clear();
+        this.queueSequence = 0L;
+        this.priorityCenterX = Integer.MIN_VALUE;
+        this.priorityCenterZ = Integer.MIN_VALUE;
+        this.priorityDirectionX = 0;
+        this.priorityDirectionZ = 0;
         this.markerSnapshot = List.of();
+        this.tileSnapshot = List.of();
         this.scoreIndexSnapshot = Map.of();
         this.flaggedMarkerCount = 0;
         this.tunnelSnapshot = List.of();
-        this.stashSnapshot = List.of();
+        this.activityClusterSnapshot = List.of();
+        this.worldObservationSnapshot = List.of();
         if (newLevel == null) {
             this.session = "menu";
             this.dimension = "unknown";
@@ -92,7 +129,7 @@ public final class TraceEngine {
     }
 
     public void onChunkLoad(ClientWorld world, WorldChunk chunk) {
-        if (world == this.level && (this.config.enabled || this.config.tunnelEsp)) {
+        if (world == this.level && this.scanningEnabled()) {
             this.enqueue(chunk.getPos().x, chunk.getPos().z, true);
         }
     }
@@ -101,11 +138,17 @@ public final class TraceEngine {
         if (world == this.level) {
             TraceKey traceKey = this.key(chunk.getPos().x, chunk.getPos().z);
             this.queued.remove(traceKey);
-            this.scanQueue.remove(traceKey);
             this.activeScanKeys.remove(traceKey);
             this.activeScans.removeIf(scan -> scan.key.equals(traceKey));
             this.scannedChunks.remove(traceKey);
+            this.dirtyChunks.remove(traceKey);
+            this.correlator.forgetChunk(chunk.getPos().x, chunk.getPos().z);
             this.tunnelSegments.remove(traceKey);
+            this.worldObservationChunks.remove(traceKey);
+            this.liveWorldObservations.keySet().removeIf(key -> key.traceKey().equals(traceKey));
+            this.cobbledTrailCandidateChunks.remove(traceKey);
+            this.liveTrailCandidates.keySet().removeIf(key -> key.traceKey().equals(traceKey));
+            this.scanner.forgetChunk(chunk);
         }
     }
 
@@ -114,9 +157,11 @@ public final class TraceEngine {
         if (client.world != this.level) {
             this.onWorldChange(client, client.world);
         }
-        if (!this.config.enabled && !this.config.tunnelEsp || client.world == null || client.player == null) {
+        if (!this.scanningEnabled() || client.world == null || client.player == null) {
             return;
         }
+        this.updateScanPriority(client);
+        this.flushDirtyScans();
         if (this.tick % ((long)this.config.rescanSeconds * 20L) == 0L) {
             this.queueNearby(client);
         }
@@ -136,13 +181,17 @@ public final class TraceEngine {
         if (client.world == null || client.player == null) {
             return;
         }
+        this.updateScanPriority(client);
         ChunkPos center = client.player.getChunkPos();
-        for (int radius = 0; radius <= this.config.scanRadius; ++radius) {
-            for (int dx = -radius; dx <= radius; ++dx) {
-                for (int dz = -radius; dz <= radius; ++dz) {
-                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
-                    this.enqueue(center.x + dx, center.z + dz);
-                }
+        int observerSectionY = ChunkSectionPos.getSectionCoord(client.player.getBlockY());
+        for (int dz = -this.config.scanRadius; dz <= this.config.scanRadius; ++dz) {
+            for (int dx = -this.config.scanRadius; dx <= this.config.scanRadius; ++dx) {
+                int chunkX = center.x + dx;
+                int chunkZ = center.z + dz;
+                if (client.world.getChunkManager().getWorldChunk(chunkX, chunkZ, false) == null) continue;
+                TraceKey traceKey = this.key(chunkX, chunkZ);
+                boolean frontier = this.scannedChunks.getOrDefault(traceKey, Integer.MIN_VALUE) != observerSectionY;
+                this.enqueue(chunkX, chunkZ, frontier);
             }
         }
     }
@@ -154,13 +203,21 @@ public final class TraceEngine {
         this.activeScans.clear();
         this.activeScanKeys.clear();
         this.scannedChunks.clear();
+        this.dirtyChunks.clear();
+        this.correlator.reset();
         this.tunnelSegments.clear();
+        this.worldObservationChunks.clear();
+        this.liveWorldObservations.clear();
+        this.cobbledTrailCandidateChunks.clear();
+        this.liveTrailCandidates.clear();
         this.scanner.resetTemporalHistory();
         this.markerSnapshot = List.of();
+        this.tileSnapshot = List.of();
         this.scoreIndexSnapshot = Map.of();
         this.flaggedMarkerCount = 0;
         this.tunnelSnapshot = List.of();
-        this.stashSnapshot = List.of();
+        this.activityClusterSnapshot = List.of();
+        this.worldObservationSnapshot = List.of();
     }
 
     public void recordLive(BlockPos pos, SignalCategory category, int strength, String reason) {
@@ -168,7 +225,7 @@ public final class TraceEngine {
     }
 
     public void recordLive(BlockPos pos, SignalCategory category, int strength, String reason, int decayTicks, int cooldownTicks) {
-        if (!this.config.enabled || !this.config.packetSignals || this.level == null || strength <= 0) {
+        if (!this.config.enabled || this.level == null || strength <= 0) {
             return;
         }
         BlockPosition blockPosition = new BlockPosition(pos.getX(), pos.getY(), pos.getZ());
@@ -181,6 +238,90 @@ public final class TraceEngine {
         this.merge(this.key(blockPosition.chunkX(), blockPosition.chunkZ()), result);
     }
 
+    /** Called only after the packet bridge has rejected storage-bearing old and new states. */
+    public void recordAllowedBlockUpdate(
+        BlockPos pos,
+        GrowthTransitions.GrowthEvent growth,
+        boolean automationChanged
+    ) {
+        if ((!this.config.enabled && !this.config.amethystEsp) || this.level == null) return;
+        BlockPosition position = new BlockPosition(pos.getX(), pos.getY(), pos.getZ());
+        TraceKey traceKey = this.key(position.chunkX(), position.chunkZ());
+        this.dirtyChunks.computeIfAbsent(traceKey, ignored -> new DirtyChunk())
+            .mark(ChunkSectionPos.getSectionCoord(pos.getY()), this.tick);
+        List<ScanEvidence> correlated = this.correlator.record(position, this.tick, growth, automationChanged);
+        if (correlated.isEmpty()) return;
+        ScanResult.Builder result = ScanResult.builder().observedAt(this.tick);
+        for (ScanEvidence evidence : correlated) result.add(evidence);
+        this.merge(traceKey, result.build());
+    }
+
+    public void recordAmethystState(BlockPos pos, String beforeId, String afterId) {
+        if ((!this.config.enabled && !this.config.amethystEsp) || this.level == null) return;
+        int before = GrowthTransitions.amethystRank(beforeId);
+        int after = GrowthTransitions.amethystRank(afterId);
+        BlockPosition position = new BlockPosition(pos.getX(), pos.getY(), pos.getZ());
+        TraceKey traceKey = this.key(position.chunkX(), position.chunkZ());
+        LiveWorldKey key = new LiveWorldKey(traceKey, position, WorldObservation.Kind.AMETHYST_SHARD);
+        if (after >= 0) {
+            this.liveWorldObservations.put(
+                key,
+                new TimedWorldObservation(
+                    new WorldObservation(position, WorldObservation.Kind.AMETHYST_SHARD, 100, true, after),
+                    this.tick + 12000L
+                )
+            );
+            this.trimLiveWorldObservations();
+        } else if (before >= 0) {
+            this.removeStaticWorldObservation(traceKey, position, WorldObservation.Kind.AMETHYST_SHARD);
+            TimedWorldObservation removed = new TimedWorldObservation(
+                new WorldObservation(position, WorldObservation.Kind.AMETHYST_SHARD, 100, true, before),
+                this.tick + 3600L
+            );
+            this.liveWorldObservations.put(key, removed);
+            this.trimLiveWorldObservations();
+        }
+    }
+
+    public void recordAmethystBreak(BlockPos pos, String blockId) {
+        if ((!this.config.enabled && !this.config.amethystEsp) || this.level == null) return;
+        int stage = GrowthTransitions.amethystRank(blockId);
+        if (stage < 0) return;
+        BlockPosition position = new BlockPosition(pos.getX(), pos.getY(), pos.getZ());
+        TraceKey traceKey = this.key(position.chunkX(), position.chunkZ());
+        LiveWorldKey key = new LiveWorldKey(traceKey, position, WorldObservation.Kind.AMETHYST_SHARD);
+        this.liveWorldObservations.put(key, new TimedWorldObservation(
+            new WorldObservation(position, WorldObservation.Kind.AMETHYST_SHARD, 100, true, stage),
+            this.tick + 4800L
+        ));
+        this.trimLiveWorldObservations();
+    }
+
+    public void recordCobbledDeepslateState(BlockPos pos, String beforeId, String afterId) {
+        if ((!this.config.enabled && !this.config.accessTrailEsp) || this.level == null) return;
+        boolean before = ActivityClassifier.isCobbledDeepslateTrailPath(beforeId);
+        boolean after = ActivityClassifier.isCobbledDeepslateTrailPath(afterId);
+        if (!before && !after) return;
+        this.recordCobbledDeepslateCandidate(pos, after ? 100 : 90, after ? 12000 : 4800);
+    }
+
+    public void recordCobbledDeepslateHint(BlockPos pos, int confidence) {
+        if ((!this.config.enabled && !this.config.accessTrailEsp) || this.level == null) return;
+        this.recordCobbledDeepslateCandidate(pos, confidence, 4800);
+    }
+
+    private void recordCobbledDeepslateCandidate(BlockPos pos, int confidence, int lifetimeTicks) {
+        BlockPosition position = new BlockPosition(pos.getX(), pos.getY(), pos.getZ());
+        TraceKey traceKey = this.key(position.chunkX(), position.chunkZ());
+        LiveWorldKey key = new LiveWorldKey(traceKey, position, WorldObservation.Kind.COBBLED_DEEPSLATE_TRAIL);
+        TimedWorldObservation incoming = new TimedWorldObservation(
+            new WorldObservation(position, WorldObservation.Kind.COBBLED_DEEPSLATE_TRAIL, confidence, true),
+            this.tick + lifetimeTicks
+        );
+        this.liveTrailCandidates.merge(key, incoming, TraceEngine::strongerTimedObservation);
+        trimTimedObservations(this.liveTrailCandidates);
+    }
+
     public void mergeStatic(int chunkX, int chunkZ, ScanResult result) {
         if (this.config.enabled && this.level != null) {
             this.merge(this.key(chunkX, chunkZ), result);
@@ -191,8 +332,12 @@ public final class TraceEngine {
         return this.tick;
     }
 
+    public boolean recordsConcealedLight() {
+        return this.config.enabled && this.config.evidenceConstellation;
+    }
+
     public int queueSize() {
-        return this.scanQueue.size() + this.activeScans.size();
+        return this.queued.size() + this.activeScans.size();
     }
 
     public int flaggedCount() {
@@ -207,16 +352,48 @@ public final class TraceEngine {
         return this.markerSnapshot;
     }
 
+    /** Completed nearby scans, including quiet chunks, for the world-space tile overlay. */
+    public List<ChunkTile> tiles() {
+        return this.tileSnapshot;
+    }
+
     public List<TunnelSegment> tunnels() {
         return this.tunnelSnapshot;
     }
 
-    public List<StashCandidate> stashCandidates() {
-        return this.stashSnapshot;
+    public List<ActivityClusterCandidate> activityClusters() {
+        return this.activityClusterSnapshot;
+    }
+
+    public List<WorldObservation> worldObservations() {
+        return this.worldObservationSnapshot;
+    }
+
+    public int worldObservationCount(WorldObservation.Kind kind) {
+        int count = 0;
+        for (WorldObservation observation : this.worldObservationSnapshot) {
+            if (observation.kind() == kind) count++;
+        }
+        return count;
+    }
+
+    public int amethystStageCount(int stage) {
+        int count = 0;
+        for (WorldObservation observation : this.worldObservationSnapshot) {
+            if (observation.kind() == WorldObservation.Kind.AMETHYST_SHARD && observation.stage() == stage) count++;
+        }
+        return count;
+    }
+
+    public int activityClusterCount() {
+        return this.activityClusterSnapshot.size();
     }
 
     public void settingsChanged(MinecraftClient client) {
         if (this.level != null && client.player != null) {
+            if (this.config.evidenceConstellation || this.config.amethystEsp || this.config.accessTrailEsp) {
+                this.queueNearby(client);
+            }
             this.refreshMarkers(client);
             this.refreshTunnelSnapshot(client);
         }
@@ -273,38 +450,72 @@ public final class TraceEngine {
         return List.copyOf(markers.subList(0, Math.min(count, markers.size())));
     }
 
-    private void enqueue(int x, int z) {
-        this.enqueue(x, z, false);
+    private void enqueue(int x, int z, boolean frontier) {
+        TraceKey traceKey = this.key(x, z);
+        if (this.activeScanKeys.contains(traceKey)) {
+            return;
+        }
+        QueuedScan existing = this.queued.get(traceKey);
+        if (existing != null && (!frontier || existing.frontier)) {
+            return;
+        }
+        long sequence = existing == null ? ++this.queueSequence : existing.sequence;
+        QueuedScan queuedScan = new QueuedScan(traceKey, frontier, sequence);
+        this.queued.put(traceKey, queuedScan);
+        this.scanQueue.add(queuedScan);
     }
 
-    private void enqueue(int x, int z, boolean urgent) {
-        TraceKey traceKey = this.key(x, z);
-        if (!this.activeScanKeys.contains(traceKey) && this.queued.add(traceKey)) {
-            if (urgent) {
-                this.scanQueue.addFirst(traceKey);
-            } else {
-                this.scanQueue.addLast(traceKey);
+    private void flushDirtyScans() {
+        Iterator<Map.Entry<TraceKey, DirtyChunk>> iterator = this.dirtyChunks.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<TraceKey, DirtyChunk> entry = iterator.next();
+            TraceKey key = entry.getKey();
+            DirtyChunk dirty = entry.getValue();
+            if (!this.isCurrent(key)) {
+                iterator.remove();
+                continue;
             }
+            if (this.tick - dirty.lastUpdateTick < 8L || this.activeScanKeys.contains(key)) continue;
+            this.enqueue(key.x, key.z, true);
+            iterator.remove();
         }
     }
 
     private void startScanJobs(MinecraftClient client) {
-        int targetActive = Math.max(2, this.config.chunksPerTick * 2);
-        while (this.activeScans.size() < targetActive) {
-            WorldChunk chunk;
-            TraceKey next = this.scanQueue.pollFirst();
-            if (next == null) {
+        int targetActive = ScanScheduling.activeWindow(this.config.chunksPerTick);
+        while (true) {
+            QueuedScan next = this.peekQueuedScan();
+            int activeLimit = targetActive + (next != null && next.frontier ? 2 : 0);
+            if (next == null || this.activeScans.size() >= activeLimit) {
+                this.prioritizeActiveScans();
                 return;
             }
-            this.queued.remove(next);
-            if (!this.isCurrent(next) || !this.withinScanRadius(client, next) || (chunk = client.world.getChunkManager().getWorldChunk(next.x, next.z, false)) == null) continue;
+            WorldChunk chunk;
+            this.scanQueue.poll();
+            if (!this.queued.remove(next.key, next)) continue;
+            TraceKey traceKey = next.key;
+            if (!this.isCurrent(traceKey)
+                || !this.withinScanRadius(client, traceKey)
+                || (chunk = client.world.getChunkManager().getWorldChunk(traceKey.x, traceKey.z, false)) == null) continue;
             try {
                 int observerSectionY = ChunkSectionPos.getSectionCoord((int)client.player.getBlockPos().getY());
-                this.activeScans.addLast(new ActiveScan(next, this.scanner.begin(client.world, chunk, this.tick, observerSectionY, this.config.tunnelEsp)));
-                this.activeScanKeys.add(next);
+                this.activeScans.addLast(new ActiveScan(
+                    traceKey,
+                    this.scanner.begin(
+                        client.world,
+                        chunk,
+                        this.tick,
+                        observerSectionY,
+                        this.config.tunnelEsp,
+                        this.config.evidenceConstellation
+                    ),
+                    next.frontier,
+                    next.sequence
+                ));
+                this.activeScanKeys.add(traceKey);
             }
             catch (RuntimeException exception) {
-                ArcaneClient.LOGGER.warn("Could not start chunk scan at {}, {}", new Object[]{next.x, next.z, exception});
+                ArcaneClient.LOGGER.warn("Could not start chunk scan at {}, {}", new Object[]{traceKey.x, traceKey.z, exception});
             }
         }
     }
@@ -313,15 +524,23 @@ public final class TraceEngine {
         long started = System.nanoTime();
         long deadline = started + this.scanBudgetNanos(client);
         int slices = 0;
-        while (!(this.activeScans.isEmpty() || slices >= 128 || slices > 0 && System.nanoTime() >= deadline)) {
+        while (!(this.activeScans.isEmpty() || slices >= MAX_SCAN_SLICES_PER_TICK || slices > 0 && System.nanoTime() >= deadline)) {
             ActiveScan active = this.activeScans.removeFirst();
             if (!this.isCurrent(active.key) || !this.withinScanRadius(client, active.key)) {
                 this.activeScanKeys.remove(active.key);
                 continue;
             }
             try {
-                active.job.step(2048);
-                if (active.job.isComplete()) {
+                boolean completed = false;
+                for (int turnSlice = 0;
+                     turnSlice < ScanScheduling.SLICES_PER_JOB_TURN
+                         && slices < MAX_SCAN_SLICES_PER_TICK
+                         && (slices == 0 || System.nanoTime() < deadline);
+                     ++turnSlice) {
+                    active.job.step(SCAN_SLICE_BLOCKS);
+                    ++slices;
+                    if (!active.job.isComplete()) continue;
+                    completed = true;
                     this.activeScanKeys.remove(active.key);
                     this.scannedChunks.put(active.key, active.job.observerSectionY());
                     if (this.config.tunnelEsp) {
@@ -332,8 +551,22 @@ public final class TraceEngine {
                             this.tunnelSegments.put(active.key, found);
                         }
                     }
+                    List<WorldObservation> observations = active.job.worldObservations();
+                    if (observations.isEmpty()) {
+                        this.worldObservationChunks.remove(active.key);
+                    } else {
+                        this.worldObservationChunks.put(active.key, observations);
+                    }
+                    List<BlockPosition> trailCandidates = active.job.cobbledTrailCandidates();
+                    if (trailCandidates.isEmpty()) {
+                        this.cobbledTrailCandidateChunks.remove(active.key);
+                    } else {
+                        this.cobbledTrailCandidateChunks.put(active.key, trailCandidates);
+                    }
                     this.merge(active.key, active.job.result());
-                } else {
+                    break;
+                }
+                if (!completed) {
                     this.activeScans.addLast(active);
                 }
             }
@@ -341,8 +574,70 @@ public final class TraceEngine {
                 this.activeScanKeys.remove(active.key);
                 ArcaneClient.LOGGER.warn("Chunk scan failed at {}, {}", new Object[]{active.key.x, active.key.z, exception});
             }
-            ++slices;
         }
+    }
+
+    private void updateScanPriority(MinecraftClient client) {
+        ChunkPos center = client.player.getChunkPos();
+        int directionX = ScanScheduling.direction(client.player.getVelocity().x);
+        int directionZ = ScanScheduling.direction(client.player.getVelocity().z);
+        if (center.x == this.priorityCenterX
+            && center.z == this.priorityCenterZ
+            && directionX == this.priorityDirectionX
+            && directionZ == this.priorityDirectionZ) {
+            return;
+        }
+        this.priorityCenterX = center.x;
+        this.priorityCenterZ = center.z;
+        this.priorityDirectionX = directionX;
+        this.priorityDirectionZ = directionZ;
+        this.scanQueue.clear();
+        this.scanQueue.addAll(this.queued.values());
+        this.prioritizeActiveScans();
+    }
+
+    private @Nullable QueuedScan peekQueuedScan() {
+        while (true) {
+            QueuedScan queuedScan = this.scanQueue.peek();
+            if (queuedScan == null || this.queued.get(queuedScan.key) == queuedScan) {
+                return queuedScan;
+            }
+            this.scanQueue.poll();
+        }
+    }
+
+    private void prioritizeActiveScans() {
+        if (this.activeScans.size() < 2) {
+            return;
+        }
+        ArrayList<ActiveScan> prioritized = new ArrayList<>(this.activeScans);
+        prioritized.sort(this::compareActiveScans);
+        this.activeScans.clear();
+        this.activeScans.addAll(prioritized);
+    }
+
+    private int compareQueuedScans(QueuedScan left, QueuedScan right) {
+        int compared = Long.compare(this.priority(left.key, left.frontier), this.priority(right.key, right.frontier));
+        return compared != 0 ? compared : Long.compare(left.sequence, right.sequence);
+    }
+
+    private int compareActiveScans(ActiveScan left, ActiveScan right) {
+        int compared = Long.compare(this.priority(left.key, left.frontier), this.priority(right.key, right.frontier));
+        return compared != 0 ? compared : Long.compare(left.sequence, right.sequence);
+    }
+
+    private long priority(TraceKey traceKey, boolean frontier) {
+        int centerX = this.priorityCenterX == Integer.MIN_VALUE ? traceKey.x : this.priorityCenterX;
+        int centerZ = this.priorityCenterZ == Integer.MIN_VALUE ? traceKey.z : this.priorityCenterZ;
+        return ScanScheduling.priorityScore(
+            frontier,
+            traceKey.x,
+            traceKey.z,
+            centerX,
+            centerZ,
+            this.priorityDirectionX,
+            this.priorityDirectionZ
+        );
     }
 
     private long scanBudgetNanos(MinecraftClient client) {
@@ -351,24 +646,31 @@ public final class TraceEngine {
     }
 
     private void merge(TraceKey traceKey, ScanResult result) {
-        if (result.evidence().isEmpty()) {
+        if (result.evidence().isEmpty() && !result.completeSnapshot()) {
             return;
         }
-        this.traces.computeIfAbsent(traceKey, ignored -> new ChunkTrace()).merge(result);
+        this.traces.computeIfAbsent(traceKey, ignored -> new ChunkTrace()).merge(result, this.tick);
         while (this.traces.size() > 12000) {
             Iterator<TraceKey> iterator = this.traces.keySet().iterator();
             if (!iterator.hasNext()) continue;
-            iterator.next();
+            TraceKey removed = iterator.next();
             iterator.remove();
+            this.tunnelSegments.remove(removed);
+            this.worldObservationChunks.remove(removed);
+            this.liveWorldObservations.keySet().removeIf(key -> key.traceKey().equals(removed));
+            this.cobbledTrailCandidateChunks.remove(removed);
+            this.liveTrailCandidates.keySet().removeIf(key -> key.traceKey().equals(removed));
         }
     }
 
     private void refreshMarkers(MinecraftClient client) {
+        this.refreshWorldObservationSnapshot(client);
         if (!this.config.enabled || client.player == null) {
             this.markerSnapshot = List.of();
-                this.scoreIndexSnapshot = Map.of();
+            this.tileSnapshot = List.of();
+            this.scoreIndexSnapshot = Map.of();
             this.flaggedMarkerCount = 0;
-            this.stashSnapshot = List.of();
+            this.activityClusterSnapshot = List.of();
             return;
         }
         ChunkPos center = client.player.getChunkPos();
@@ -382,17 +684,12 @@ public final class TraceEngine {
                 raw.add(marker);
             }
         }
-        HashMap<Long, ChunkMarker> rawIndex = new HashMap<>(Math.max(16, raw.size() * 4 / 3 + 1));
-        for (ChunkMarker marker : raw) {
-            rawIndex.putIfAbsent(chunkKey(marker.chunkX, marker.chunkZ), marker);
-        }
         ArrayList<ChunkMarker> markers = new ArrayList<ChunkMarker>();
         ArrayList<ChunkMarker> scored = new ArrayList<ChunkMarker>(raw.size());
         for (ChunkMarker marker : raw) {
-            ChunkMarker regional = withRegionalGrowth(marker, rawIndex);
-            scored.add(regional);
-            if (regional.score >= this.config.threshold) {
-                markers.add(regional);
+            scored.add(marker);
+            if (marker.score >= this.config.threshold) {
+                markers.add(marker);
             }
         }
         markers.sort(Comparator.comparingInt(ChunkMarker::score).reversed());
@@ -405,79 +702,82 @@ public final class TraceEngine {
         this.scoreIndexSnapshot = Map.copyOf(scoreIndex);
         int markerLimit = this.config.performanceProfile().markerTargetLimit();
         this.markerSnapshot = List.copyOf(markers.subList(0, Math.min(markerLimit, markers.size())));
-        this.refreshStashSnapshot(scored, scoreIndex);
+        ArrayList<ChunkTile> tiles = new ArrayList<>();
+        for (TraceKey scanned : this.scannedChunks.keySet()) {
+            if (!this.isCurrent(scanned)
+                || Math.abs(scanned.x - center.x) > renderRadius
+                || Math.abs(scanned.z - center.z) > renderRadius) continue;
+            ChunkMarker marker = scoreIndex.get(chunkKey(scanned.x, scanned.z));
+            int score = marker == null ? 0 : marker.score;
+            tiles.add(new ChunkTile(scanned.x, scanned.z, score, score > 0 && score >= this.config.threshold));
+        }
+        tiles.sort(Comparator.comparingInt(tile ->
+            Math.max(Math.abs(tile.chunkX - center.x), Math.abs(tile.chunkZ - center.z))
+        ));
+        this.tileSnapshot = List.copyOf(tiles.subList(0, Math.min(markerLimit, tiles.size())));
+        this.refreshActivityClusterSnapshot(scored, scoreIndex);
     }
 
-    private static ChunkMarker withRegionalGrowth(ChunkMarker marker, Map<Long, ChunkMarker> byChunk) {
-        int centerGrowth = growthScore(marker);
-        int supporting = 0;
-        int strongest = 0;
-        for (int dz = -1; dz <= 1; ++dz) {
-            for (int dx = -1; dx <= 1; ++dx) {
-                if (dx == 0 && dz == 0) {
-                    continue;
-                }
-                ChunkMarker neighbor = byChunk.get(chunkKey(marker.chunkX + dx, marker.chunkZ + dz));
-                if (neighbor == null) {
-                    continue;
-                }
-                int growth = growthScore(neighbor);
-                if (growth >= 3) {
-                    ++supporting;
-                    strongest = Math.max(strongest, growth);
-                }
-            }
-        }
-        int boost = EvidenceHeuristics.regionalGrowthBoost(centerGrowth, supporting, strongest);
-        if (boost <= 0) {
-            return marker;
-        }
-        ArrayList<String> reasons = new ArrayList<>(marker.reasons);
-        reasons.add("3x3 regional growth support");
-        return new ChunkMarker(marker.chunkX, marker.chunkZ, Math.min(100, marker.score + boost), marker.deepAnchor, reasons, marker.categoryBreakdown);
-    }
-
-    private static int growthScore(ChunkMarker marker) {
+    static int growthScore(ChunkMarker marker) {
         return marker.categoryBreakdown.getOrDefault(SignalCategory.NATURAL_GROWTH, 0)
-            + marker.categoryBreakdown.getOrDefault(SignalCategory.CULTIVATION, 0)
-            + marker.categoryBreakdown.getOrDefault(SignalCategory.LIVE_ACTIVITY, 0);
+            + marker.categoryBreakdown.getOrDefault(SignalCategory.CULTIVATION, 0);
     }
 
-    private void refreshStashSnapshot(List<ChunkMarker> scored, Map<Long, ChunkMarker> byChunk) {
-        ArrayList<StashCandidate> candidates = new ArrayList<>();
+    private void refreshActivityClusterSnapshot(List<ChunkMarker> scored, Map<Long, ChunkMarker> byChunk) {
+        if (!this.config.clusterInference) {
+            this.activityClusterSnapshot = List.of();
+            return;
+        }
+        ArrayList<ActivityClusterCandidate> candidates = new ArrayList<>();
         for (ChunkMarker marker : scored) {
             boolean direct = StashHeuristics.direct(marker.score, marker.deepAnchor, marker.categoryBreakdown);
-            boolean clustered = !direct
-                && StashHeuristics.clusterMember(marker.score, marker.deepAnchor, marker.categoryBreakdown)
-                && hasStrongNeighbor(marker, byChunk);
-            if ((!direct && !clustered) || nearExistingLabel(marker, candidates)) continue;
-            candidates.add(new StashCandidate(marker.chunkX, marker.chunkZ, marker.score));
-            if (candidates.size() >= MAX_STASH_LABELS) break;
+            List<Long> members = direct ? List.of(chunkKey(marker.chunkX, marker.chunkZ))
+                : legacyClusterMembers(marker, byChunk);
+            boolean clustered = members.size() > 1;
+            if ((!direct && !clustered) || nearExistingCandidate(marker, candidates)) continue;
+            candidates.add(new ActivityClusterCandidate(
+                marker.chunkX,
+                marker.chunkZ,
+                marker.score,
+                members.size(),
+                StashHeuristics.independentCategories(marker.categoryBreakdown),
+                growthScore(marker),
+                members
+            ));
+            if (candidates.size() >= MAX_ACTIVITY_CLUSTERS) break;
         }
-        this.stashSnapshot = List.copyOf(candidates);
+        this.activityClusterSnapshot = List.copyOf(candidates);
     }
 
-    private static boolean hasStrongNeighbor(ChunkMarker marker, Map<Long, ChunkMarker> byChunk) {
-        for (int dz = -2; dz <= 2; dz++) {
-            for (int dx = -2; dx <= 2; dx++) {
+    private static List<Long> legacyClusterMembers(ChunkMarker marker, Map<Long, ChunkMarker> byChunk) {
+        if (!StashHeuristics.clusterMember(marker.score, marker.deepAnchor, marker.categoryBreakdown)) {
+            return List.of(chunkKey(marker.chunkX, marker.chunkZ));
+        }
+        ArrayList<Long> members = new ArrayList<>();
+        members.add(chunkKey(marker.chunkX, marker.chunkZ));
+        for (int dz = -2; dz <= 2; ++dz) {
+            for (int dx = -2; dx <= 2; ++dx) {
                 if (dx == 0 && dz == 0) continue;
                 ChunkMarker neighbor = byChunk.get(chunkKey(marker.chunkX + dx, marker.chunkZ + dz));
-                if (neighbor != null && StashHeuristics.clusterPair(
+                if (neighbor == null || !StashHeuristics.clusterPair(
                     marker.score,
                     marker.deepAnchor,
                     marker.categoryBreakdown,
                     neighbor.score,
                     neighbor.deepAnchor,
                     neighbor.categoryBreakdown
-                )) return true;
+                )) continue;
+                members.add(chunkKey(neighbor.chunkX, neighbor.chunkZ));
             }
         }
-        return false;
+        members.sort(Long::compare);
+        return List.copyOf(members);
     }
 
-    private static boolean nearExistingLabel(ChunkMarker marker, List<StashCandidate> candidates) {
-        for (StashCandidate candidate : candidates) {
-            if (Math.abs(marker.chunkX - candidate.chunkX) <= 2 && Math.abs(marker.chunkZ - candidate.chunkZ) <= 2) {
+    private static boolean nearExistingCandidate(ChunkMarker marker, List<ActivityClusterCandidate> candidates) {
+        for (ActivityClusterCandidate candidate : candidates) {
+            if (Math.abs(marker.chunkX - candidate.chunkX) <= 2
+                && Math.abs(marker.chunkZ - candidate.chunkZ) <= 2) {
                 return true;
             }
         }
@@ -510,11 +810,172 @@ public final class TraceEngine {
         this.tunnelSnapshot = List.copyOf(visible);
     }
 
+    private void refreshWorldObservationSnapshot(MinecraftClient client) {
+        if (client.player == null || (!this.config.amethystEsp && !this.config.accessTrailEsp)) {
+            this.worldObservationSnapshot = List.of();
+            return;
+        }
+        ChunkPos center = client.player.getChunkPos();
+        int renderRadius = Math.max(32, this.config.scanRadius + 4);
+        LinkedHashMap<ObservationIdentity, WorldObservation> visible = new LinkedHashMap<>();
+        for (Map.Entry<TraceKey, List<WorldObservation>> entry : this.worldObservationChunks.entrySet()) {
+            TraceKey traceKey = entry.getKey();
+            if (!this.isCurrent(traceKey)
+                || Math.abs(traceKey.x() - center.x) > renderRadius
+                || Math.abs(traceKey.z() - center.z) > renderRadius) continue;
+            for (WorldObservation observation : entry.getValue()) {
+                if (observation.kind() == WorldObservation.Kind.COBBLED_DEEPSLATE_TRAIL) continue;
+                mergeWorldObservation(visible, observation);
+            }
+        }
+        Iterator<Map.Entry<LiveWorldKey, TimedWorldObservation>> iterator = this.liveWorldObservations.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<LiveWorldKey, TimedWorldObservation> entry = iterator.next();
+            LiveWorldKey key = entry.getKey();
+            TimedWorldObservation timed = entry.getValue();
+            if (!this.isCurrent(key.traceKey()) || timed.expiresAtTick() <= this.tick) {
+                iterator.remove();
+                continue;
+            }
+            if (Math.abs(key.traceKey().x() - center.x) > renderRadius
+                || Math.abs(key.traceKey().z() - center.z) > renderRadius) continue;
+            mergeWorldObservation(visible, timed.observation());
+        }
+        LinkedHashMap<BlockPosition, Boolean> trailCandidates = new LinkedHashMap<>();
+        Iterator<Map.Entry<LiveWorldKey, TimedWorldObservation>> trailIterator = this.liveTrailCandidates.entrySet().iterator();
+        while (trailIterator.hasNext()) {
+            Map.Entry<LiveWorldKey, TimedWorldObservation> entry = trailIterator.next();
+            LiveWorldKey key = entry.getKey();
+            TimedWorldObservation timed = entry.getValue();
+            if (!this.isCurrent(key.traceKey()) || timed.expiresAtTick() <= this.tick) {
+                trailIterator.remove();
+                continue;
+            }
+            if (Math.abs(key.traceKey().x() - center.x) > renderRadius
+                || Math.abs(key.traceKey().z() - center.z) > renderRadius) continue;
+            trailCandidates.put(key.position(), true);
+        }
+        for (Map.Entry<TraceKey, List<BlockPosition>> entry : this.cobbledTrailCandidateChunks.entrySet()) {
+            TraceKey traceKey = entry.getKey();
+            if (!this.isCurrent(traceKey)
+                || Math.abs(traceKey.x() - center.x) > renderRadius
+                || Math.abs(traceKey.z() - center.z) > renderRadius) continue;
+            for (BlockPosition candidate : entry.getValue()) trailCandidates.putIfAbsent(candidate, false);
+        }
+        for (CobbledDeepslateTrailHeuristics.Trail trail :
+            CobbledDeepslateTrailHeuristics.detect(trailCandidates.keySet(), 32)) {
+            for (BlockPosition point : trail.points()) {
+                mergeWorldObservation(visible, new WorldObservation(
+                    point,
+                    WorldObservation.Kind.COBBLED_DEEPSLATE_TRAIL,
+                    trail.confidence(),
+                    trailCandidates.getOrDefault(point, false)
+                ));
+            }
+        }
+        ArrayList<WorldObservation> sorted = new ArrayList<>(visible.values());
+        sorted.sort(Comparator.comparing(WorldObservation::live).reversed()
+            .thenComparing(Comparator.comparingInt(WorldObservation::confidence).reversed())
+            .thenComparing(observation -> observation.kind().ordinal())
+            .thenComparingInt(observation -> observation.position().x())
+            .thenComparingInt(observation -> observation.position().y())
+            .thenComparingInt(observation -> observation.position().z()));
+        this.worldObservationSnapshot = List.copyOf(sorted.subList(0, Math.min(MAX_WORLD_OBSERVATIONS, sorted.size())));
+    }
+
+    private static void mergeWorldObservation(
+        Map<ObservationIdentity, WorldObservation> observations,
+        WorldObservation incoming
+    ) {
+        ObservationIdentity identity = new ObservationIdentity(incoming.position(), incoming.kind());
+        observations.merge(identity, incoming, (existing, replacement) -> {
+            boolean replacementIsNewerExact = replacement.live() && replacement.stage() >= 0;
+            int stage = replacementIsNewerExact || existing.stage() < 0 ? replacement.stage() : existing.stage();
+            return new WorldObservation(
+                existing.position(), existing.kind(),
+                Math.max(existing.confidence(), replacement.confidence()),
+                existing.live() || replacement.live(),
+                stage
+            );
+        });
+    }
+
+    private void removeStaticWorldObservation(
+        TraceKey traceKey,
+        BlockPosition position,
+        WorldObservation.Kind kind
+    ) {
+        List<WorldObservation> existing = this.worldObservationChunks.get(traceKey);
+        if (existing == null) return;
+        ArrayList<WorldObservation> retained = new ArrayList<>(existing);
+        retained.removeIf(observation -> observation.kind() == kind && observation.position().equals(position));
+        if (retained.isEmpty()) this.worldObservationChunks.remove(traceKey);
+        else this.worldObservationChunks.put(traceKey, List.copyOf(retained));
+    }
+
+    private void trimLiveWorldObservations() {
+        trimTimedObservations(this.liveWorldObservations);
+    }
+
+    private static TimedWorldObservation strongerTimedObservation(
+        TimedWorldObservation existing,
+        TimedWorldObservation replacement
+    ) {
+        WorldObservation strongest = existing.observation().confidence() >= replacement.observation().confidence()
+            ? existing.observation()
+            : replacement.observation();
+        return new TimedWorldObservation(
+            strongest,
+            Math.max(existing.expiresAtTick(), replacement.expiresAtTick())
+        );
+    }
+
+    private static void trimTimedObservations(LinkedHashMap<LiveWorldKey, TimedWorldObservation> observations) {
+        while (observations.size() > MAX_WORLD_OBSERVATIONS) {
+            Iterator<LiveWorldKey> iterator = observations.keySet().iterator();
+            if (!iterator.hasNext()) return;
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
+    private boolean scanningEnabled() {
+        return this.config.enabled || this.config.tunnelEsp || this.config.amethystEsp || this.config.accessTrailEsp;
+    }
+
     private ChunkMarker marker(TraceKey traceKey, ChunkTrace trace) {
-        ScoreSummary summary = trace.summarizeAt(this.tick, this.config::allows, this.config.packetSignals, this.config.deepFocus);
+        ScoreSummary summary = trace.summarizeLegacyAt(
+            this.tick, this::allowsEvidence, this.config.packetSignals, this.config.deepFocus
+        );
+        ChunkIntel intel = trace.intelligenceEvidenceAt(this.tick, this::allowsEvidence, true);
         List<String> reasons = summary.reasons().subList(0, Math.min(4, summary.reasons().size()));
-        boolean deepAnchor = trace.hasActiveEvidenceAtOrBelow(this.tick, this.config::allows, this.config.packetSignals, 48);
-        return new ChunkMarker(traceKey.x, traceKey.z, summary.score(), deepAnchor, reasons, summary.categoryBreakdown());
+        boolean deepAnchor = trace.legacyHasActiveEvidenceAtOrBelow(
+            this.tick, this::allowsEvidence, this.config.packetSignals, 48
+        );
+        return new ChunkMarker(
+            traceKey.x, traceKey.z, summary.score(), reasons, summary.categoryBreakdown(), intel, deepAnchor
+        );
+    }
+
+    boolean allowsEvidence(ScanEvidence evidence) {
+        return switch (evidence.family()) {
+            case GROWTH -> this.config.growthChronicle;
+            case HARVEST -> this.config.harvestRhythm;
+            case FARM_GEOMETRY -> this.config.farmGeometry;
+            case AUTOMATION -> this.config.automationCadence;
+            case MANAGED_HABITAT -> this.config.managedHabitats;
+            case LIGHTING -> this.config.evidenceConstellation;
+            case AMETHYST_ACTIVITY, ACCESS_TRAIL -> false;
+            case PLAYER_PLACEMENT, EXCAVATION -> this.config.playerBlockSignals;
+            case INFRASTRUCTURE -> this.config.machineSignals;
+            case OTHER -> switch (evidence.category()) {
+                case PLACED_BLOCK, INTERACTION -> this.config.playerBlockSignals;
+                case INFRASTRUCTURE, BLOCK_ENTITY -> this.config.machineSignals;
+                case LIVE_ACTIVITY -> this.config.packetSignals;
+                case ENTITY -> this.config.managedHabitats;
+                default -> true;
+            };
+        };
     }
 
     private boolean withinScanRadius(MinecraftClient client, TraceKey traceKey) {
@@ -548,18 +1009,88 @@ public final class TraceEngine {
     }
 
     @Environment(value=EnvType.CLIENT)
-    public record ChunkMarker(int chunkX, int chunkZ, int score, boolean deepAnchor, List<String> reasons, Map<SignalCategory, Integer> categoryBreakdown) {
-        public ChunkMarker {
-            reasons = List.copyOf(reasons);
-            categoryBreakdown = Map.copyOf(new EnumMap<SignalCategory, Integer>(categoryBreakdown));
+    private record ObservationIdentity(BlockPosition position, WorldObservation.Kind kind) {
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    private record LiveWorldKey(TraceKey traceKey, BlockPosition position, WorldObservation.Kind kind) {
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    private record TimedWorldObservation(WorldObservation observation, long expiresAtTick) {
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    private static final class DirtyChunk {
+        private final Set<Integer> sections = new HashSet<Integer>();
+        private long lastUpdateTick;
+
+        void mark(int sectionY, long tick) {
+            this.sections.add(sectionY);
+            this.lastUpdateTick = tick;
         }
     }
 
     @Environment(value=EnvType.CLIENT)
-    private record ActiveScan(TraceKey key, ChunkScanner.ChunkScanJob job) {
+    public record ChunkMarker(
+        int chunkX,
+        int chunkZ,
+        int score,
+        List<String> reasons,
+        Map<SignalCategory, Integer> categoryBreakdown,
+        ChunkIntel intel,
+        boolean deepAnchor
+    ) {
+        public ChunkMarker(int chunkX, int chunkZ, int score, List<String> reasons, Map<SignalCategory, Integer> categoryBreakdown) {
+            this(chunkX, chunkZ, score, reasons, categoryBreakdown, ChunkIntel.EMPTY, false);
+        }
+
+        public ChunkMarker(
+            int chunkX,
+            int chunkZ,
+            int score,
+            List<String> reasons,
+            Map<SignalCategory, Integer> categoryBreakdown,
+            ChunkIntel intel
+        ) {
+            this(chunkX, chunkZ, score, reasons, categoryBreakdown, intel, false);
+        }
+
+        public ChunkMarker {
+            reasons = List.copyOf(reasons);
+            categoryBreakdown = Map.copyOf(new EnumMap<SignalCategory, Integer>(categoryBreakdown));
+            if (intel == null) intel = ChunkIntel.EMPTY;
+        }
     }
 
     @Environment(value=EnvType.CLIENT)
-    public record StashCandidate(int chunkX, int chunkZ, int score) {
+    public record ChunkTile(int chunkX, int chunkZ, int score, boolean flagged) {
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    private record QueuedScan(TraceKey key, boolean frontier, long sequence) {
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    private record ActiveScan(TraceKey key, ChunkScanner.ChunkScanJob job, boolean frontier, long sequence) {
+    }
+
+    @Environment(value=EnvType.CLIENT)
+    public record ActivityClusterCandidate(
+        int chunkX,
+        int chunkZ,
+        int confidence,
+        int members,
+        int families,
+        int growthStrength,
+        List<Long> memberChunks
+    ) {
+        public ActivityClusterCandidate {
+            memberChunks = List.copyOf(memberChunks);
+        }
+
+        public boolean contains(int targetChunkX, int targetChunkZ) {
+            return memberChunks.contains(chunkKey(targetChunkX, targetChunkZ));
+        }
     }
 }
