@@ -26,15 +26,15 @@ import org.junit.jupiter.api.Test;
 
 final class FontResourceTest {
     @Test
-    void everyScalePointsAtThePackagedSoraFontAndHasVanillaFallback() throws IOException {
+    void everyScalePointsAtThePackagedCondensedFontAndHasVanillaFallback() throws IOException {
         ClassLoader loader = getClass().getClassLoader();
-        assertNotNull(loader.getResource("assets/arcaneclient/font/sora.ttf"));
+        assertNotNull(loader.getResource("assets/arcaneclient/font/barlow-condensed.ttf"));
         for (int scale = 1; scale <= 6; scale++) {
             String path = "assets/arcaneclient/font/ui_x" + scale + ".json";
             try (InputStream stream = loader.getResourceAsStream(path)) {
                 assertNotNull(stream, path);
                 String json = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-                assertTrue(json.contains("\"file\": \"arcaneclient:sora.ttf\""), path);
+                assertTrue(json.contains("\"file\": \"arcaneclient:barlow-condensed.ttf\""), path);
                 assertTrue(json.contains("\"id\": \"minecraft:default\""), path);
                 assertTrue(json.contains("\"oversample\": " + scale + ".0"), path);
                 JsonParser.parseString(json).getAsJsonObject().getAsJsonArray("providers").forEach(provider ->
@@ -45,8 +45,8 @@ final class FontResourceTest {
     }
 
     @Test
-    void minecraftTrueTypeLoaderOpensSoraAndProvidesLatinGlyphs() throws Exception {
-        Identifier definitionLocation = Identifier.of("arcaneclient", "sora.ttf");
+    void minecraftTrueTypeLoaderOpensCondensedFontAndProvidesLatinGlyphs() throws Exception {
+        Identifier definitionLocation = Identifier.of("arcaneclient", "barlow-condensed.ttf");
         TrueTypeFontLoader definition = new TrueTypeFontLoader(
             definitionLocation,
             10.0f,
@@ -63,7 +63,7 @@ final class FontResourceTest {
             assertTrue(font.getProvidedGlyphs().contains((int)'a'));
             assertTrue(font.getProvidedGlyphs().contains((int)'0'));
         }
-        assertTrue(Identifier.of("arcaneclient", "font/sora.ttf").equals(opened.get()));
+        assertTrue(Identifier.of("arcaneclient", "font/barlow-condensed.ttf").equals(opened.get()));
     }
 
     private static ResourceManager classpathResources(AtomicReference<Identifier> opened) {

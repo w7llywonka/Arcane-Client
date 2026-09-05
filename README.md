@@ -1,165 +1,60 @@
 # Arcane Client
 
-[![Build](https://github.com/eiiorejierge/Arcane-Client/actions/workflows/build.yml/badge.svg)](https://github.com/eiiorejierge/Arcane-Client/actions/workflows/build.yml)
+Source for the public **Arcane Client 2.9.2** release and **ARCLoader 1.2.3**, for Minecraft 1.21.11.
 
-Arcane Client is a 42-module client-side Fabric utility suite for Minecraft 1.21.11. It retains the combined archived 1.6/1.8 discovery engine while adding a complete combat, entity ESP, camera, media, notification, and custom-interface layer.
+Official downloads: [arcaneclient.shop](https://arcaneclient.shop).
 
-## Highlights
+## What is included
 
-- **Discovery engine:** incremental loaded-chunk scanning, evidence scoring, sensitivity control, deep-Y focus, configurable farm/machine/player-block/light/entity signals, packet activity, rescans, and per-dimension history.
-- **ESP:** storage, items, tunnels, players, mobs, projectiles, crystals, entity tracers, safe holes, chunk tiles, and diagnostics.
-- **Combat:** Auto Totem, Auto Sprint, Auto Eat, health/armor alerts, Hit Sound, slow-only Swing Speed, and a configurable combat HUD.
-- **Camera and media:** smooth Freecam and anchored third-person Freelook with visible player bodies, safe body-reach mining, and invalid-entity packet guards, plus Zoom, Fullbright, No Hurt Cam, Clean Capture, and Streamer Mode.
-- **Arcane Click GUI:** exactly 42 validated modules, searchable draggable categories, collision-safe labels, arbitrary RGB accent/panel/text colors, notification volume, persistent settings, and the Sora interface font.
-- **Clean source:** readable Yarn-named Java, typed collections, warning-free compilation, client-only mixins, Gradle wrapper, sources JAR, and GitHub Actions CI.
+- Growth-based loaded-chunk scanning, grounded chunk tiles, radar and evidence scoring.
+- Camera controls, Fullbright, ESP and dropped-item nametags.
+- Combat, movement and utility modules, including built-in Relog: disconnect, wait two seconds, reconnect without another mod.
+- The draggable category interface, fonts and their licenses.
+- Public loader source, including signed updates, installation and the after-exit replacement helper.
+- Unit tests and Minecraft client integration tests.
 
-Use Arcane Client only where the server rules and applicable terms permit it.
-
-## Requirements
-
-- Minecraft **1.21.11**
-- Java **21**
-- Fabric Loader **0.19.3 or newer**
-- Fabric API **0.141.6+1.21.11 or newer compatible release**
-
-## Install
-
-1. Install Fabric Loader for Minecraft 1.21.11.
-2. Put Fabric API and the Arcane Client JAR in the Minecraft `mods` folder.
-3. Start the Fabric profile.
-4. Press **Right Shift** to open the Arcane Click GUI.
-
-Configuration is saved to `config/arcane-client.json`.
-
-## Click GUI
-
-Press **Right Shift** to open the module menu. Each category is its own window: drag a title bar to move it, click the title bar to collapse it.
-
-| Input | Action |
-| --- | --- |
-| Left click a module | Toggle it on or off |
-| Right click a module | Open or close its settings |
-| Middle click a module | Rebind its key |
-| Drag a title bar | Move that category window |
-| Click a title bar | Collapse or expand that category |
-
-The exact 42 modules are grouped by purpose, with the new combat, ESP, render, and client controls presented first:
-
-| Category | Modules |
-| --- | --- |
-| Combat | Auto Totem, Auto Sprint, Auto Eat, Health Alert, Armor Alert, Hit Sound, Swing Speed, Combat HUD |
-| ESP | Storage ESP, Item ESP, Tunnel ESP, Chunk Tiles, ESP Debug, Player ESP, Mob ESP, Projectile ESP, Crystal ESP, Entity Tracers, Hole ESP |
-| Render | Base Radar, Freecam, Freelook, Fullbright, No Hurt Cam, Zoom, Clean Capture |
-| Client | Performance, Interface, Info HUD, Sound Notifications, Streamer Mode |
-| Utility | Auto Tool, Chat Macros |
-| Base Finding | Chunk Finder, Growth Signals, Build Traces, Machine Signals, Live Changes, Light Signals, Entity Signals, Stash Finder, Chunk Intel |
-
-Chunk Finder carries the scan budget and sensitivity controls. Auto Tool picks the strongest suitable hotbar tool before mining and safely restores the selected slot afterward. Info HUD provides individually switchable FPS, XYZ, facing, movement speed, ping, and biome lines. The original scanner internals remain unchanged; the new work is isolated to combat, ESP, camera, media, notifications, utility, and interface customization. Search filters every category by module name, description, or setting name.
-
-## Freecam and Freelook
-
-Freecam accelerates and decelerates instead of jumping between per-tick positions. Scroll up while active to increase speed and scroll down to decrease it; the selected level is persisted. The camera flies independently with WASD, Space, and Shift while a client-only replica keeps your stationary body, skin, pose, and equipment visible. That replica renders normally but cannot be targeted, attacked, used, or collided with. Directional mining starts at the real player's eye position, uses the player's actual interaction range, and only sends valid body-origin block actions.
-
-Freelook is a separate third-person orbit camera. It stays anchored to the moving character, synchronizes the visible player replica while you move, lets the mouse rotate only the camera, and never copies orbit rotation into the player's head. Mining uses the same safe body-origin reach path, and all other detached-camera interaction packets are stopped before they can reach a server. Freecam and Freelook automatically disable one another.
-
-## Interface customization
-
-The Interface module supports preset themes or exact 0–255 RGB channels for accent, panel, and text colors. Sound Notifications has a master volume. Clean Capture suppresses every Arcane HUD/world overlay for media, while Streamer Mode redacts coordinates and player names from Arcane overlays.
-
-## Text sharpness
-
-Minecraft bakes a TrueType glyph once, at `size x oversample` pixels, and samples the glyph atlas with `FilterMode.NEAREST` — there is no filtering anywhere in that path. A glyph is then drawn at `size x guiScale` physical pixels. Unless `oversample` matches the GUI scale, every glyph is an antialiased bitmap resampled with no interpolation, which is what makes custom fonts look blocky at GUI scale 3 and above.
-
-Arcane picks its font per frame, from a style on the text rather than through a private text renderer:
-
-| Situation | Font used | Result |
-| --- | --- | --- |
-| [Caxton](https://modrinth.com/mod/caxton) installed | `ui_caxton`, Sora as multi-channel signed distance fields | Crisp at any size |
-| Otherwise | `ui_x1` to `ui_x6`, Sora baked at the matching oversample | One texel per physical pixel |
-
-Caxton is optional and listed under `suggests`. Arcane checks that its font actually resolved before using it, so a missing native library falls back to the bundled variants rather than rendering blank. Note that Caxton is [incompatible with Iris Shaders](https://gitlab.com/Kyarei/caxton#incompatible); without it the bundled variants already give sharp text at every GUI scale, so install it only if you want every font in the game smooth.
-
-All variants load Sora from Minecraft's required `assets/arcaneclient/font/` path and fall back to `minecraft:default` for glyphs Sora does not provide. Their metrics remain identical across GUI scales.
-
-## Performance profiles
-
-**High FPS** is the default. Cycle it from the Performance module in the Client window or run `/arcane profile`.
-
-| Profile | Default scan budget | Snapshot cadence | Storage targets | Item targets | Tunnel/chunk targets | Storage fill |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| High FPS | 1.0 ms/tick | 20 ticks | 256 | 128 | 384 | Outline only |
-| Balanced | 1.85 ms/tick | 10 ticks | 512 | 256 | 768 | Enabled |
-| Quality | 2.5 ms/tick | 5 ticks | 1,024 | 512 | 1,500 | Enabled |
-
-While the Click GUI is open, 3D overlays and the HUD pause and background scanning is capped at 0.5 ms/tick. The interface itself uses cached module/filter models, a cached FPS label, static no-animation toggles, and an OFL-licensed Sora TrueType renderer. Actual FPS remains hardware, shader, resource-pack, and world dependent.
-
-## Default controls
-
-| Action | Key |
-| --- | --- |
-| Open Click GUI | Right Shift |
-| Toggle base scanner | B |
-| Toggle chunk tiles | N |
-| Toggle freecam | F6 |
-| Toggle freelook | Unbound |
-| Hold zoom | C |
-| Toggle Clean Capture | Unbound |
-| Toggle storage ESP | F7 |
-| Toggle Auto Totem | F8 |
-| Toggle tunnel ESP | F9 |
-| Toggle item ESP | F10 |
-| Chat macros 1–4 | Unbound |
-
-Bindings can be changed in the Click GUI or Minecraft's keybind settings.
-
-## Commands
-
-The primary command is `/arcane`; `/dtrace` remains as a compatibility alias for existing users.
-
-- `/arcane` — show current status.
-- `/arcane on|off|settings` — control the scanner or open the GUI.
-- `/arcane profile` — cycle High FPS, Balanced, and Quality budgets.
-- `/arcane here` and `/arcane list [count]` — inspect recorded chunk evidence.
-- `/arcane threshold <0-100>` — set the flagged-score threshold.
-- `/arcane radius <2-24>` — set the loaded-chunk scan radius.
-- `/arcane speed <1-8>` — set scan work per tick.
-- `/arcane rescan|clear` — refresh or clear the current server/dimension evidence.
-- `/arcane overlay|hud|freecam|esp|itemesp|tunnelesp|autototem|macros|tracers|stashalerts|analysis` — toggle individual tools.
-
-## Product website
-
-The responsive Arcane Client product site lives in [website/](website/). It is a build-free static page with a Krypton-inspired dark forest/mint visual system, centered hero, setup bento, interface samples, explicit Base/Premium plans, a session-aware Hiss intro, and an FAQ. See [website/README.md](website/README.md) for local preview instructions.
+The source of the shipped client is under `src/`; the public loader is under `loader/`. The private DEV loader and Discord administrator service are not part of this release. Existing `legacy/`, `website/` and older documents are historical material, not the current client build inputs. This update does not deploy or refresh the website source.
 
 ## Build from source
 
-Windows:
+Install Java 21. From the repository root:
 
 ```powershell
-.\gradlew.bat clean build
+.\gradlew.bat build
+.\gradlew.bat -p loader build
 ```
 
-Linux/macOS:
+On Linux/macOS, use `./gradlew` instead of `.\gradlew.bat`.
 
-```bash
-./gradlew clean build
+Outputs:
+
+- `build/libs/arcane-client-2.9.2+mc1.21.11.jar`
+- `loader/build/libs/ARCLoader.jar`
+
+The loader bundles the client you just compiled. No prebuilt client binary or private signing key is required. Do not install both outputs together: choose the standalone client **or** ARCLoader, alongside Fabric API.
+
+Runtime requirements: Minecraft 1.21.11, Java 21, Fabric Loader 0.19.3+, compatible Fabric API 0.141.6+1.21.11. Right Shift opens the module interface.
+
+## Inspect and verify
+
+Read [the security and release-verification notes](docs/SECURITY-AND-VERIFICATION.md). They explain the loader's network requests, file writes, helper process, trust model and release hashes.
+
+Publishing source is not a malware audit or a guarantee that a download matches it. Review the code, build it yourself, and compare the compiled contents with your download:
+
+```powershell
+java tools/CompareJars.java loader/build/libs/ARCLoader.jar path/to/downloaded/ARCLoader.jar
 ```
 
-The remapped mod and sources JARs are written to `build/libs/`.
+This compares every file's bytes, recursively inside nested JARs, ignoring only ZIP container metadata. Differences cause a failing exit code.
 
-## Project layout
+## Tests
 
-- `src/main/java/dev/arcaneclient/` — client logic, UI, rendering, scanners, commands, and mixins.
-- `src/main/resources/` — Fabric metadata, mixin config, language strings, Sora font, and packaged icon.
-- `website/` — responsive product website and local assets.
-- `artwork/` — full-resolution Arcane Client emblem source asset.
-- `third-party/` — Sora's SIL Open Font License.
-- `legacy/artifacts/` — untouched 1.6 and 1.8 input binaries retained for provenance.
-- `.github/workflows/build.yml` — reproducible Java 21 build.
+```powershell
+.\gradlew.bat test
+.\gradlew.bat runClientGameTest
+.\gradlew.bat -p loader test verifyDistributionJar
+```
 
-## Design and provenance
+Minecraft integration tests launch a test client and create isolated worlds. Relog tests start an offline test server bound to **127.0.0.1:25586**, not your public server. Linux CI uses Xvfb. The test build accepts Minecraft's EULA; review that setting before running.
 
-Version 1.8 was a functional superset of 1.6, so its newer chat macro, block-entity classification, transient-entity filtering, and expanded visual settings form the base. The older artifact is retained to make that comparison auditable. The rebuilt UI follows the category-window module menu that established Fabric clients share — Krypton's in particular, where a right click on a module opens its settings — while using an original Arcane visual system and implementation. No source or asset was copied from those projects; Arcane uses its own neutral graphite foundation with violet, blue, and rose accents.
-
-Useful references used during the rebuild include [Meteor Client](https://github.com/MeteorDevelopment/meteor-client), [67 Client](https://github.com/alx-3/67-Client), [Krypton Client's feature overview](https://kryptonclient.org/features), and the [official Fabric example mod](https://github.com/FabricMC/fabric-example-mod).
-
-The supplied artifacts declared **CC0-1.0**, and this reconstructed source is provided under the same license. The bundled Sora font remains under **OFL-1.1**; its license is included in `third-party/` and inside release JARs. See [LICENSE](LICENSE), [legacy/README.md](legacy/README.md), and the detailed [merge/design research](docs/DESIGN-RESEARCH.md).
+Tests cover representative behavior, not every module combination, shader or server policy. Server-hidden blocks cannot be guaranteed discoverable. Use the client only where server rules and applicable terms permit it.

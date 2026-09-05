@@ -24,6 +24,7 @@ import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexRendering;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.decoration.EndCrystalEntity;
@@ -53,34 +54,42 @@ public final class EntityEspRenderer {
     private static List<HoleTarget> holes = List.of();
     private static long lastEntityRefresh = Long.MIN_VALUE;
     private static long lastHoleRefresh = Long.MIN_VALUE;
+    private static int renderedNameCount;
 
     private EntityEspRenderer() {
     }
 
     public static void register() {
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(EntityEspRenderer::render);
+        WorldRenderEvents.END_MAIN.register(EntityEspRenderer::render);
+    }
+
+    public static void reset() {
+        targets = List.of();
+        holes = List.of();
+        lastEntityRefresh = Long.MIN_VALUE;
+        lastHoleRefresh = Long.MIN_VALUE;
     }
 
     public static void tick(MinecraftClient client) {
         ArcaneConfig config = ArcaneClient.config();
         if (client.world == null || client.player == null) {
-            targets = List.of();
-            holes = List.of();
+            reset();
             return;
         }
         long time = client.world.getTime();
-        if (time - lastEntityRefresh >= 5 || time < lastEntityRefresh) {
+        if (lastEntityRefresh == Long.MIN_VALUE || time - lastEntityRefresh >= 5 || time < lastEntityRefresh) {
             lastEntityRefresh = time;
             refreshEntities(client, config);
         }
-        if (time - lastHoleRefresh >= 10 || time < lastHoleRefresh) {
+        if (lastHoleRefresh == Long.MIN_VALUE || time - lastHoleRefresh >= 10 || time < lastHoleRefresh) {
             lastHoleRefresh = time;
             refreshHoles(client, config);
         }
     }
 
     private static void refreshEntities(MinecraftClient client, ArcaneConfig config) {
-        if (!config.playerEsp && !config.mobEsp && !config.projectileEsp && !config.crystalEsp) {
+        if (!config.playerEsp && !config.mobEsp && !config.projectileEsp && !config.crystalEsp
+            && !config.entityTracers && !config.nametags) {
             targets = List.of();
             return;
         }
@@ -89,20 +98,33 @@ public final class EntityEspRenderer {
             targets = List.of();
             return;
         }
-        double maxDistance = config.entityEspRange * (double) config.entityEspRange;
+        int maximumRange = config.nametags ? Math.max(config.entityEspRange, config.nametagRange) : config.entityEspRange;
+        double maxDistance = maximumRange * (double)maximumRange;
+        double entityRange = config.entityEspRange * (double)config.entityEspRange;
+        double nameRange = config.nametagRange * (double)config.nametagRange;
         ArrayList<Target> refreshed = new ArrayList<>();
         for (Entity entity : client.world.getEntities()) {
-            if (entity == client.player || entity == camera || entity.isRemoved()
-                || EspRanges.horizontalDistanceSquared(entity.getX(), entity.getZ(), camera.getX(), camera.getZ()) > maxDistance) continue;
-            int color = targetColor(entity, config);
-            if (color == 0) continue;
+            double distanceSquared = EspRanges.horizontalDistanceSquared(entity.getX(), entity.getZ(), camera.getX(), camera.getZ());
+            if (entity == client.player || entity == camera || entity.isRemoved() || distanceSquared > maxDistance) continue;
+            int espColor = distanceSquared <= entityRange ? targetColor(entity, config) : 0;
+            boolean nameOnly = config.nametags && (entity instanceof PlayerEntity || entity instanceof ItemEntity)
+                && entity.squaredDistanceTo(camera) <= nameRange;
+            boolean tracerOnly = config.entityTracers && traceable(entity) && distanceSquared <= entityRange;
+            if (espColor == 0 && !nameOnly && !tracerOnly) continue;
+            int color = espColor != 0 ? espColor : nameOnly ? config.nametagColor : defaultColor(entity, config);
             Box box = entity.getBoundingBox();
             VoxelShape shape = VoxelShapes.cuboid(box.offset(-entity.getX(), -entity.getY(), -entity.getZ()));
             String name = null;
-            if (config.entityNameTags && entity instanceof LivingEntity) {
-                name = config.streamerMode && entity instanceof PlayerEntity ? "PLAYER" : entity.getName().getString();
+            if (nameOnly && entity instanceof ItemEntity item && !item.getStack().isEmpty()) {
+                name = item.getStack().getName().getString() + " ×" + item.getStack().getCount();
+            } else if (nameOnly && entity instanceof LivingEntity living) {
+                String entityName = config.streamerMode && entity instanceof PlayerEntity ? "PLAYER" : entity.getName().getString();
+                int health = Math.max(0, Math.round(living.getHealth() + living.getAbsorptionAmount()));
+                int distance = (int)Math.round(Math.sqrt(entity.squaredDistanceTo(camera)));
+                name = entityName + "  " + health + " HP  " + distance + "m";
             }
-            refreshed.add(new Target(new Vec3d(entity.getX(), entity.getY(), entity.getZ()), shape, color, name));
+            refreshed.add(new Target(new Vec3d(entity.getX(), entity.getY(), entity.getZ()), shape, color, name,
+                box.maxY - entity.getY() + 0.3, espColor != 0, tracerOnly));
             if (refreshed.size() >= 512) break;
         }
         targets = List.copyOf(refreshed);
@@ -114,6 +136,18 @@ public final class EntityEspRenderer {
         if (entity instanceof ProjectileEntity) return config.projectileEsp ? config.projectileEspColor : 0;
         if (entity instanceof LivingEntity && !(entity instanceof ArmorStandEntity)) return config.mobEsp ? config.mobEspColor : 0;
         return 0;
+    }
+
+    private static boolean traceable(Entity entity) {
+        return entity instanceof PlayerEntity || entity instanceof LivingEntity && !(entity instanceof ArmorStandEntity)
+            || entity instanceof ProjectileEntity || entity instanceof EndCrystalEntity;
+    }
+
+    private static int defaultColor(Entity entity, ArcaneConfig config) {
+        if (entity instanceof PlayerEntity) return config.playerEspColor;
+        if (entity instanceof EndCrystalEntity) return config.crystalEspColor;
+        if (entity instanceof ProjectileEntity) return config.projectileEspColor;
+        return config.mobEspColor;
     }
 
     private static void refreshHoles(MinecraftClient client, ArcaneConfig config) {
@@ -154,6 +188,7 @@ public final class EntityEspRenderer {
     }
 
     private static void render(WorldRenderContext context) {
+        renderedNameCount = 0;
         MinecraftClient client = MinecraftClient.getInstance();
         ArcaneConfig config = ArcaneClient.config();
         if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client) || context.matrices() == null) return;
@@ -167,15 +202,24 @@ public final class EntityEspRenderer {
             double x = pos.x - camera.x;
             double y = pos.y - camera.y;
             double z = pos.z - camera.z;
-            VertexRendering.drawOutline(matrices, lines, target.shape(), x, y, z, target.color(), 1.8f);
-            if (config.entityTracers) {
+            if (target.outline()) {
+                VertexRendering.drawOutline(matrices, lines, target.shape(), x, y, z, target.color(), 1.8f);
+            }
+            if (target.tracer()) {
                 TracerLines.draw(matrices.peek(), lines, forward.x() * 0.25, forward.y() * 0.25, forward.z() * 0.25, x, y + 0.5, z, target.color(), 1.15f);
             }
-            if (target.name() != null) drawName(context, target.name(), pos, camera, target.color());
         }
         for (HoleTarget hole : holes) {
             BlockPos pos = hole.pos();
             VertexRendering.drawOutline(matrices, lines, HOLE_BOX, pos.getX() - camera.x, pos.getY() - camera.y, pos.getZ() - camera.z, hole.color(), 1.8f);
+        }
+        // Text rendering may switch the shared immediate buffer to another layer, which
+        // invalidates the line consumer. Draw labels only after every outline is complete.
+        for (Target target : targets) {
+            if (config.nametags && target.name() != null) {
+                drawName(context, target.name(), target.pos().add(0, target.nameHeight(), 0), camera, config.nametagColor);
+                renderedNameCount++;
+            }
         }
     }
 
@@ -184,10 +228,12 @@ public final class EntityEspRenderer {
         TextRenderer font = ArcaneFont.renderer(client);
         MatrixStack matrices = context.matrices();
         matrices.push();
-        matrices.translate(pos.x - camera.x, pos.y + 2.2 - camera.y, pos.z - camera.z);
+        matrices.translate(pos.x - camera.x, pos.y - camera.y, pos.z - camera.z);
         matrices.multiply((Quaternionfc) context.worldState().cameraRenderState.orientation);
-        matrices.scale(-0.025f, -0.025f, 0.025f);
-        font.draw(name, -font.getWidth(name) / 2.0f, 0.0f, color, false, matrices.peek().getPositionMatrix(), context.consumers(), TextRenderer.TextLayerType.SEE_THROUGH, 0x90000000, 0xF000F0);
+        // Match vanilla's label orientation; negative X reverses the text face and culls it.
+        matrices.scale(0.025f, -0.025f, 0.025f);
+        var label = ArcaneFont.text(name);
+        font.draw(label, -font.getWidth(label) / 2.0f, 0.0f, color, false, matrices.peek().getPositionMatrix(), context.consumers(), TextRenderer.TextLayerType.SEE_THROUGH, 0x90000000, 0xF000F0);
         matrices.pop();
     }
 
@@ -195,7 +241,21 @@ public final class EntityEspRenderer {
         return targets.size() + holes.size();
     }
 
-    private record Target(Vec3d pos, VoxelShape shape, int color, String name) {
+    public static int tracerTargetCount() {
+        int count = 0;
+        for (Target target : targets) {
+            if (target.tracer()) count++;
+        }
+        return count;
+    }
+
+    public static int renderedNameCount() { return renderedNameCount; }
+
+    public static List<String> nameLabels() {
+        return targets.stream().map(Target::name).filter(java.util.Objects::nonNull).toList();
+    }
+
+    private record Target(Vec3d pos, VoxelShape shape, int color, String name, double nameHeight, boolean outline, boolean tracer) {
     }
 
     private record HoleTarget(BlockPos pos, int color) {

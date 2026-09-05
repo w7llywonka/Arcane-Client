@@ -41,14 +41,19 @@ public final class ItemEspRenderer {
     }
 
     public static void register() {
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(ItemEspRenderer::render);
+        WorldRenderEvents.END_MAIN.register(ItemEspRenderer::render);
+    }
+
+    public static void reset() {
+        targets = List.of();
+        lastRefresh = Long.MIN_VALUE;
     }
 
     public static void tick(MinecraftClient client) {
         if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
         ArcaneConfig config = ArcaneClient.config();
         if (!config.itemEsp || client.world == null || client.getCameraEntity() == null) {
-            targets = List.of();
+            reset();
             return;
         }
         PerformanceProfile profile = config.performanceProfile();

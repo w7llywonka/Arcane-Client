@@ -18,43 +18,50 @@ import net.minecraft.world.Heightmap;
 import org.joml.Quaternionfc;
 
 @Environment(value=EnvType.CLIENT)
-public final class StashLabelRenderer {
-    private static final String LABEL = "POSSIBLE STASH FOUND";
-    private static List<TraceEngine.StashCandidate> source = List.of();
+public final class ActivityClusterLabelRenderer {
+    private static final String LABEL = "BASE CANDIDATE";
+    private static List<TraceEngine.ActivityClusterCandidate> source = List.of();
     private static List<Target> targets = List.of();
 
-    private StashLabelRenderer() {
+    private ActivityClusterLabelRenderer() {
     }
 
     public static void register() {
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(StashLabelRenderer::render);
+        WorldRenderEvents.END_MAIN.register(ActivityClusterLabelRenderer::render);
+    }
+
+    public static void reset() {
+        source = List.of();
+        targets = List.of();
     }
 
     public static void tick(MinecraftClient client) {
         if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
-        if (!ArcaneClient.config().stashAlerts || client.world == null) {
-            source = List.of();
-            targets = List.of();
+        if (!ArcaneClient.config().overlay || client.world == null) {
+            reset();
             return;
         }
-        List<TraceEngine.StashCandidate> current = ArcaneClient.engine().stashCandidates();
+        List<TraceEngine.ActivityClusterCandidate> current = ArcaneClient.engine().activityClusters();
         if (current == source) {
             return;
         }
         source = current;
         ArrayList<Target> rebuilt = new ArrayList<Target>(current.size());
-        for (TraceEngine.StashCandidate candidate : current) {
+        for (TraceEngine.ActivityClusterCandidate candidate : current) {
             if (client.world.getChunkManager().getWorldChunk(candidate.chunkX(), candidate.chunkZ(), false) == null) continue;
             int x = candidate.chunkX() * 16 + 8;
             int z = candidate.chunkZ() * 16 + 8;
             int y = Math.max(72, client.world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) + 8);
-            rebuilt.add(new Target((double)x + 0.5, y, (double)z + 0.5, candidate.score()));
+            rebuilt.add(new Target(
+                (double)x + 0.5, y, (double)z + 0.5,
+                candidate.confidence(), candidate.members(), candidate.families()
+            ));
         }
         targets = List.copyOf(rebuilt);
     }
 
     private static void render(WorldRenderContext context) {
-        if (!ArcaneClient.config().stashAlerts || targets.isEmpty() || context.matrices() == null) {
+        if (!ArcaneClient.config().overlay || targets.isEmpty() || context.matrices() == null) {
             return;
         }
         MinecraftClient client = MinecraftClient.getInstance();
@@ -67,9 +74,9 @@ public final class StashLabelRenderer {
             matrices.translate(target.x() - camera.x, target.y() - camera.y, target.z() - camera.z);
             matrices.multiply((Quaternionfc)context.worldState().cameraRenderState.orientation);
             matrices.scale(-0.025f, -0.025f, 0.025f);
-            String score = "CONFIDENCE " + target.score();
-            StashLabelRenderer.drawCentered(font, LABEL, 0.0f, matrices, context, -1);
-            StashLabelRenderer.drawCentered(font, score, 10.0f, matrices, context, -3092272);
+            String score = "CONF " + target.confidence() + "% · " + target.members() + " CH · " + target.families() + " FAM";
+            ActivityClusterLabelRenderer.drawCentered(font, LABEL, 0.0f, matrices, context, -1);
+            ActivityClusterLabelRenderer.drawCentered(font, score, 10.0f, matrices, context, -3092272);
             matrices.pop();
         }
     }
@@ -79,6 +86,6 @@ public final class StashLabelRenderer {
     }
 
     @Environment(value=EnvType.CLIENT)
-    private record Target(double x, double y, double z, int score) {
+    private record Target(double x, double y, double z, int confidence, int members, int families) {
     }
 }

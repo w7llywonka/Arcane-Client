@@ -2,6 +2,7 @@ package dev.arcaneclient.command;
 
 import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.mojang.brigadier.context.CommandContext;
@@ -9,7 +10,7 @@ import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.TraceEngine;
 import dev.arcaneclient.freecam.FreecamController;
-import dev.arcaneclient.render.EspRenderer;
+import dev.arcaneclient.render.WaypointStore;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import java.util.List;
 import java.util.function.ToIntFunction;
@@ -37,17 +38,23 @@ public final class ArcaneCommands {
                 .then(command("hud", ArcaneCommands::hud))
                 .then(command("freecam", ArcaneCommands::freecam))
                 .then(command("esp", ArcaneCommands::esp))
-                .then(command("bedebug", ArcaneCommands::blockEntityDebug))
                 .then(command("itemesp", ArcaneCommands::itemEsp))
                 .then(command("tunnelesp", ArcaneCommands::tunnelEsp))
                 .then(command("autototem", ArcaneCommands::autoTotem))
                 .then(command("macros", ArcaneCommands::chatMacros))
                 .then(command("tracers", ArcaneCommands::tracers))
-                .then(command("stashalerts", ArcaneCommands::stashAlerts))
                 .then(command("analysis", ArcaneCommands::analysis))
                 .then(command("settings", ignored -> settings()))
                 .then(command("profile", ArcaneCommands::profile))
                 .then(command("here", ArcaneCommands::here))
+                .then(ClientCommandManager.literal("waypoint")
+                    .then(command("list", ArcaneCommands::waypointList))
+                    .then(ClientCommandManager.literal("add")
+                        .then(ClientCommandManager.argument("name", StringArgumentType.greedyString())
+                            .executes(context -> waypointAdd(context, StringArgumentType.getString(context, "name")))))
+                    .then(ClientCommandManager.literal("remove")
+                        .then(ClientCommandManager.argument("name", StringArgumentType.greedyString())
+                            .executes(context -> waypointRemove(context, StringArgumentType.getString(context, "name"))))))
                 .then(command("list", source -> list(source, 8))
                     .then(ClientCommandManager.argument("count", IntegerArgumentType.integer(1, 20))
                         .executes(context -> list(context.getSource(), IntegerArgumentType.getInteger(context, "count")))))
@@ -79,7 +86,7 @@ public final class ArcaneCommands {
     private static int status(FabricClientCommandSource source) {
         ArcaneConfig config = ArcaneClient.config();
         TraceEngine engine = ArcaneClient.engine();
-        ArcaneCommands.feedback(source, "Arcane Client " + (config.enabled ? "on" : "off") + ", sensitivity " + config.sensitivity() + "%, radius " + config.scanRadius + ", speed " + config.chunksPerTick + ", deep focus " + (config.deepFocus ? "on" : "off") + ", profile " + config.performanceProfile().label() + ", item/tunnel/totem " + ArcaneCommands.state(config.itemEsp) + "/" + ArcaneCommands.state(config.tunnelEsp) + "/" + ArcaneCommands.state(config.autoTotem) + ", macros " + ArcaneCommands.state(config.chatMacros) + ", flagged " + engine.flaggedCount() + ", queued " + engine.queueSize());
+        ArcaneCommands.feedback(source, "Arcane Client " + (config.enabled ? "on" : "off") + ", sensitivity " + config.sensitivity() + "%, radius " + config.scanRadius + ", speed " + config.chunksPerTick + ", profile " + config.performanceProfile().label() + ", item/tunnel/totem " + ArcaneCommands.state(config.itemEsp) + "/" + ArcaneCommands.state(config.tunnelEsp) + "/" + ArcaneCommands.state(config.autoTotem) + ", macros " + ArcaneCommands.state(config.chatMacros) + ", flagged " + engine.flaggedCount() + ", queued " + engine.queueSize());
         return 1;
     }
 
@@ -131,14 +138,6 @@ public final class ArcaneCommands {
         return 1;
     }
 
-    private static int blockEntityDebug(FabricClientCommandSource source) {
-        ArcaneConfig config = ArcaneClient.config();
-        config.blockEntityDebug = !config.blockEntityDebug;
-        config.save();
-        ArcaneCommands.feedback(source, "Block entity debug " + (config.blockEntityDebug ? "enabled" : "disabled") + "; cached visible targets: " + EspRenderer.targetCount());
-        return 1;
-    }
-
     private static int tunnelEsp(FabricClientCommandSource source) {
         ArcaneConfig config = ArcaneClient.config();
         config.tunnelEsp = !config.tunnelEsp;
@@ -171,14 +170,6 @@ public final class ArcaneCommands {
         config.itemTracers = enabled;
         config.save();
         ArcaneCommands.feedback(source, "All ESP tracers " + (enabled ? "enabled" : "disabled"));
-        return 1;
-    }
-
-    private static int stashAlerts(FabricClientCommandSource source) {
-        ArcaneConfig config = ArcaneClient.config();
-        config.stashAlerts = !config.stashAlerts;
-        config.save();
-        ArcaneCommands.feedback(source, "Stash alerts " + (config.stashAlerts ? "enabled" : "disabled"));
         return 1;
     }
 
@@ -217,6 +208,33 @@ public final class ArcaneCommands {
             ArcaneCommands.feedback(source, ArcaneCommands.describe(marker));
         }
         return 1;
+    }
+
+    private static int waypointAdd(CommandContext<FabricClientCommandSource> context, String name) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null || client.world == null) return 0;
+        WaypointStore.Waypoint waypoint = WaypointStore.add(client, name, client.player.getBlockPos());
+        ArcaneCommands.feedback(context.getSource(), "Waypoint saved: " + waypoint.name() + " at "
+            + waypoint.x() + ", " + waypoint.y() + ", " + waypoint.z());
+        return 1;
+    }
+
+    private static int waypointRemove(CommandContext<FabricClientCommandSource> context, String name) {
+        boolean removed = WaypointStore.remove(MinecraftClient.getInstance(), name);
+        ArcaneCommands.feedback(context.getSource(), removed ? "Waypoint removed: " + WaypointStore.cleanName(name) : "No waypoint named " + WaypointStore.cleanName(name));
+        return removed ? 1 : 0;
+    }
+
+    private static int waypointList(FabricClientCommandSource source) {
+        List<WaypointStore.Waypoint> waypoints = WaypointStore.current(MinecraftClient.getInstance());
+        if (waypoints.isEmpty()) {
+            ArcaneCommands.feedback(source, "No waypoints in this server and dimension");
+            return 1;
+        }
+        for (WaypointStore.Waypoint waypoint : waypoints) {
+            ArcaneCommands.feedback(source, waypoint.name() + ": " + waypoint.x() + ", " + waypoint.y() + ", " + waypoint.z());
+        }
+        return waypoints.size();
     }
 
     private static int list(FabricClientCommandSource source, int count) {

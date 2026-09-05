@@ -2,6 +2,7 @@ package dev.arcaneclient.screen;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.arcaneclient.ArcaneConfig;
 import org.junit.jupiter.api.Test;
@@ -28,5 +29,12 @@ final class ClickGuiColorsTest {
         int edited = ArcaneConfig.withChannel(0xFF102030, 8, 0xAA);
         assertEquals(0xFF10AA30, edited);
         assertEquals(0xAA, ArcaneConfig.channel(edited, 8));
+    }
+
+    @Test
+    void themeSelectorOffersSeveralDistinctProfessionalPalettes() {
+        assertTrue(ClickGuiTheme.count() >= 6);
+        assertNotEquals(ClickGuiTheme.ARCANE.accent(), ClickGuiTheme.AETHER.accent());
+        assertNotEquals(ClickGuiTheme.EMBER.accent(), ClickGuiTheme.ULTRAVIOLET.accent());
     }
 }

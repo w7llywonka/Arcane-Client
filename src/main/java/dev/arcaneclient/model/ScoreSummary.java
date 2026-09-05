@@ -43,6 +43,14 @@ public record ScoreSummary(int score, int synergy, Map<SignalCategory, Integer> 
     }
 
     static ScoreSummary fromRawStrengths(Map<SignalCategory, Integer> rawStrengths, Collection<String> contributingReasons) {
+        return fromRawStrengths(rawStrengths, contributingReasons, Integer.MAX_VALUE);
+    }
+
+    static ScoreSummary fromRawStrengths(
+        Map<SignalCategory, Integer> rawStrengths,
+        Collection<String> contributingReasons,
+        int independentFamilies
+    ) {
         EnumMap<SignalCategory, Integer> breakdown = new EnumMap<SignalCategory, Integer>(SignalCategory.class);
         int baseScore = 0;
         int independentCategories = 0;
@@ -53,7 +61,8 @@ public record ScoreSummary(int score, int synergy, Map<SignalCategory, Integer> 
             if (categoryScore < 4) continue;
             ++independentCategories;
         }
-        int synergy = Math.min(21, Math.max(0, independentCategories - 1) * 7);
+        int corroborated = Math.min(independentCategories, Math.max(0, independentFamilies));
+        int synergy = Math.min(21, Math.max(0, corroborated - 1) * 7);
         int finalScore = Math.min(100, baseScore + synergy);
         TreeSet<String> sortedReasons = new TreeSet<String>(contributingReasons);
         return new ScoreSummary(finalScore, synergy, breakdown, new ArrayList<String>(sortedReasons));

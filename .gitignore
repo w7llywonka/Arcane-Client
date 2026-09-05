@@ -41,3 +41,14 @@ replay_*.log
 
 # test/runtime logs
 logs/
+
+# Secrets and private/runtime data must never be committed.
+.secrets/
+.env
+.env.*
+*.key
+*private*.pem
+arcane-dev/
+node_modules/
+liscensechecker/
+loader/src/main/jars/

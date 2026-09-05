@@ -57,7 +57,7 @@ public final class EspRenderer {
     }
 
     public static void register() {
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(EspRenderer::render);
+        WorldRenderEvents.END_MAIN.register(EspRenderer::render);
     }
 
     public static void tick(MinecraftClient client) {
@@ -83,7 +83,12 @@ public final class EspRenderer {
         int centerZ = ChunkSectionPos.getSectionCoord((int)cameraEntity.getBlockZ());
         int radius = profile.storageRadiusChunks();
         int targetLimit = profile.storageTargetLimit();
-        PriorityQueue<RankedTarget> nearest = new PriorityQueue<>(
+        PriorityQueue<RankedTarget> nearestStorage = new PriorityQueue<>(
+            Comparator.comparingDouble(RankedTarget::horizontalDistanceSquared)
+                .thenComparingInt(ranked -> ranked.target.pos.getY())
+                .reversed()
+        );
+        PriorityQueue<RankedTarget> nearestDebug = new PriorityQueue<>(
             Comparator.comparingDouble(RankedTarget::horizontalDistanceSquared)
                 .thenComparingInt(ranked -> ranked.target.pos.getY())
                 .reversed()
@@ -96,11 +101,13 @@ public final class EspRenderer {
                 for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
                     Identifier id = Registries.BLOCK_ENTITY_TYPE.getId(blockEntity.getType());
                     String path = id == null ? "unknown" : id.getPath();
-                    int color = BlockEntityEspClassifier.color(path, config.esp, config.blockEntityDebug);
-                    if (color == 0) continue;
                     BlockPos pos = blockEntity.getPos().toImmutable();
-                    boolean storageTarget = BlockEntityEspClassifier.isStorageTarget(path);
-                    if (config.esp && config.storageChatAlerts && BlockEntityEspClassifier.isContainerTarget(path) && DISCOVERIES.markNew(pos.asLong())) {
+                    int storageColor = config.esp ? BlockEntityEspClassifier.color(path) : 0;
+                    int debugColor = config.blockEntityDebug ? BlockEntityEspClassifier.debugColor(pos.getY()) : 0;
+                    boolean storageTarget = storageColor != 0;
+                    boolean debugTarget = debugColor != 0 && !storageTarget;
+                    if (!storageTarget && !debugTarget) continue;
+                    if (storageTarget && config.storageChatAlerts && BlockEntityEspClassifier.isContainerTarget(path) && DISCOVERIES.markNew(pos.asLong())) {
                         discovered.add(new StorageDiscovery(pos, path));
                     }
                     double horizontalDistanceSquared = EspRanges.horizontalDistanceSquared(
@@ -109,15 +116,18 @@ public final class EspRenderer {
                         cameraEntity.getX(),
                         cameraEntity.getZ()
                     );
-                    RankedTarget ranked = new RankedTarget(new Target(pos, color, storageTarget), horizontalDistanceSquared);
-                    nearest.add(ranked);
-                    if (nearest.size() > targetLimit) {
-                        nearest.poll();
+                    if (storageTarget) {
+                        offerNearest(nearestStorage, new Target(pos, storageColor, true, false), horizontalDistanceSquared, targetLimit);
+                    }
+                    if (debugTarget) {
+                        offerNearest(nearestDebug, new Target(pos, debugColor, false, true), horizontalDistanceSquared, targetLimit);
                     }
                 }
             }
         }
-        ArrayList<RankedTarget> ranked = new ArrayList<>(nearest);
+        ArrayList<RankedTarget> ranked = new ArrayList<>(nearestStorage.size() + nearestDebug.size());
+        ranked.addAll(nearestStorage);
+        ranked.addAll(nearestDebug);
         ranked.sort(
             Comparator.comparingDouble(RankedTarget::horizontalDistanceSquared)
                 .thenComparingInt(candidate -> candidate.target.pos.getY())
@@ -130,6 +140,13 @@ public final class EspRenderer {
             cameraEntity.getZ()
         )));
         publishDiscoveries(client, discovered);
+    }
+
+    private static void offerNearest(PriorityQueue<RankedTarget> queue, Target target, double distanceSquared, int targetLimit) {
+        queue.add(new RankedTarget(target, distanceSquared));
+        if (queue.size() > targetLimit) {
+            queue.poll();
+        }
     }
 
     private static void publishDiscoveries(MinecraftClient client, List<StorageDiscovery> discovered) {
@@ -178,7 +195,6 @@ public final class EspRenderer {
         Vec3d camera = context.worldState().cameraRenderState.pos;
         VertexConsumer lines = context.consumers().getBuffer(ESP_LINE_TYPE);
         PerformanceProfile profile = config.performanceProfile();
-        VertexConsumer fills = profile.filledStorageBoxes() ? context.consumers().getBuffer(ESP_FILL_TYPE) : null;
         Vector3fc forward = client.gameRenderer.getCamera().getHorizontalPlane();
         for (Target target : targets) {
             BlockPos pos = target.pos();
@@ -186,9 +202,17 @@ public final class EspRenderer {
             double y = (double)pos.getY() + 0.5 - camera.y;
             double z = (double)pos.getZ() + 0.5 - camera.z;
             VertexRendering.drawOutline((MatrixStack)matrices, (VertexConsumer)lines, (VoxelShape)BLOCK_BOX, (double)((double)pos.getX() - camera.x), (double)((double)pos.getY() - camera.y), (double)((double)pos.getZ() - camera.z), (int)target.color(), (float)2.0f);
-            if (fills != null) EspRenderer.drawFilledBox(matrices.peek(), fills, (double)pos.getX() - camera.x, (double)pos.getY() - camera.y, (double)pos.getZ() - camera.z, 0x30000000 | target.color() & 0xFFFFFF);
             if (!target.storageTarget() || !config.storageTracers) continue;
             TracerLines.draw(matrices.peek(), lines, (double)forward.x() * 0.25, (double)forward.y() * 0.25, (double)forward.z() * 0.25, x, y, z, target.color(), 1.25f);
+        }
+        if (profile.filledStorageBoxes()) {
+            // Requesting another custom layer flushes the shared line buffer. Finish every
+            // line first, then acquire and populate the fill buffer in a separate pass.
+            VertexConsumer fills = context.consumers().getBuffer(ESP_FILL_TYPE);
+            for (Target target : targets) {
+                BlockPos pos = target.pos();
+                EspRenderer.drawFilledBox(matrices.peek(), fills, (double)pos.getX() - camera.x, (double)pos.getY() - camera.y, (double)pos.getZ() - camera.z, 0x30000000 | target.color() & 0xFFFFFF);
+            }
         }
     }
 
@@ -215,11 +239,15 @@ public final class EspRenderer {
     }
 
     public static int targetCount() {
-        return targets.size();
+        return (int)targets.stream().filter(Target::storageTarget).count();
+    }
+
+    public static int debugTargetCount() {
+        return (int)targets.stream().filter(Target::debugTarget).count();
     }
 
     @Environment(value=EnvType.CLIENT)
-    private record Target(BlockPos pos, int color, boolean storageTarget) {
+    private record Target(BlockPos pos, int color, boolean storageTarget, boolean debugTarget) {
     }
 
     @Environment(value=EnvType.CLIENT)

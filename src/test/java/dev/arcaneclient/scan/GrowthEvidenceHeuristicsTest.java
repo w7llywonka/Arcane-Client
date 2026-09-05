@@ -33,4 +33,12 @@ final class GrowthEvidenceHeuristicsTest {
         assertEquals(0, EvidenceHeuristics.regionalGrowthBoost(8, 0, 0));
         assertTrue(EvidenceHeuristics.regionalGrowthBoost(8, 2, 12) > 0);
     }
+
+    @Test
+    void naturalHerdsDoNotCountAsDenseAnimalEvidence() {
+        assertEquals(0, EvidenceHeuristics.pennedAnimalCluster(4, 4));
+        assertEquals(0, EvidenceHeuristics.pennedAnimalCluster(5, 10));
+        assertEquals(0, EvidenceHeuristics.pennedAnimalCluster(8, 7));
+        assertTrue(EvidenceHeuristics.pennedAnimalCluster(6, 8) > 0);
+    }
 }

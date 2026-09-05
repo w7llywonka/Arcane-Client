@@ -27,6 +27,9 @@ jobs:
       - name: Build Arcane Client
         run: ./gradlew clean build --no-daemon
 
+      - name: Build public loader from freshly compiled client
+        run: ./gradlew -p loader clean build --no-daemon
+
       - name: Test Freecam, Freelook, and interface in Minecraft
         run: xvfb-run -a ./gradlew runClientGameTest --no-daemon
 
@@ -42,5 +45,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: arcane-client-${{ github.sha }}
-          path: build/libs/*.jar
+          path: |
+            build/libs/*.jar
+            loader/build/libs/ARCLoader.jar
           if-no-files-found: error

@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class GameRendererMixin {
     @Inject(method = "tiltViewWhenHurt", at = @At("HEAD"), cancellable = true)
     private void arcaneclient$removeHurtCamera(MatrixStack matrices, float tickProgress, CallbackInfo ci) {
-        if (ArcaneClient.config() != null && ArcaneClient.config().noHurtCam) ci.cancel();
+        if (ArcaneClient.config() != null && (ArcaneClient.config().noHurtCam || ArcaneClient.config().noRender)) ci.cancel();
     }
 
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)

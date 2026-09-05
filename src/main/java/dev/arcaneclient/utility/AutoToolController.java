@@ -2,13 +2,14 @@ package dev.arcaneclient.utility;
 
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
+import dev.arcaneclient.inventory.InventoryActionScheduler;
+import dev.arcaneclient.inventory.InventoryAutomationSupport;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 
@@ -60,12 +61,30 @@ public final class AutoToolController {
                 || stack.getMaxDamage() - stack.getDamage() > 1;
         }
         int bestSlot = AutoToolSelector.choose(currentSlot, speeds, suitable, eligible);
-        if (bestSlot == currentSlot) return;
+        if (bestSlot == currentSlot) {
+            if (autoSelectedSlot >= 0 && currentSlot == autoSelectedSlot) {
+                InventoryActionScheduler.shared().tryAcquire(
+                    InventoryActionScheduler.Owner.AUTO_TOOL,
+                    InventoryActionScheduler.Channel.HOTBAR_SELECTION,
+                    InventoryAutomationSupport.tick(player),
+                    2
+                );
+            }
+            return;
+        }
 
+        if (!InventoryAutomationSupport.selectHotbar(
+            client,
+            player,
+            InventoryActionScheduler.Owner.AUTO_TOOL,
+            bestSlot,
+            2
+        )) {
+            return;
+        }
         if (autoSelectedSlot < 0 || currentSlot != autoSelectedSlot) {
             restoreSlot = currentSlot;
         }
-        setSelectedSlot(client, player, bestSlot);
         autoSelectedSlot = bestSlot;
     }
 
@@ -73,16 +92,16 @@ public final class AutoToolController {
         ClientPlayerEntity player = client.player;
         if (player != null && restoreSlot >= 0 && restoreSlot < 9
             && player.getInventory().getSelectedSlot() == autoSelectedSlot) {
-            setSelectedSlot(client, player, restoreSlot);
+            InventoryAutomationSupport.selectHotbar(
+                client,
+                player,
+                InventoryActionScheduler.Owner.AUTO_TOOL,
+                restoreSlot,
+                1
+            );
         }
+        InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOOL);
         restoreSlot = -1;
         autoSelectedSlot = -1;
-    }
-
-    private static void setSelectedSlot(MinecraftClient client, ClientPlayerEntity player, int slot) {
-        player.getInventory().setSelectedSlot(slot);
-        if (client.getNetworkHandler() != null) {
-            client.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(slot));
-        }
     }
 }

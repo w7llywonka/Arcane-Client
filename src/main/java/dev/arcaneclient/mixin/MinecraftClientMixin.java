@@ -1,6 +1,7 @@
 package dev.arcaneclient.mixin;
 
 import dev.arcaneclient.freecam.DetachedCameraInteraction;
+import dev.arcaneclient.combat.CombatAutomationController;
 import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -28,7 +29,16 @@ public abstract class MinecraftClientMixin {
             cir.setReturnValue(false);
             return;
         }
-        AutoToolController.prepareForCrosshair((MinecraftClient) (Object) this, true);
+        MinecraftClient client = (MinecraftClient)(Object)this;
+        // Release any mining-owned slot before selecting the combat weapon that must
+        // still be active when vanilla sends the synchronous attack packet.
+        AutoToolController.prepareForCrosshair(client, true);
+        CombatAutomationController.prepareForManualAttack(client);
+    }
+
+    @Inject(method = "doAttack", at = @At("RETURN"))
+    private void arcaneclient$restoreCombatWeapon(CallbackInfoReturnable<Boolean> cir) {
+        CombatAutomationController.restoreAfterManualAttack((MinecraftClient)(Object)this);
     }
 
     @Inject(method = "handleBlockBreaking", at = @At("HEAD"), cancellable = true)

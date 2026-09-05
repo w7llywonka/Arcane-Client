@@ -1,9 +1,11 @@
 package dev.arcaneclient.scan;
 
 import dev.arcaneclient.model.BlockPosition;
+import dev.arcaneclient.model.CobbledDeepslateTrailHeuristics;
 import dev.arcaneclient.model.ScanResult;
 import dev.arcaneclient.model.SignalCategory;
 import dev.arcaneclient.model.TunnelSegment;
+import dev.arcaneclient.model.WorldObservation;
 import dev.arcaneclient.scan.ActivityClassifier;
 import dev.arcaneclient.scan.EvidenceHeuristics;
 import dev.arcaneclient.scan.TransientEntityFilter;
@@ -18,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.WeakHashMap;
 import java.util.function.Function;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -50,13 +51,12 @@ import net.minecraft.world.chunk.WorldChunk;
 
 @Environment(value=EnvType.CLIENT)
 public final class ChunkScanner {
-    private static final int AMETHYST_DECAY_TICKS = 12000;
     private static final int TEMPORAL_DECAY_TICKS = 12000;
     private static final int MAX_TEMPORAL_SNAPSHOTS = 2048;
+    private static final int MAX_WORLD_OBSERVATIONS_PER_CHUNK = 192;
     private static final long HASH_SEED = -3750763034362895579L;
     private static final Set<String> PENNED_ANIMALS = Set.of("cow", "sheep", "pig", "chicken", "rabbit", "goat", "llama", "horse", "donkey", "mule");
     private final ActivityClassifier classifier;
-    private final Map<WorldChunk, AmethystSnapshot> amethystSnapshots = new WeakHashMap<WorldChunk, AmethystSnapshot>();
     private final LinkedHashMap<Long, ChunkSnapshot> temporalSnapshots = new LinkedHashMap<Long, ChunkSnapshot>(256, 0.75f, true){
 
         @Override
@@ -82,15 +82,29 @@ public final class ChunkScanner {
     }
 
     public ChunkScanJob begin(ClientWorld level, WorldChunk chunk, long tick, int observerSectionY, boolean collectTunnels) {
+        return this.begin(level, chunk, tick, observerSectionY, collectTunnels, true);
+    }
+
+    public ChunkScanJob begin(
+        ClientWorld level,
+        WorldChunk chunk,
+        long tick,
+        int observerSectionY,
+        boolean collectTunnels,
+        boolean collectConcealedLight
+    ) {
         if (chunk.getWorld() != level) {
             throw new IllegalArgumentException("chunk does not belong to the supplied client level");
         }
-        return new ChunkScanJob(level, chunk, tick, observerSectionY, collectTunnels);
+        return new ChunkScanJob(level, chunk, tick, observerSectionY, collectTunnels, collectConcealedLight);
     }
 
     public void resetTemporalHistory() {
-        this.amethystSnapshots.clear();
         this.temporalSnapshots.clear();
+    }
+
+    public void forgetChunk(WorldChunk chunk) {
+        this.temporalSnapshots.remove(chunk.getPos().toLong());
     }
 
     public ScanResult scan(ClientWorld level, WorldChunk chunk, long tick) {
@@ -108,6 +122,7 @@ public final class ChunkScanner {
     private static void emitBlockAggregates(ScanResult.Builder result, EnumMap<ActivityClassifier.Signal, Aggregate> aggregates, boolean generatedDeepStructure) {
         for (Map.Entry<ActivityClassifier.Signal, Aggregate> entry : aggregates.entrySet()) {
             ActivityClassifier.Signal signal = entry.getKey();
+            if (signal == ActivityClassifier.Signal.AMETHYST_STAGE) continue;
             if (generatedDeepStructure && signal == ActivityClassifier.Signal.WORKED_DEEPSLATE) continue;
             Aggregate aggregate = entry.getValue();
             result.addStatic(signal.category(), ChunkScanner.modelPosition(aggregate.representative), signal.reason() + " x" + aggregate.count, signal.aggregateStrength(aggregate.count));
@@ -137,13 +152,7 @@ public final class ChunkScanner {
         ClientWorld level,
         ActivityClassifier classifier,
         Map<Integer, Grid> berryLayers,
-        KelpColumns kelp,
-        int amethystShell,
-        int calcite,
-        int smoothBasalt,
-        int buddingAmethyst,
-        int amethystBuds,
-        BlockPos geodeRepresentative
+        KelpColumns kelp
     ) {
         Grid berries = ChunkScanner.strongestGrid(berryLayers);
         if (berries != null) {
@@ -165,15 +174,6 @@ public final class ChunkScanner {
                 ChunkScanner.modelPosition(kelp.representative),
                 "aligned long kelp farm columns x" + kelp.longColumns(),
                 kelpStrength
-            );
-        }
-        int geodeStrength = EvidenceHeuristics.strippedGeode(amethystShell, calcite, smoothBasalt, buddingAmethyst, amethystBuds);
-        if (geodeStrength > 0 && geodeRepresentative != null) {
-            result.addStatic(
-                SignalCategory.INTERACTION,
-                ChunkScanner.modelPosition(geodeRepresentative),
-                "stripped amethyst geode shell",
-                geodeStrength
             );
         }
     }
@@ -205,30 +205,40 @@ public final class ChunkScanner {
         }
     }
 
-    private void emitAmethystChanges(ScanResult.Builder result, WorldChunk chunk, Map<Long, String> current, int observerSectionY, long tick) {
-        AmethystSnapshot snapshot = new AmethystSnapshot(Map.copyOf(current), observerSectionY);
-        AmethystSnapshot previous = this.amethystSnapshots.put(chunk, snapshot);
-        if (previous == null || previous.observerSectionY != observerSectionY) {
-            return;
+    private static List<WorldObservation> collectWorldObservations(
+        Map<Long, String> currentAmethyst,
+        List<BlockPosition> cobbledTrailBlocks
+    ) {
+        ArrayList<WorldObservation> observations = new ArrayList<>();
+        ArrayList<Map.Entry<Long, String>> shardPositions = new ArrayList<>();
+        for (Map.Entry<Long, String> entry : currentAmethyst.entrySet()) {
+            if (GrowthTransitions.amethystRank(entry.getValue()) >= 0) shardPositions.add(entry);
         }
-        ArrayList<Long> removed = new ArrayList<Long>();
-        ArrayList<Long> advanced = new ArrayList<Long>();
-        for (Map.Entry<Long, String> entry : previous.stages.entrySet()) {
-            String next = current.get(entry.getKey());
-            if (next == null) {
-                removed.add(entry.getKey());
-            } else if (GrowthTransitions.amethystRank(next) > GrowthTransitions.amethystRank(entry.getValue())) {
-                advanced.add(entry.getKey());
+        shardPositions.sort(Map.Entry.comparingByKey());
+        for (Map.Entry<Long, String> shard : shardPositions) {
+            if (observations.size() == MAX_WORLD_OBSERVATIONS_PER_CHUNK) break;
+            BlockPos position = BlockPos.fromLong(shard.getKey());
+            observations.add(new WorldObservation(
+                modelPosition(position), WorldObservation.Kind.AMETHYST_SHARD, 100, false,
+                GrowthTransitions.amethystRank(shard.getValue())
+            ));
+        }
+
+        List<CobbledDeepslateTrailHeuristics.Trail> trails =
+            CobbledDeepslateTrailHeuristics.detect(cobbledTrailBlocks, 8);
+        for (CobbledDeepslateTrailHeuristics.Trail trail : trails) {
+            for (BlockPosition point : trail.points()) {
+                if (observations.size() == MAX_WORLD_OBSERVATIONS_PER_CHUNK) break;
+                observations.add(new WorldObservation(
+                    point, WorldObservation.Kind.COBBLED_DEEPSLATE_TRAIL, trail.confidence(), false
+                ));
             }
         }
-        if (!removed.isEmpty() && removed.size() <= 4) {
-            BlockPos position = BlockPos.fromLong((long)((Long)removed.getFirst()));
-            result.addLive(SignalCategory.INTERACTION, ChunkScanner.modelPosition(position), "amethyst removed while the same chunk stayed loaded x" + removed.size(), Math.min(150, 65 + removed.size() * 20), tick, 12000);
-        }
-        if (!advanced.isEmpty()) {
-            BlockPos position = BlockPos.fromLong(advanced.getFirst());
-            result.addLive(SignalCategory.NATURAL_GROWTH, ChunkScanner.modelPosition(position), "amethyst stage advanced while loaded x" + advanced.size(), Math.min(90, 30 + advanced.size() * 12), tick, 12000);
-        }
+        observations.sort(java.util.Comparator.comparing((WorldObservation observation) -> observation.kind().ordinal())
+            .thenComparingInt(observation -> observation.position().y())
+            .thenComparingInt(observation -> observation.position().x())
+            .thenComparingInt(observation -> observation.position().z()));
+        return List.copyOf(observations);
     }
 
     private void emitTemporalChanges(ScanResult.Builder result, WorldChunk chunk, long[] hashes, int[] counts, int observerSectionY, long tick) {
@@ -264,6 +274,7 @@ public final class ChunkScanner {
         int functionalCount = 0;
         for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
             String type = ActivityClassifier.blockEntityTypePath(blockEntity);
+            if (ScannerStorageFilter.isStoragePath(type)) continue;
             if (this.classifier.isHighBlockEntityType(type)) {
                 highTypes.add(type);
                 ++highCount;
@@ -286,7 +297,7 @@ public final class ChunkScanner {
     }
 
     private static void emitEntities(ScanResult.Builder result, ClientWorld level, WorldChunk chunk, long tick) {
-        int clusteredAnimals;
+        int animalStrength;
         int villagerStrength;
         int experienceStrength;
         double minX = chunk.getPos().getStartX();
@@ -304,6 +315,7 @@ public final class ChunkScanner {
         BlockPos itemPosition = null;
         BlockPos experiencePosition = null;
         BlockPos villagerPosition = null;
+        BlockPos animalPosition = null;
         ClientPlayerEntity localPlayer = level.getPlayers().stream().filter(ClientPlayerEntity.class::isInstance).map(ClientPlayerEntity.class::cast).findFirst().orElse(null);
         for (Entity entity2 : entities) {
             VillagerEntity villager;
@@ -315,6 +327,9 @@ public final class ChunkScanner {
             String type = ActivityClassifier.entityTypePath(entity2);
             if (PENNED_ANIMALS.contains(type)) {
                 animalTypes.merge(type, 1, Integer::sum);
+                if (animalPosition == null) {
+                    animalPosition = entity2.getBlockPos();
+                }
             }
             if (entity2 instanceof TameableEntity && (tamable = (TameableEntity)entity2).isTamed()) {
                 signals.addTamed(entity2);
@@ -365,8 +380,19 @@ public final class ChunkScanner {
         if ((villagerStrength = EvidenceHeuristics.tradedVillagers(tradedVillagers, tradedVillagerLevels)) > 0) {
             result.addStatic(SignalCategory.INTERACTION, ChunkScanner.modelPosition(villagerPosition), "player-traded villagers x" + tradedVillagers, villagerStrength);
         }
-        if ((clusteredAnimals = animalTypes.values().stream().filter(count -> count >= 4).mapToInt(Integer::intValue).sum()) >= 4 && !entities.isEmpty()) {
-            result.addStatic(SignalCategory.CULTIVATION, ChunkScanner.modelPosition(((Entity)entities.getFirst()).getBlockPos()), "clustered passive animals x" + clusteredAnimals, Math.min(120, 35 + clusteredAnimals * 8));
+        int totalAnimals = 0;
+        int maxSameType = 0;
+        for (int count : animalTypes.values()) {
+            totalAnimals += count;
+            maxSameType = Math.max(maxSameType, count);
+        }
+        if ((animalStrength = EvidenceHeuristics.pennedAnimalCluster(maxSameType, totalAnimals)) > 0) {
+            result.addStatic(
+                SignalCategory.CULTIVATION,
+                ChunkScanner.modelPosition(animalPosition),
+                "dense passive-animal cluster x" + totalAnimals,
+                animalStrength
+            );
         }
     }
 
@@ -398,11 +424,13 @@ public final class ChunkScanner {
         private final ArrayList<BlockPos> cauldrons = new ArrayList<>();
         private final Map<Long, String> currentAmethyst = new HashMap<Long, String>();
         private final KelpColumns kelpColumns = new KelpColumns();
+        private final List<BlockPosition> cobbledTrailBlocks = new ArrayList<>();
         private final BlockPos.Mutable cursor = new BlockPos.Mutable();
         private final ChunkSection[] sections;
         private final int minX;
         private final int minZ;
         private final int observerSectionY;
+        private final boolean collectConcealedLight;
         private final long[] stableHashes;
         private final int[] stableCounts;
         private final TunnelDetector.Volume tunnelVolume;
@@ -414,20 +442,23 @@ public final class ChunkScanner {
         private int strongestLeakedLight;
         private BlockPos lightRepresentative;
         private int generatedDeepStructureMarkers;
-        private int amethystShell;
-        private int calcite;
-        private int smoothBasalt;
-        private int buddingAmethyst;
-        private int amethystBuds;
-        private BlockPos geodeRepresentative;
         private ScanResult completed;
         private List<TunnelSegment> tunnels = List.of();
+        private List<WorldObservation> worldObservations = List.of();
 
-        private ChunkScanJob(ClientWorld level, WorldChunk chunk, long tick, int observerSectionY, boolean collectTunnels) {
+        private ChunkScanJob(
+            ClientWorld level,
+            WorldChunk chunk,
+            long tick,
+            int observerSectionY,
+            boolean collectTunnels,
+            boolean collectConcealedLight
+        ) {
             this.level = level;
             this.chunk = chunk;
             this.tick = tick;
             this.observerSectionY = observerSectionY;
+            this.collectConcealedLight = collectConcealedLight;
             this.sections = chunk.getSectionArray();
             this.minX = chunk.getPos().getStartX();
             this.minZ = chunk.getPos().getStartZ();
@@ -442,7 +473,7 @@ public final class ChunkScanner {
                 return 0;
             }
             int visited = 0;
-            while (this.sectionIndex < this.sections.length && visited < blockBudget) {
+            while (this.sectionIndex < this.sections.length) {
                 ChunkSection section = this.sections[this.sectionIndex];
                 if (section.isEmpty()) {
                     if (this.tunnelVolume != null) {
@@ -455,6 +486,9 @@ public final class ChunkScanner {
                 if (this.blockIndex == 0 && this.tunnelVolume == null && !section.hasAny(ChunkScanner.this.classifier::isDetailedScanCandidate)) {
                     ++this.sectionIndex;
                     continue;
+                }
+                if (visited >= blockBudget) {
+                    break;
                 }
                 int localX = this.blockIndex & 0xF;
                 int localZ = this.blockIndex >>> 4 & 0xF;
@@ -496,6 +530,20 @@ public final class ChunkScanner {
             return this.tunnels;
         }
 
+        public List<WorldObservation> worldObservations() {
+            if (this.completed == null) {
+                throw new IllegalStateException("scan is not complete");
+            }
+            return this.worldObservations;
+        }
+
+        public List<BlockPosition> cobbledTrailCandidates() {
+            if (this.completed == null) {
+                throw new IllegalStateException("scan is not complete");
+            }
+            return List.copyOf(this.cobbledTrailBlocks);
+        }
+
         private void inspect(BlockState state, int localX, int localY, int localZ, int y) {
             int blockLight;
             ActivityClassifier.Signal signal;
@@ -506,11 +554,18 @@ public final class ChunkScanner {
                 return;
             }
             ActivityClassifier.BlockFacts facts = ChunkScanner.this.classifier.facts(state);
+            if (ScannerStorageFilter.isStoragePath(facts.path())) {
+                return;
+            }
             if (this.tunnelVolume != null && ChunkScanner.tunnelPassable(facts.path())) {
                 this.tunnelVolume.setOpen(localX, y, localZ);
             }
             if ((signal = facts.signal()) != null) {
                 ++this.aggregates.computeIfAbsent(signal, ignored -> new Aggregate(this.cursor.toImmutable())).count;
+            }
+            if (ActivityClassifier.isCobbledDeepslateTrailPath(facts.path())
+                && this.cobbledTrailBlocks.size() < 256) {
+                this.cobbledTrailBlocks.add(modelPosition(this.cursor));
             }
             if (facts.crop()) {
                 Grid grid = this.cropLayers.computeIfAbsent(y, ignored -> new Grid());
@@ -542,21 +597,6 @@ public final class ChunkScanner {
             }
             if (facts.amethystStage()) {
                 this.currentAmethyst.put(this.cursor.asLong(), facts.path());
-                if (facts.path().equals("budding_amethyst")) {
-                    ++this.buddingAmethyst;
-                } else {
-                    ++this.amethystBuds;
-                }
-                this.geodeRepresentative = this.cursor.toImmutable();
-            } else if (facts.path().equals("amethyst_block")) {
-                ++this.amethystShell;
-                this.geodeRepresentative = this.cursor.toImmutable();
-            } else if (facts.path().equals("calcite")) {
-                ++this.calcite;
-                this.geodeRepresentative = this.cursor.toImmutable();
-            } else if (facts.path().equals("smooth_basalt")) {
-                ++this.smoothBasalt;
-                this.geodeRepresentative = this.cursor.toImmutable();
             }
             if (facts.temporalStable()) {
                 this.stableHashes[this.sectionIndex] = ChunkScanner.mixHash(this.stableHashes[this.sectionIndex], this.blockIndex, facts.path().hashCode());
@@ -566,7 +606,10 @@ public final class ChunkScanner {
             if (facts.path().equals("reinforced_deepslate") || facts.path().equals("trial_spawner") || facts.path().equals("vault") || facts.path().equals("sculk_catalyst") || facts.path().equals("sculk_sensor") || facts.path().equals("sculk_shrieker")) {
                 ++this.generatedDeepStructureMarkers;
             }
-            if ((localX & 1) == 0 && (localY & 1) == 0 && (localZ & 1) == 0 && facts.opaqueMaskBlock() && (blockLight = this.level.getLightLevel(LightType.BLOCK, (BlockPos)this.cursor)) > 0) {
+            if (this.collectConcealedLight
+                && (localX & 1) == 0 && (localY & 1) == 0 && (localZ & 1) == 0
+                && facts.opaqueMaskBlock()
+                && (blockLight = this.level.getLightLevel(LightType.BLOCK, (BlockPos)this.cursor)) > 0) {
                 ++this.lightLeakCount;
                 if (blockLight > this.strongestLeakedLight) {
                     this.strongestLeakedLight = blockLight;
@@ -583,13 +626,7 @@ public final class ChunkScanner {
                 this.level,
                 ChunkScanner.this.classifier,
                 this.berryLayers,
-                this.kelpColumns,
-                this.amethystShell,
-                this.calcite,
-                this.smoothBasalt,
-                this.buddingAmethyst,
-                this.amethystBuds,
-                this.geodeRepresentative
+                this.kelpColumns
             );
             if (this.importedPlants > 0) {
                 this.builder.addStatic(SignalCategory.CULTIVATION, ChunkScanner.modelPosition(this.importedRepresentative), "plants outside their native biome x" + this.importedPlants, Math.min(110, 30 + this.importedPlants * 5));
@@ -599,14 +636,16 @@ public final class ChunkScanner {
                 int rawStrength = Math.min(200, 80 + this.strongestLeakedLight * 6 + Math.min(40, this.lightLeakCount * 2));
                 this.builder.addStatic(SignalCategory.INFRASTRUCTURE, ChunkScanner.modelPosition(this.lightRepresentative), "block light inside opaque stone mask x" + this.lightLeakCount, rawStrength);
             }
-            ChunkScanner.this.emitAmethystChanges(this.builder, this.chunk, this.currentAmethyst, this.observerSectionY, this.tick);
+            this.worldObservations = ChunkScanner.collectWorldObservations(
+                this.currentAmethyst, this.cobbledTrailBlocks
+            );
             ChunkScanner.this.emitTemporalChanges(this.builder, this.chunk, this.stableHashes, this.stableCounts, this.observerSectionY, this.tick);
             ChunkScanner.this.emitBlockEntities(this.builder, this.chunk);
             ChunkScanner.emitEntities(this.builder, this.level, this.chunk, this.tick);
             if (this.tunnelVolume != null) {
                 this.tunnels = TunnelDetector.detect(this.tunnelVolume, this.minX, this.minZ);
             }
-            this.completed = this.builder.build();
+            this.completed = this.builder.completeSnapshot(this.tick, this.sections.length, this.sections.length).build();
         }
 
     }
@@ -741,10 +780,6 @@ public final class ChunkScanner {
             }
             return total;
         }
-    }
-
-    @Environment(value=EnvType.CLIENT)
-    private record AmethystSnapshot(Map<Long, String> stages, int observerSectionY) {
     }
 
     @Environment(value=EnvType.CLIENT)

@@ -34,7 +34,7 @@ public final class TunnelEspRenderer {
     }
 
     public static void register() {
-        WorldRenderEvents.BEFORE_DEBUG_RENDER.register(TunnelEspRenderer::render);
+        WorldRenderEvents.END_MAIN.register(TunnelEspRenderer::render);
     }
 
     public static void tick() {

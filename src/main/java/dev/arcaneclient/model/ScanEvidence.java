@@ -8,14 +8,19 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
 @Environment(value=EnvType.CLIENT)
-public record ScanEvidence(SignalCategory category, BlockPosition position, String reason, int strength, Kind kind, long observedAtTick, int decayTicks) {
-    static final Comparator<ScanEvidence> ORDER = Comparator.<ScanEvidence>comparingInt(evidence -> evidence.category().ordinal()).thenComparing(ScanEvidence::reason).thenComparingInt(evidence -> evidence.position().x()).thenComparingInt(evidence -> evidence.position().y()).thenComparingInt(evidence -> evidence.position().z()).thenComparingInt(evidence -> evidence.kind().ordinal()).thenComparingInt(ScanEvidence::strength).thenComparingLong(ScanEvidence::observedAtTick).thenComparingInt(ScanEvidence::decayTicks);
+public record ScanEvidence(SignalCategory category, BlockPosition position, String reason, int strength, Kind kind, long observedAtTick, int decayTicks, EvidenceFamily family) {
+    static final Comparator<ScanEvidence> ORDER = Comparator.<ScanEvidence>comparingInt(evidence -> evidence.category().ordinal()).thenComparingInt(evidence -> evidence.family().ordinal()).thenComparing(ScanEvidence::reason).thenComparingInt(evidence -> evidence.position().x()).thenComparingInt(evidence -> evidence.position().y()).thenComparingInt(evidence -> evidence.position().z()).thenComparingInt(evidence -> evidence.kind().ordinal()).thenComparingInt(ScanEvidence::strength).thenComparingLong(ScanEvidence::observedAtTick).thenComparingInt(ScanEvidence::decayTicks);
+
+    public ScanEvidence(SignalCategory category, BlockPosition position, String reason, int strength, Kind kind, long observedAtTick, int decayTicks) {
+        this(category, position, reason, strength, kind, observedAtTick, decayTicks, EvidenceFamily.infer(category, reason));
+    }
 
     public ScanEvidence {
         Objects.requireNonNull(category, "category");
         Objects.requireNonNull(position, "position");
         Objects.requireNonNull(reason, "reason");
         Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(family, "family");
         reason = reason.trim();
         if (reason.isEmpty()) {
             throw new IllegalArgumentException("reason must not be blank");
@@ -32,11 +37,19 @@ public record ScanEvidence(SignalCategory category, BlockPosition position, Stri
     }
 
     public static ScanEvidence staticSignal(SignalCategory category, BlockPosition position, String reason, int strength) {
-        return new ScanEvidence(category, position, reason, strength, Kind.STATIC, 0L, 0);
+        return staticSignal(category, position, reason, strength, EvidenceFamily.infer(category, reason));
+    }
+
+    public static ScanEvidence staticSignal(SignalCategory category, BlockPosition position, String reason, int strength, EvidenceFamily family) {
+        return new ScanEvidence(category, position, reason, strength, Kind.STATIC, 0L, 0, family);
     }
 
     public static ScanEvidence liveSignal(SignalCategory category, BlockPosition position, String reason, int strength, long observedAtTick, int decayTicks) {
-        return new ScanEvidence(category, position, reason, strength, Kind.LIVE, observedAtTick, decayTicks);
+        return liveSignal(category, position, reason, strength, observedAtTick, decayTicks, EvidenceFamily.infer(category, reason));
+    }
+
+    public static ScanEvidence liveSignal(SignalCategory category, BlockPosition position, String reason, int strength, long observedAtTick, int decayTicks, EvidenceFamily family) {
+        return new ScanEvidence(category, position, reason, strength, Kind.LIVE, observedAtTick, decayTicks, family);
     }
 
     public boolean isLive() {
@@ -62,7 +75,7 @@ public record ScanEvidence(SignalCategory category, BlockPosition position, Stri
     }
 
     EvidenceKey key() {
-        return new EvidenceKey(this.category, this.position, this.reason);
+        return new EvidenceKey(this.category, this.family, this.position, this.reason);
     }
 
     ScanEvidence mergeDuplicate(ScanEvidence other) {
@@ -73,7 +86,7 @@ public record ScanEvidence(SignalCategory category, BlockPosition position, Stri
             return this.isLive() ? other : this;
         }
         if (!this.isLive()) {
-            return ScanEvidence.staticSignal(this.category, this.position, this.reason, Math.max(this.strength, other.strength));
+            return ScanEvidence.staticSignal(this.category, this.position, this.reason, Math.max(this.strength, other.strength), this.family);
         }
         if (this.observedAtTick != other.observedAtTick) {
             return this.observedAtTick > other.observedAtTick ? this : other;
@@ -92,6 +105,6 @@ public record ScanEvidence(SignalCategory category, BlockPosition position, Stri
     }
 
     @Environment(value=EnvType.CLIENT)
-    record EvidenceKey(SignalCategory category, BlockPosition position, String reason) {
+    record EvidenceKey(SignalCategory category, EvidenceFamily family, BlockPosition position, String reason) {
     }
 }
