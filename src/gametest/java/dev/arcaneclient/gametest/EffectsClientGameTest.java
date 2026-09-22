@@ -156,6 +156,12 @@ public final class EffectsClientGameTest implements FabricClientGameTest {
         world.getServer().runCommand("damage @a[limit=1] 1000 minecraft:generic");
         context.waitFor(client -> client.player != null && client.player.getOffhandItem().isEmpty()
             && !client.player.isDeadOrDying() && (!custom || Effects.totemAnimationActive()), 100);
+        context.waitFor(client -> {
+            LevelRenderState levelState = field(client.levelRenderer, "levelRenderState");
+            var activation = levelState.playerRenderState.itemActivation;
+            return activation != null && activation.item != null
+                && activation.item.is(Items.TOTEM_OF_UNDYING) && activation.ticks > 0;
+        }, 100);
         context.runOnClient(client -> {
             LevelRenderState levelState = field(client.levelRenderer, "levelRenderState");
             var activation = levelState.playerRenderState.itemActivation;

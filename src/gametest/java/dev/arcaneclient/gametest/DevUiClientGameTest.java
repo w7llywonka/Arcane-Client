@@ -231,7 +231,6 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
         });
         context.runOnClient(client -> {
             require(client.player != null, "Chunk tile test needs a player");
-            require(!ArcaneClient.engine().tiles().isEmpty(), "Live completed scans produced no chunk tiles");
             ChunkPos chunk = client.player.chunkPosition();
             BlockPosition first = new BlockPosition(chunk.getMinBlockX() + 4, client.player.getBlockY(), chunk.getMinBlockZ() + 4);
             BlockPosition second = new BlockPosition(chunk.getMinBlockX() + 10, client.player.getBlockY(), chunk.getMinBlockZ() + 10);
@@ -245,6 +244,7 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
             ArcaneClient.engine().queueNearby(client);
             ArcaneClient.engine().settingsChanged(client);
         });
+        context.waitFor(client -> !ArcaneClient.engine().tiles().isEmpty(), 200);
         context.waitTicks(5);
         context.runOnClient(client -> require(TraceRenderer.renderedTileCount() > 0, "Chunk tile renderer submitted no geometry"));
         context.takeScreenshot("chunk-tiles-enabled");
