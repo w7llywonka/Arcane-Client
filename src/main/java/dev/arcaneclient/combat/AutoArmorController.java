@@ -6,16 +6,16 @@ import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.EquippableComponent;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.equipment.Equippable;
 
 /** Equips one objectively better armor piece per configured action delay. */
 @Environment(EnvType.CLIENT)
@@ -40,26 +40,26 @@ public final class AutoArmorController {
     private AutoArmorController() {
     }
 
-    public static void tick(MinecraftClient client, Settings settings) {
-        ClientPlayerEntity player = client.player;
-        if (!settings.enabled() || player == null || client.world == null) {
+    public static void tick(Minecraft client, Settings settings) {
+        LocalPlayer player = client.player;
+        if (!settings.enabled() || player == null || client.level == null) {
             InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_ARMOR);
             return;
         }
         long tick = InventoryAutomationSupport.tick(player);
-        if (tick < nextActionTick || player.isUsingItem() || player.isGliding()) return;
-        if (settings.requireInventoryScreen() && !(client.currentScreen instanceof InventoryScreen)) return;
-        if (settings.pauseWhileMoving() && player.getVelocity().horizontalLengthSquared() > 1.0e-4) return;
+        if (tick < nextActionTick || player.isUsingItem() || player.isFallFlying()) return;
+        if (settings.requireInventoryScreen() && !(client.gui.screen() instanceof InventoryScreen)) return;
+        if (settings.pauseWhileMoving() && player.getDeltaMovement().horizontalDistanceSqr() > 1.0e-4) return;
         if (!InventoryAutomationSupport.canUsePlayerInventory(client, player)) return;
 
         List<AutoArmorPolicy.Candidate> inventory = new ArrayList<>();
         for (int index = 0; index < 36; index++) {
-            AutoArmorPolicy.Candidate candidate = candidate(player.getInventory().getStack(index), index);
+            AutoArmorPolicy.Candidate candidate = candidate(player.getInventory().getItem(index), index);
             if (candidate != null) inventory.add(candidate);
         }
         List<AutoArmorPolicy.Candidate> equipped = new ArrayList<>();
         for (EquipmentSlot slot : armorSlots()) {
-            AutoArmorPolicy.Candidate candidate = candidate(player.getEquippedStack(slot), -1);
+            AutoArmorPolicy.Candidate candidate = candidate(player.getItemBySlot(slot), -1);
             if (candidate != null) equipped.add(candidate);
         }
 
@@ -95,12 +95,12 @@ public final class AutoArmorController {
 
     private static AutoArmorPolicy.Candidate candidate(ItemStack stack, int inventoryIndex) {
         if (stack.isEmpty()) return null;
-        EquippableComponent equippable = stack.get(DataComponentTypes.EQUIPPABLE);
+        Equippable equippable = stack.get(DataComponents.EQUIPPABLE);
         if (equippable == null || !isArmorSlot(equippable.slot())) return null;
         EquipmentSlot slot = equippable.slot();
-        double armor = CombatItemScoring.attribute(stack, EntityAttributes.ARMOR, 0.0, slot);
-        double toughness = CombatItemScoring.attribute(stack, EntityAttributes.ARMOR_TOUGHNESS, 0.0, slot);
-        double knockback = CombatItemScoring.attribute(stack, EntityAttributes.KNOCKBACK_RESISTANCE, 0.0, slot);
+        double armor = CombatItemScoring.attribute(stack, Attributes.ARMOR, 0.0, slot);
+        double toughness = CombatItemScoring.attribute(stack, Attributes.ARMOR_TOUGHNESS, 0.0, slot);
+        double knockback = CombatItemScoring.attribute(stack, Attributes.KNOCKBACK_RESISTANCE, 0.0, slot);
         int protection = CombatItemScoring.enchantmentLevel(stack, Enchantments.PROTECTION);
         int specialist = CombatItemScoring.enchantmentLevel(stack, Enchantments.BLAST_PROTECTION)
             + CombatItemScoring.enchantmentLevel(stack, Enchantments.FIRE_PROTECTION)
@@ -117,7 +117,7 @@ public final class AutoArmorController {
             specialist,
             CombatItemScoring.durabilityPercent(stack),
             binding,
-            stack.isOf(Items.ELYTRA)
+            stack.is(Items.ELYTRA)
         );
     }
 

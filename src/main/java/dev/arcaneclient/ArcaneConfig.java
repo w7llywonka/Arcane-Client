@@ -23,8 +23,24 @@ import net.fabricmc.loader.api.FabricLoader;
 
 @Environment(value=EnvType.CLIENT)
 public final class ArcaneConfig {
+    public dev.arcaneclient.additions.combat.CombatAdditionsConfig combatAdditions = new dev.arcaneclient.additions.combat.CombatAdditionsConfig();
+    public dev.arcaneclient.additions.utility.UtilityAdditionsConfig utilityAdditions = new dev.arcaneclient.additions.utility.UtilityAdditionsConfig();
+    public dev.arcaneclient.additions.visual.VisualAdditionsConfig visualAdditions = new dev.arcaneclient.additions.visual.VisualAdditionsConfig();
+    public dev.arcaneclient.additions.intel.IntelAdditionsConfig intelAdditions = new dev.arcaneclient.additions.intel.IntelAdditionsConfig();
+    public dev.arcaneclient.additions.social.SocialConfig social = new dev.arcaneclient.additions.social.SocialConfig();
+    public dev.arcaneclient.additions.media.MediaHudConfig mediaHud = new dev.arcaneclient.additions.media.MediaHudConfig();
+    public dev.arcaneclient.additions.preview.PreviewConfig preview = new dev.arcaneclient.additions.preview.PreviewConfig();
+    public dev.arcaneclient.additions.dispenser.DispenserConfig dispenser = new dev.arcaneclient.additions.dispenser.DispenserConfig();
+    public dev.arcaneclient.additions.viewmodel.ViewmodelConfig viewmodel = new dev.arcaneclient.additions.viewmodel.ViewmodelConfig();
+    public dev.arcaneclient.additions.mining.MiningOverlayConfig miningOverlay = new dev.arcaneclient.additions.mining.MiningOverlayConfig();
+    public dev.arcaneclient.additions.presence.PresenceConfig presence = new dev.arcaneclient.additions.presence.PresenceConfig();
+    public dev.arcaneclient.additions.cosmetics.NametagConfig nametagAdditions = new dev.arcaneclient.additions.cosmetics.NametagConfig();
+    public dev.arcaneclient.additions.effects.EffectsConfig effects = new dev.arcaneclient.additions.effects.EffectsConfig();
+    public dev.arcaneclient.additions.susfinder.SusChunkFinderConfig susFinder = new dev.arcaneclient.additions.susfinder.SusChunkFinderConfig();
+    public dev.arcaneclient.additions.nuker.NukerConfig nuker = new dev.arcaneclient.additions.nuker.NukerConfig();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final int CURRENT_CONFIG_VERSION = 14;
+    private static final int CURRENT_CONFIG_VERSION = 15;
+    public int grownBlocksRequired = 16;
     public boolean enabled = true;
     public int welcomeNoticeVersion = 0;
     public boolean overlay = false;
@@ -33,8 +49,14 @@ public final class ArcaneConfig {
     public boolean storageTracers = false;
     public boolean storageChatAlerts = false;
     public boolean blockEntityDebug = false;
+    public boolean blockEntityDebugTracers = false;
     public boolean itemTracers = true;
     public boolean itemEsp = false;
+    public boolean itemEspAll = false;
+    public boolean itemEspUsePresets = true;
+    public java.util.Set<String> itemEspItems = new java.util.LinkedHashSet<>();
+    public int itemEspCustomColor = 0xFF72CFC6;
+    public int itemEspRange = 160;
     public boolean tunnelEsp = false;
     /** Optional detail panel; the base radar is the only HUD enabled by default. */
     public boolean chunkAnalysis = false;
@@ -226,15 +248,30 @@ public final class ArcaneConfig {
     public int projectileEspColor = 0xFFF59E0B;
     public int crystalEspColor = 0xFFC084FC;
     public int holeEspColor = 0xFF34D399;
-    public int uiAccentColor = 0xFF9A8CFF;
-    public int uiPanelColor = 0xFF121317;
-    public int uiTextColor = 0xFFF4F4F5;
+    public int uiAccentColor = 0xFF8CCFD8;
+    public int uiPanelColor = 0xFF161C24;
+    public int uiTextColor = 0xFFF2F5F8;
     public int uiScalePercent = 100;
     /** Higher values mean tighter rows and more modules visible at once. */
     public int uiDensityPercent = 100;
-    public int uiOpacityPercent = 100;
+    public int uiOpacityPercent = 82;
     public int devUiRevision = 0;
-    public int uiCornerRadius = 3;
+    public int uiCornerRadius = 10;
+    public boolean uiBlur = true;
+    public boolean uiVectorRendering = true;
+    /** 0: condensed display font, 1: Sora. Both are bundled under the OFL. */
+    public int uiFont = 0;
+    public int uiThemesX = -1;
+    public int uiThemesY = -1;
+    public boolean uiThemesOpen = false;
+    public boolean uiSingleSettings = true;
+    public boolean uiReducedMotion = false;
+    public boolean uiShowEnabledOnly = false;
+    public boolean uiShowFavoritesOnly = false;
+    public java.util.Set<String> uiFavorites = new java.util.LinkedHashSet<>();
+    public boolean uiLayoutCustomized = false;
+    public java.util.Map<String, PanelLayout> uiPanelLayout = new java.util.LinkedHashMap<>();
+    public record PanelLayout(int x, int y, boolean open, int scroll, int order) {}
     public int uiAnimationPercent = 100;
     public int uiBackgroundDimPercent = 42;
     public int hudScalePercent = 100;
@@ -265,6 +302,9 @@ public final class ArcaneConfig {
                 config.rescanSeconds = 30;
             }
             int loadedConfigVersion = config.configVersion;
+            if (loadedConfigVersion < 15) {
+                config.grownBlocksRequired = dev.arcaneclient.scan.GrowthCountPolicy.fromSensitivity(100 - config.threshold);
+            }
             boolean upgradedFeatureDefaults = loadedConfigVersion < 3;
             boolean upgradedSlowSwingAndInfo = loadedConfigVersion < 4;
             boolean upgradedGrowthScanner = loadedConfigVersion < 5;
@@ -418,12 +458,12 @@ public final class ArcaneConfig {
                 if (config.uiOpacityPercent == 88) config.uiOpacityPercent = 96;
                 if (config.uiCornerRadius == 5) config.uiCornerRadius = 3;
             }
-            if (upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery || upgradedElytraAssist || upgradedExpandedModules || upgradedExactCatalog || upgradedFocusedCatalog || upgradedObservationEsp || upgradedUndergroundEntityDebug || upgradedLegacyBaseFinder || upgradedUiPolish) {
+            if (loadedConfigVersion < 15 || upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery || upgradedElytraAssist || upgradedExpandedModules || upgradedExactCatalog || upgradedFocusedCatalog || upgradedObservationEsp || upgradedUndergroundEntityDebug || upgradedLegacyBaseFinder || upgradedUiPolish) {
                 config.configVersion = CURRENT_CONFIG_VERSION;
             }
 
             config.clamp();
-            if (upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery || upgradedElytraAssist || upgradedExpandedModules || upgradedExactCatalog || upgradedFocusedCatalog || upgradedObservationEsp || upgradedUndergroundEntityDebug || upgradedLegacyBaseFinder || upgradedUiPolish) {
+            if (loadedConfigVersion < 15 || upgradedSpeedDefaults || upgradedFeatureDefaults || upgradedSlowSwingAndInfo || upgradedGrowthScanner || upgradedStorageDiscovery || upgradedElytraAssist || upgradedExpandedModules || upgradedExactCatalog || upgradedFocusedCatalog || upgradedObservationEsp || upgradedUndergroundEntityDebug || upgradedLegacyBaseFinder || upgradedUiPolish) {
                 config.save();
             }
             return config;
@@ -457,11 +497,12 @@ public final class ArcaneConfig {
     }
 
     public int sensitivity() {
-        return 100 - this.threshold;
+        return dev.arcaneclient.scan.GrowthCountPolicy.sensitivity(this.grownBlocksRequired);
     }
 
     public void setSensitivity(int sensitivity) {
         this.threshold = 100 - Math.clamp((long)sensitivity, 0, 100);
+        this.grownBlocksRequired = dev.arcaneclient.scan.GrowthCountPolicy.fromSensitivity(sensitivity);
     }
 
     public boolean itemEspEnabled(ItemEspCategory category) {
@@ -588,12 +629,56 @@ public final class ArcaneConfig {
         return color & ~(0xFF << shift) | clamped << shift | 0xFF000000;
     }
 
+    public void sanitize() {
+        this.clamp();
+    }
+
     private void clamp() {
+        if (itemEspItems == null) itemEspItems = new java.util.LinkedHashSet<>();
+        itemEspItems = itemEspItems.stream()
+            .filter(id -> id != null && id.length() <= 256 && id.matches("[a-z0-9_.-]+:[a-z0-9_/.-]+") && !id.equals("minecraft:air"))
+            .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+        itemEspCustomColor |= 0xFF000000;
+        itemEspRange = Math.clamp(itemEspRange, 16, 256);
+        if (combatAdditions == null) combatAdditions = new dev.arcaneclient.additions.combat.CombatAdditionsConfig();
+        if (utilityAdditions == null) utilityAdditions = new dev.arcaneclient.additions.utility.UtilityAdditionsConfig();
+        if (visualAdditions == null) visualAdditions = new dev.arcaneclient.additions.visual.VisualAdditionsConfig();
+        if (intelAdditions == null) intelAdditions = new dev.arcaneclient.additions.intel.IntelAdditionsConfig();
+        if (social == null) social = new dev.arcaneclient.additions.social.SocialConfig();
+        if (mediaHud == null) mediaHud = new dev.arcaneclient.additions.media.MediaHudConfig();
+        if (preview == null) preview = new dev.arcaneclient.additions.preview.PreviewConfig();
+        if (dispenser == null) dispenser = new dev.arcaneclient.additions.dispenser.DispenserConfig();
+        if (viewmodel == null) viewmodel = new dev.arcaneclient.additions.viewmodel.ViewmodelConfig();
+        if (miningOverlay == null) miningOverlay = new dev.arcaneclient.additions.mining.MiningOverlayConfig();
+        if (presence == null) presence = new dev.arcaneclient.additions.presence.PresenceConfig();
+        if (nametagAdditions == null) nametagAdditions = new dev.arcaneclient.additions.cosmetics.NametagConfig();
+        if (effects == null) effects = new dev.arcaneclient.additions.effects.EffectsConfig();
+        if (susFinder == null) susFinder = new dev.arcaneclient.additions.susfinder.SusChunkFinderConfig();
+        if (nuker == null) nuker = new dev.arcaneclient.additions.nuker.NukerConfig();
+        combatAdditions.sanitize();
+        utilityAdditions.sanitize();
+        visualAdditions.sanitize();
+        intelAdditions.sanitize();
+        social.sanitize();
+        mediaHud.sanitize();
+        preview.sanitize();
+        dispenser.sanitize();
+        viewmodel.sanitize();
+        miningOverlay.sanitize();
+        presence.sanitize();
+        nametagAdditions.sanitize();
+        effects.sanitize();
+        susFinder.sanitize();
+        nuker.sanitize();
         this.threshold = Math.clamp((long)this.threshold, 0, 100);
+        this.grownBlocksRequired = Math.clamp(this.grownBlocksRequired, 1, 256);
         this.scanRadius = Math.clamp((long)this.scanRadius, 2, 24);
         this.chunksPerTick = Math.clamp((long)this.chunksPerTick, 1, 16);
         this.rescanSeconds = Math.clamp((long)this.rescanSeconds, 10, 300);
-        this.uiTheme = Math.clamp(this.uiTheme, 0, 2);
+        this.uiTheme = Math.clamp(this.uiTheme, 0, dev.arcaneclient.screen.ClickGuiTheme.count() - 1);
+        this.uiFont = Math.clamp(this.uiFont, 0, 1);
+        this.uiThemesX = Math.clamp(this.uiThemesX, -1, 16384);
+        this.uiThemesY = Math.clamp(this.uiThemesY, -1, 16384);
         this.performanceProfile = Math.clamp(this.performanceProfile, 0, 2);
         this.configVersion = CURRENT_CONFIG_VERSION;
         this.freecamSpeed = Math.clamp(this.freecamSpeed, FreecamSpeed.MIN, FreecamSpeed.MAX);
@@ -643,6 +728,24 @@ public final class ArcaneConfig {
         this.uiCornerRadius = Math.clamp(this.uiCornerRadius, 0, 12);
         this.uiAnimationPercent = Math.clamp(this.uiAnimationPercent, 0, 150);
         this.uiBackgroundDimPercent = Math.clamp(this.uiBackgroundDimPercent, 0, 80);
+        java.util.LinkedHashSet<String> favorites = new java.util.LinkedHashSet<>();
+        if (this.uiFavorites != null) {
+            for (String name : this.uiFavorites) {
+                if (name == null) continue;
+                String clean = name.strip();
+                if (clean.isEmpty() || clean.length() > 96 || clean.chars().anyMatch(Character::isISOControl)) continue;
+                favorites.add(clean);
+                if (favorites.size() >= 128) break;
+            }
+        }
+        this.uiFavorites = favorites;
+        java.util.LinkedHashMap<String, PanelLayout> layout = new java.util.LinkedHashMap<>();
+        if (this.uiPanelLayout != null) {
+            this.uiPanelLayout.forEach((name, panel) -> {
+                if (name != null && !name.isBlank() && panel != null) layout.put(name, panel);
+            });
+        }
+        this.uiPanelLayout = layout;
         this.hudScalePercent = Math.clamp(this.hudScalePercent, 70, 140);
         this.hudAnchor = Math.clamp(this.hudAnchor, 0, 3);
         this.playerEspColor |= 0xFF000000;

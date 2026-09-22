@@ -6,15 +6,15 @@ import dev.arcaneclient.inventory.InventoryActionScheduler;
 import dev.arcaneclient.inventory.InventoryAutomationSupport;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 @Environment(value=EnvType.CLIENT)
 public final class AutoTotemController {
@@ -24,31 +24,31 @@ public final class AutoTotemController {
     private AutoTotemController() {
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         if (!ArcaneClient.config().autoTotem) {
             acknowledgementTicks = 0;
             InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
             return;
         }
-        ClientPlayerEntity player = client.player;
-        if (player == null || client.interactionManager == null || player.isSpectator()) {
+        LocalPlayer player = client.player;
+        if (player == null || client.gameMode == null || player.isSpectator()) {
             acknowledgementTicks = 0;
             InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
             return;
         }
-        if (player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) {
+        if (player.getOffhandItem().is(Items.TOTEM_OF_UNDYING)) {
             acknowledgementTicks = 0;
             InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
             return;
         }
-        if (client.currentScreen instanceof HandledScreen && !(client.currentScreen instanceof InventoryScreen) && !(client.currentScreen instanceof CreativeInventoryScreen)) {
+        if (client.gui.screen() instanceof AbstractContainerScreen && !(client.gui.screen() instanceof InventoryScreen) && !(client.gui.screen() instanceof CreativeModeInventoryScreen)) {
             return;
         }
         if (acknowledgementTicks > 0) {
             --acknowledgementTicks;
             return;
         }
-        if (player.currentScreenHandler != player.playerScreenHandler || !player.playerScreenHandler.getCursorStack().isEmpty()) {
+        if (player.containerMenu != player.inventoryMenu || !player.inventoryMenu.getCarried().isEmpty()) {
             return;
         }
         int inventoryIndex = AutoTotemController.findTotem(player);
@@ -64,7 +64,7 @@ public final class AutoTotemController {
         )) {
             return;
         }
-        client.interactionManager.clickSlot(player.playerScreenHandler.syncId, AutoTotemSlots.inventoryMenuSlot(inventoryIndex), 40, SlotActionType.SWAP, (PlayerEntity)player);
+        client.gameMode.handleContainerInput(player.inventoryMenu.containerId, AutoTotemSlots.inventoryMenuSlot(inventoryIndex), 40, ContainerInput.SWAP, (Player)player);
         acknowledgementTicks = ACK_TIMEOUT_TICKS;
     }
 
@@ -73,10 +73,10 @@ public final class AutoTotemController {
         InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_TOTEM);
     }
 
-    private static int findTotem(ClientPlayerEntity player) {
+    private static int findTotem(LocalPlayer player) {
         for (int index = 0; index < 36; ++index) {
-            ItemStack stack = player.getInventory().getStack(index);
-            if (!stack.isOf(Items.TOTEM_OF_UNDYING)) continue;
+            ItemStack stack = player.getInventory().getItem(index);
+            if (!stack.is(Items.TOTEM_OF_UNDYING)) continue;
             return index;
         }
         return -1;

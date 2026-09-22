@@ -6,16 +6,16 @@ import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.enchantment.Enchantments;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.item.AxeItem;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantments;
 
 /** Selects the strongest eligible hotbar weapon for a concrete target. */
 @Environment(EnvType.CLIENT)
@@ -38,23 +38,23 @@ public final class SmartWeaponController {
     private SmartWeaponController() {
     }
 
-    public static boolean prepareForTarget(MinecraftClient client, Entity target, Settings settings) {
-        ClientPlayerEntity player = client.player;
-        if (!settings.enabled() || player == null || target == null || client.currentScreen != null) return false;
+    public static boolean prepareForTarget(Minecraft client, Entity target, Settings settings) {
+        LocalPlayer player = client.player;
+        if (!settings.enabled() || player == null || target == null || client.gui.screen() != null) return false;
         int currentSlot = player.getInventory().getSelectedSlot();
         List<SmartWeaponPolicy.Candidate> candidates = new ArrayList<>();
         for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
-            if (stack.isEmpty() || !stack.contains(DataComponentTypes.WEAPON)) continue;
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.isEmpty() || !stack.has(DataComponents.WEAPON)) continue;
             double attackDamage = CombatItemScoring.attribute(
                 stack,
-                EntityAttributes.ATTACK_DAMAGE,
+                Attributes.ATTACK_DAMAGE,
                 1.0,
                 EquipmentSlot.MAINHAND
             );
             double attackSpeed = CombatItemScoring.attribute(
                 stack,
-                EntityAttributes.ATTACK_SPEED,
+                Attributes.ATTACK_SPEED,
                 4.0,
                 EquipmentSlot.MAINHAND
             );
@@ -69,13 +69,13 @@ public final class SmartWeaponController {
                 attackSpeed,
                 enchantmentDamage,
                 armorPenetration,
-                stack.getItem() instanceof AxeItem,
+                stack.is(ItemTags.AXES),
                 CombatItemScoring.durabilityPercent(stack),
                 true
             ));
         }
 
-        double armor = target instanceof LivingEntity living ? living.getArmor() : 0.0;
+        double armor = target instanceof LivingEntity living ? living.getArmorValue() : 0.0;
         boolean blocking = target instanceof LivingEntity living && living.isBlocking();
         int bestSlot = SmartWeaponPolicy.choose(
             currentSlot,
@@ -96,8 +96,8 @@ public final class SmartWeaponController {
         return true;
     }
 
-    public static void restore(MinecraftClient client) {
-        ClientPlayerEntity player = client.player;
+    public static void restore(Minecraft client) {
+        LocalPlayer player = client.player;
         long tick = InventoryAutomationSupport.tick(player);
         if (player != null && restoreSlot >= 0 && restoreSlot < 9 && selectedSlot >= 0
             && player.getInventory().getSelectedSlot() == selectedSlot

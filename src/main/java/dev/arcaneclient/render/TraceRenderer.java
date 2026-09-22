@@ -1,7 +1,7 @@
 package dev.arcaneclient.render;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.TraceEngine;
@@ -13,27 +13,17 @@ import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderSetup;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Vec3d;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.world.phys.Vec3;
 
 @Environment(value=EnvType.CLIENT)
 public final class TraceRenderer {
     private static volatile int renderedTileCount;
+    private static volatile int renderedAmethystCount;
     private static final GroundTileRenderer GROUND_TILES = new GroundTileRenderer();
-    private static final RenderPipeline THROUGH_WALL_TILE_LINES = RenderPipelines.register((RenderPipeline)RenderPipeline.builder((RenderPipeline.Snippet[])new RenderPipeline.Snippet[]{RenderPipelines.RENDERTYPE_LINES_SNIPPET}).withLocation(Identifier.of((String)"arcaneclient", (String)"pipeline/chunk_tile_outlines_through_walls")).withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).build());
-    private static final RenderLayer THROUGH_WALL_TILE_LINE_TYPE = RenderLayer.of((String)"arcaneclient_chunk_tile_outlines_through_walls", (RenderSetup)RenderSetup.builder((RenderPipeline)THROUGH_WALL_TILE_LINES).build());
-    private static final RenderPipeline THROUGH_WALL_TILES = RenderPipelines.register((RenderPipeline)RenderPipeline.builder((RenderPipeline.Snippet[])new RenderPipeline.Snippet[]{RenderPipelines.POSITION_COLOR_SNIPPET}).withLocation(Identifier.of((String)"arcaneclient", (String)"pipeline/chunk_tiles_through_walls")).withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).withCull(false).build());
-    private static final RenderLayer THROUGH_WALL_TILE_TYPE = RenderLayer.of((String)"arcaneclient_chunk_tiles_through_walls", (RenderSetup)RenderSetup.builder((RenderPipeline)THROUGH_WALL_TILES).translucent().build());
-    private static final RenderPipeline THROUGH_WALL_POINTS = RenderPipelines.register((RenderPipeline)RenderPipeline.builder((RenderPipeline.Snippet[])new RenderPipeline.Snippet[]{RenderPipelines.POSITION_COLOR_SNIPPET}).withLocation(Identifier.of((String)"arcaneclient", (String)"pipeline/evidence_points_through_walls")).withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).withCull(false).build());
-    private static final RenderLayer THROUGH_WALL_POINT_TYPE = RenderLayer.of((String)"arcaneclient_evidence_points_through_walls", (RenderSetup)RenderSetup.builder((RenderPipeline)THROUGH_WALL_POINTS).translucent().build());
 
     private TraceRenderer() {
     }
@@ -42,42 +32,42 @@ public final class TraceRenderer {
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> GROUND_TILES.clear());
         // The debug-render phase is skipped when Minecraft's HUD is hidden (F1).
         // END_MAIN still runs and flushes custom buffers before the hand/GUI pass.
-        WorldRenderEvents.END_MAIN.register(TraceRenderer::render);
+        LevelRenderEvents.COLLECT_SUBMITS.register(TraceRenderer::render);
     }
 
-    private static void render(WorldRenderContext context) {
+    private static void render(LevelRenderContext context) {
         renderedTileCount = 0;
+        renderedAmethystCount = 0;
         ArcaneConfig config = ArcaneClient.config();
         boolean regularLayers = EvidencePointRenderPolicy.anyLayerEnabled(config.enabled, config.overlay, config.evidencePoints);
         boolean observationLayers = config.amethystEsp || config.accessTrailEsp;
-        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(MinecraftClient.getInstance())
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(Minecraft.getInstance())
             || (!regularLayers && !observationLayers)) {
             return;
         }
         List<TraceEngine.ChunkMarker> markers = ArcaneClient.engine().markers();
         List<TraceEngine.ChunkTile> tileSnapshot = ArcaneClient.engine().tiles();
-        MatrixStack matrices = context.matrices();
+        PoseStack matrices = context.poseStack();
         if (matrices == null) {
             return;
         }
-        Vec3d camera = context.worldState().cameraRenderState.pos;
-        MatrixStack.Entry pose = matrices.peek();
+        Vec3 camera = Render263.camera(context);
         if (config.enabled && config.overlay && !tileSnapshot.isEmpty()) {
-            renderedTileCount = GROUND_TILES.render(MinecraftClient.getInstance().world, tileSnapshot, pose, camera,
-                context.consumers(), THROUGH_WALL_TILE_TYPE, THROUGH_WALL_TILE_LINE_TYPE);
+            renderedTileCount = GROUND_TILES.render(Minecraft.getInstance().level, tileSnapshot, context, true);
         } else {
             GROUND_TILES.clear();
         }
         if (config.enabled && config.evidencePoints && !markers.isEmpty()) {
             ArrayList<ChunkIntel> intelligence = new ArrayList<ChunkIntel>(markers.size());
             for (TraceEngine.ChunkMarker marker : markers) intelligence.add(marker.intel());
-            renderEvidencePoints(context.consumers().getBuffer(THROUGH_WALL_POINT_TYPE), pose, camera, EvidencePointRenderPolicy.select(intelligence));
+            List<EvidencePoint> selected = EvidencePointRenderPolicy.select(intelligence);
+            context.submitNodeCollector().submitCustomGeometry(matrices, RenderTypes.debugFilledBox(),
+                (submittedPose, vertices) -> renderEvidencePoints(vertices, submittedPose, camera, selected));
         }
         if (observationLayers) {
-            renderWorldObservations(
-                context.consumers().getBuffer(THROUGH_WALL_POINT_TYPE), pose, camera,
-                ArcaneClient.engine().worldObservations(), config
-            );
+            List<WorldObservation> observations = ArcaneClient.engine().worldObservations();
+            context.submitNodeCollector().submitCustomGeometry(matrices, RenderTypes.debugFilledBox(),
+                (submittedPose, vertices) -> renderWorldObservations(vertices, submittedPose, camera, observations, config));
         }
     }
 
@@ -85,14 +75,16 @@ public final class TraceRenderer {
         return renderedTileCount;
     }
 
+    public static int renderedAmethystCount() { return renderedAmethystCount; }
+
     public static double renderedTileSurfaceY(int chunkX, int chunkZ, int localX, int localZ) {
         return GROUND_TILES.surfaceY(chunkX, chunkZ, localX, localZ);
     }
 
     private static void renderEvidencePoints(
         VertexConsumer vertices,
-        MatrixStack.Entry pose,
-        Vec3d camera,
+        PoseStack.Pose pose,
+        Vec3 camera,
         List<EvidencePoint> evidence
     ) {
         for (EvidencePoint point : evidence) {
@@ -103,27 +95,27 @@ public final class TraceRenderer {
             if (point.observations() >= 3) radius += 0.04F;
             int color = EvidencePointRenderPolicy.color(point.family());
 
-            vertices.vertex(pose, x - radius, y - radius, z).color(color);
-            vertices.vertex(pose, x - radius, y + radius, z).color(color);
-            vertices.vertex(pose, x + radius, y + radius, z).color(color);
-            vertices.vertex(pose, x + radius, y - radius, z).color(color);
+            vertices.addVertex(pose, x - radius, y - radius, z).setColor(color);
+            vertices.addVertex(pose, x - radius, y + radius, z).setColor(color);
+            vertices.addVertex(pose, x + radius, y + radius, z).setColor(color);
+            vertices.addVertex(pose, x + radius, y - radius, z).setColor(color);
 
-            vertices.vertex(pose, x - radius, y, z - radius).color(color);
-            vertices.vertex(pose, x - radius, y, z + radius).color(color);
-            vertices.vertex(pose, x + radius, y, z + radius).color(color);
-            vertices.vertex(pose, x + radius, y, z - radius).color(color);
+            vertices.addVertex(pose, x - radius, y, z - radius).setColor(color);
+            vertices.addVertex(pose, x - radius, y, z + radius).setColor(color);
+            vertices.addVertex(pose, x + radius, y, z + radius).setColor(color);
+            vertices.addVertex(pose, x + radius, y, z - radius).setColor(color);
 
-            vertices.vertex(pose, x, y - radius, z - radius).color(color);
-            vertices.vertex(pose, x, y + radius, z - radius).color(color);
-            vertices.vertex(pose, x, y + radius, z + radius).color(color);
-            vertices.vertex(pose, x, y - radius, z + radius).color(color);
+            vertices.addVertex(pose, x, y - radius, z - radius).setColor(color);
+            vertices.addVertex(pose, x, y + radius, z - radius).setColor(color);
+            vertices.addVertex(pose, x, y + radius, z + radius).setColor(color);
+            vertices.addVertex(pose, x, y - radius, z + radius).setColor(color);
         }
     }
 
     private static void renderWorldObservations(
         VertexConsumer vertices,
-        MatrixStack.Entry pose,
-        Vec3d camera,
+        PoseStack.Pose pose,
+        Vec3 camera,
         List<WorldObservation> observations,
         ArcaneConfig config
     ) {
@@ -155,6 +147,7 @@ public final class TraceRenderer {
                 };
                 int alpha = observation.live() ? 0xE8 : 0xB8;
                 renderDiamond(vertices, pose, x, y, z, radius, height, withAlpha(config.amethystEspColor, alpha));
+                renderedAmethystCount++;
             } else {
                 float radius = 0.31F;
                 renderCross(vertices, pose, x, y, z, radius, withAlpha(config.accessTrailEspColor, 0xA8));
@@ -164,7 +157,7 @@ public final class TraceRenderer {
 
     private static void renderDiamond(
         VertexConsumer vertices,
-        MatrixStack.Entry pose,
+        PoseStack.Pose pose,
         float x,
         float y,
         float z,
@@ -172,39 +165,39 @@ public final class TraceRenderer {
         float height,
         int color
     ) {
-        vertices.vertex(pose, x, y - height, z).color(color);
-        vertices.vertex(pose, x - radius, y, z).color(color);
-        vertices.vertex(pose, x, y + height, z).color(color);
-        vertices.vertex(pose, x + radius, y, z).color(color);
+        vertices.addVertex(pose, x, y - height, z).setColor(color);
+        vertices.addVertex(pose, x - radius, y, z).setColor(color);
+        vertices.addVertex(pose, x, y + height, z).setColor(color);
+        vertices.addVertex(pose, x + radius, y, z).setColor(color);
 
-        vertices.vertex(pose, x, y - height, z).color(color);
-        vertices.vertex(pose, x, y, z - radius).color(color);
-        vertices.vertex(pose, x, y + height, z).color(color);
-        vertices.vertex(pose, x, y, z + radius).color(color);
+        vertices.addVertex(pose, x, y - height, z).setColor(color);
+        vertices.addVertex(pose, x, y, z - radius).setColor(color);
+        vertices.addVertex(pose, x, y + height, z).setColor(color);
+        vertices.addVertex(pose, x, y, z + radius).setColor(color);
 
-        vertices.vertex(pose, x, y, z - radius).color(color);
-        vertices.vertex(pose, x - radius, y, z).color(color);
-        vertices.vertex(pose, x, y, z + radius).color(color);
-        vertices.vertex(pose, x + radius, y, z).color(color);
+        vertices.addVertex(pose, x, y, z - radius).setColor(color);
+        vertices.addVertex(pose, x - radius, y, z).setColor(color);
+        vertices.addVertex(pose, x, y, z + radius).setColor(color);
+        vertices.addVertex(pose, x + radius, y, z).setColor(color);
     }
 
     private static void renderCross(
         VertexConsumer vertices,
-        MatrixStack.Entry pose,
+        PoseStack.Pose pose,
         float x,
         float y,
         float z,
         float radius,
         int color
     ) {
-        vertices.vertex(pose, x - radius, y - radius, z).color(color);
-        vertices.vertex(pose, x - radius, y + radius, z).color(color);
-        vertices.vertex(pose, x + radius, y + radius, z).color(color);
-        vertices.vertex(pose, x + radius, y - radius, z).color(color);
-        vertices.vertex(pose, x, y - radius, z - radius).color(color);
-        vertices.vertex(pose, x, y + radius, z - radius).color(color);
-        vertices.vertex(pose, x, y + radius, z + radius).color(color);
-        vertices.vertex(pose, x, y - radius, z + radius).color(color);
+        vertices.addVertex(pose, x - radius, y - radius, z).setColor(color);
+        vertices.addVertex(pose, x - radius, y + radius, z).setColor(color);
+        vertices.addVertex(pose, x + radius, y + radius, z).setColor(color);
+        vertices.addVertex(pose, x + radius, y - radius, z).setColor(color);
+        vertices.addVertex(pose, x, y - radius, z - radius).setColor(color);
+        vertices.addVertex(pose, x, y + radius, z - radius).setColor(color);
+        vertices.addVertex(pose, x, y + radius, z + radius).setColor(color);
+        vertices.addVertex(pose, x, y - radius, z + radius).setColor(color);
     }
 
     private static int withAlpha(int color, int alpha) {

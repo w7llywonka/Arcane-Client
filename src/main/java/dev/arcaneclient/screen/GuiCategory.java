@@ -40,13 +40,13 @@ public final class GuiCategory {
     }
 
     public void filter(String query) {
-        if (query.isEmpty()) {
-            this.visible = this.modules;
-            return;
-        }
+        filter(query, module -> true);
+    }
+
+    public void filter(String query, java.util.function.Predicate<GuiModule> include) {
         List<GuiModule> matched = new ArrayList<>();
         for (GuiModule module : this.modules) {
-            if (module.matches(query)) {
+            if (module.matches(query) && include.test(module)) {
                 matched.add(module);
             }
         }

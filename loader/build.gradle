@@ -4,13 +4,18 @@ plugins {
 }
 
 group = 'dev.arcane'
-version = '1.2.3+mc1.21.11'
+version = '1.2.7+mc26.3'
 
 def embeddedClientFile = layout.projectDirectory.file(
-    '../build/libs/arcane-client-2.9.2+mc1.21.11.jar'
+    '../build/libs/arcane-client-2.9.4+mc26.3.jar'
 )
 def embeddedClientPath = "META-INF/jars/${embeddedClientFile.asFile.name}"
 def loaderVersion = version.toString()
+
+tasks.register('buildEmbeddedClient', GradleBuild) {
+    dir = file('..')
+    tasks = ['build']
+}
 
 repositories {
     maven {
@@ -22,7 +27,7 @@ repositories {
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
@@ -31,8 +36,8 @@ application {
 }
 
 dependencies {
-    compileOnly 'net.fabricmc:fabric-loader:0.19.3'
-    testImplementation 'net.fabricmc:fabric-loader:0.19.3'
+    compileOnly 'net.fabricmc:fabric-loader:0.19.5'
+    testImplementation 'net.fabricmc:fabric-loader:0.19.5'
     testImplementation platform('org.junit:junit-bom:5.12.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -51,6 +56,7 @@ tasks.named('test') {
 }
 
 tasks.named('jar') {
+    dependsOn tasks.named('buildEmbeddedClient')
     archiveFileName = 'ARCLoader.jar'
     inputs.file(embeddedClientFile)
     from(embeddedClientFile) {
@@ -84,7 +90,7 @@ tasks.register('verifyDistributionJar') {
             assert metadata.version == loaderVersion: 'Unexpected outer Fabric mod version'
             assert metadata.jars*.file == [embeddedClientPath]:
                 'fabric.mod.json does not declare the embedded Arcane Client JAR'
-            assert metadata.depends.arcaneclient == '>=2.9.2':
+            assert metadata.depends.arcaneclient == '>=2.9.4':
                 'The loader must require the bundled Arcane Client version or newer'
 
             def nestedEntry = outer.getEntry(embeddedClientPath)
@@ -109,7 +115,7 @@ tasks.register('verifyDistributionJar') {
             assert nestedMetadataText != null: 'Embedded client is not a Fabric mod'
             def nestedMetadata = new groovy.json.JsonSlurper().parseText(nestedMetadataText)
             assert nestedMetadata.id == 'arcaneclient': 'Unexpected embedded Fabric mod id'
-            assert nestedMetadata.version == '2.9.2+mc1.21.11': 'Unexpected embedded client version'
+            assert nestedMetadata.version == '2.9.4+mc26.3': 'Unexpected embedded client version'
             assert hasClientEntrypoint: 'Embedded client entrypoint class is missing'
             assert hasClientMixins: 'Embedded client mixin configuration is missing'
 

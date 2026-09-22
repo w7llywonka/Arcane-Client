@@ -1,13 +1,13 @@
 package dev.arcaneclient.mixin;
 
 import dev.arcaneclient.utility.QualityOfLifeController;
-import net.minecraft.client.network.ClientPlayerInteractionManager;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
+import net.minecraft.client.multiplayer.MultiPlayerGameMode;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -15,33 +15,33 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /** Stops durability-consuming interaction packets before a protected item can break. */
-@Mixin(ClientPlayerInteractionManager.class)
+@Mixin(MultiPlayerGameMode.class)
 public abstract class ClientPlayerInteractionManagerMixin {
-    @Inject(method = "attackBlock", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "startDestroyBlock", at = @At("HEAD"), cancellable = true)
     private void arcaneclient$guardInitialBlockAttack(BlockPos pos, Direction direction, CallbackInfoReturnable<Boolean> cir) {
         if (QualityOfLifeController.shouldProtect(playerMainHand())) cir.setReturnValue(false);
     }
 
-    @Inject(method = "updateBlockBreakingProgress", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "continueDestroyBlock", at = @At("HEAD"), cancellable = true)
     private void arcaneclient$guardBlockProgress(BlockPos pos, Direction direction, CallbackInfoReturnable<Boolean> cir) {
         if (QualityOfLifeController.shouldProtect(playerMainHand())) cir.setReturnValue(false);
     }
 
-    @Inject(method = "attackEntity", at = @At("HEAD"), cancellable = true)
-    private void arcaneclient$guardEntityAttack(PlayerEntity player, Entity target, CallbackInfo ci) {
-        if (QualityOfLifeController.shouldProtect(player.getMainHandStack())) ci.cancel();
+    @Inject(method = "attack", at = @At("HEAD"), cancellable = true)
+    private void arcaneclient$guardEntityAttack(Player player, Entity target, CallbackInfo ci) {
+        if (QualityOfLifeController.shouldProtect(player.getMainHandItem())) ci.cancel();
     }
 
-    @Inject(method = "interactItem", at = @At("HEAD"), cancellable = true)
-    private void arcaneclient$guardItemUse(PlayerEntity player, Hand hand, CallbackInfoReturnable<ActionResult> cir) {
-        if (QualityOfLifeController.shouldProtect(player.getStackInHand(hand))) {
+    @Inject(method = "useItem", at = @At("HEAD"), cancellable = true)
+    private void arcaneclient$guardItemUse(Player player, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
+        if (QualityOfLifeController.shouldProtect(player.getItemInHand(hand))) {
             // PASS lets vanilla try the other hand without sending an unsafe packet for this one.
-            cir.setReturnValue(ActionResult.PASS);
+            cir.setReturnValue(InteractionResult.PASS);
         }
     }
 
-    private static net.minecraft.item.ItemStack playerMainHand() {
-        net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
-        return client.player == null ? net.minecraft.item.ItemStack.EMPTY : client.player.getMainHandStack();
+    private static net.minecraft.world.item.ItemStack playerMainHand() {
+        net.minecraft.client.Minecraft client = net.minecraft.client.Minecraft.getInstance();
+        return client.player == null ? net.minecraft.world.item.ItemStack.EMPTY : client.player.getMainHandItem();
     }
 }

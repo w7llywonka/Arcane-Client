@@ -2,14 +2,14 @@ package dev.arcaneclient.inventory;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
-import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ContainerInput;
 
 /** Shared mapped-slot and packet helpers for player inventory automation. */
 @Environment(EnvType.CLIENT)
@@ -17,19 +17,19 @@ public final class InventoryAutomationSupport {
     private InventoryAutomationSupport() {
     }
 
-    public static long tick(ClientPlayerEntity player) {
-        return player == null ? 0L : player.age;
+    public static long tick(LocalPlayer player) {
+        return player == null ? 0L : player.tickCount;
     }
 
-    public static boolean canUsePlayerInventory(MinecraftClient client, ClientPlayerEntity player) {
-        if (client.interactionManager == null || player == null || player.isSpectator()) return false;
-        if (client.currentScreen instanceof HandledScreen
-            && !(client.currentScreen instanceof InventoryScreen)
-            && !(client.currentScreen instanceof CreativeInventoryScreen)) {
+    public static boolean canUsePlayerInventory(Minecraft client, LocalPlayer player) {
+        if (client.gameMode == null || player == null || player.isSpectator()) return false;
+        if (client.gui.screen() instanceof AbstractContainerScreen
+            && !(client.gui.screen() instanceof InventoryScreen)
+            && !(client.gui.screen() instanceof CreativeModeInventoryScreen)) {
             return false;
         }
-        return player.currentScreenHandler == player.playerScreenHandler
-            && player.playerScreenHandler.getCursorStack().isEmpty();
+        return player.containerMenu == player.inventoryMenu
+            && player.inventoryMenu.getCarried().isEmpty();
     }
 
     public static int playerMenuSlot(int inventoryIndex) {
@@ -39,7 +39,7 @@ public final class InventoryAutomationSupport {
         return inventoryIndex < 9 ? inventoryIndex + 36 : inventoryIndex;
     }
 
-    public static int armorMenuSlot(net.minecraft.entity.EquipmentSlot slot) {
+    public static int armorMenuSlot(net.minecraft.world.entity.EquipmentSlot slot) {
         return switch (slot) {
             case HEAD -> 5;
             case CHEST -> 6;
@@ -50,8 +50,8 @@ public final class InventoryAutomationSupport {
     }
 
     public static boolean selectHotbar(
-        MinecraftClient client,
-        ClientPlayerEntity player,
+        Minecraft client,
+        LocalPlayer player,
         InventoryActionScheduler.Owner owner,
         int slot,
         int holdTicks
@@ -67,18 +67,18 @@ public final class InventoryAutomationSupport {
 
         if (player.getInventory().getSelectedSlot() != slot) {
             player.getInventory().setSelectedSlot(slot);
-            if (client.getNetworkHandler() != null) {
-                client.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(slot));
+            if (client.getConnection() != null) {
+                client.getConnection().send(new ServerboundSetCarriedItemPacket(slot));
             }
         }
         return true;
     }
 
     /** Swaps two player-menu stacks without leaving an item on the cursor. */
-    public static void swapMenuSlots(MinecraftClient client, ClientPlayerEntity player, int first, int second) {
-        int syncId = player.playerScreenHandler.syncId;
-        client.interactionManager.clickSlot(syncId, first, 0, SlotActionType.PICKUP, (PlayerEntity) player);
-        client.interactionManager.clickSlot(syncId, second, 0, SlotActionType.PICKUP, (PlayerEntity) player);
-        client.interactionManager.clickSlot(syncId, first, 0, SlotActionType.PICKUP, (PlayerEntity) player);
+    public static void swapMenuSlots(Minecraft client, LocalPlayer player, int first, int second) {
+        int syncId = player.inventoryMenu.containerId;
+        client.gameMode.handleContainerInput(syncId, first, 0, ContainerInput.PICKUP, (Player) player);
+        client.gameMode.handleContainerInput(syncId, second, 0, ContainerInput.PICKUP, (Player) player);
+        client.gameMode.handleContainerInput(syncId, first, 0, ContainerInput.PICKUP, (Player) player);
     }
 }

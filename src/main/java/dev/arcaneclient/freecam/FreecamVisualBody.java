@@ -5,80 +5,79 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.network.OtherClientPlayerEntity;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.player.SkinTextures;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.player.RemotePlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.player.PlayerSkin;
+import net.minecraft.world.phys.Vec3;
 
 /** Owns the client-only player snapshot shown while a detached camera is active. */
 @Environment(EnvType.CLIENT)
 final class FreecamVisualBody {
     private static final int FIRST_ENTITY_ID = -2_034_119_937;
-    private static OtherClientPlayerEntity body;
+    private static RemotePlayer body;
 
     private FreecamVisualBody() {
     }
 
-    static void spawn(MinecraftClient client, ClientPlayerEntity player) {
+    static void spawn(Minecraft client, LocalPlayer player) {
         remove();
-        ClientWorld world = client.world;
+        ClientLevel world = client.level;
         if (world == null) return;
 
-        OtherClientPlayerEntity snapshot = new VisualBodyEntity(
+        RemotePlayer snapshot = new VisualBodyEntity(
             world,
             player.getGameProfile(),
             player.getSkin()
         );
         UUID snapshotUuid = UUID.nameUUIDFromBytes(
-            ("arcane-detached-camera-body:" + player.getUuidAsString()).getBytes(StandardCharsets.UTF_8)
+            ("arcane-detached-camera-body:" + player.getStringUUID()).getBytes(StandardCharsets.UTF_8)
         );
-        snapshot.setUuid(snapshotUuid);
+        snapshot.setUUID(snapshotUuid);
         int entityId = FIRST_ENTITY_ID;
-        while (world.getEntityById(entityId) != null && entityId < -1) entityId++;
+        while (world.getEntity(entityId) != null && entityId < -1) entityId++;
         snapshot.setId(entityId);
         copyState(snapshot, player);
         snapshot.setNoGravity(true);
         snapshot.setInvisible(false);
-        snapshot.setInvulnerable(true);
         snapshot.setSilent(true);
-        snapshot.noClip = true;
+        snapshot.noPhysics = true;
 
         world.addEntity(snapshot);
         body = snapshot;
     }
 
-    static void sync(ClientPlayerEntity player) {
-        OtherClientPlayerEntity snapshot = body;
+    static void sync(LocalPlayer player) {
+        RemotePlayer snapshot = body;
         if (snapshot == null || snapshot.isRemoved()) return;
         copyState(snapshot, player);
     }
 
-    private static void copyState(OtherClientPlayerEntity snapshot, ClientPlayerEntity player) {
-        snapshot.copyPositionAndRotation(player);
-        snapshot.setHeadYaw(player.getHeadYaw());
-        snapshot.setBodyYaw(player.bodyYaw);
+    private static void copyState(RemotePlayer snapshot, LocalPlayer player) {
+        snapshot.copyPosition(player);
+        snapshot.setYHeadRot(player.getYHeadRot());
+        snapshot.setYBodyRot(player.yBodyRot);
         snapshot.setPose(player.getPose());
-        snapshot.setOnGround(player.isOnGround());
-        snapshot.setSneaking(player.isSneaking());
+        snapshot.setOnGround(player.onGround());
+        snapshot.setShiftKeyDown(player.isShiftKeyDown());
         snapshot.setSprinting(player.isSprinting());
         snapshot.setSwimming(player.isSwimming());
         snapshot.setHealth(player.getHealth());
-        snapshot.setVelocity(Vec3d.ZERO);
+        snapshot.setDeltaMovement(Vec3.ZERO);
         for (EquipmentSlot slot : EquipmentSlot.values()) {
-            snapshot.equipStack(slot, player.getEquippedStack(slot).copy());
+            snapshot.setItemSlot(slot, player.getItemBySlot(slot).copy());
         }
     }
 
     static void remove() {
-        OtherClientPlayerEntity snapshot = body;
+        RemotePlayer snapshot = body;
         body = null;
         if (snapshot == null) return;
-        if (snapshot.getEntityWorld() instanceof ClientWorld world
-            && world.getEntityById(snapshot.getId()) == snapshot) {
+        if (snapshot.level() instanceof ClientLevel world
+            && world.getEntity(snapshot.getId()) == snapshot) {
             world.removeEntity(snapshot.getId(), Entity.RemovalReason.DISCARDED);
         } else if (!snapshot.isRemoved()) {
             snapshot.discard();
@@ -86,11 +85,11 @@ final class FreecamVisualBody {
     }
 
     static boolean isPresent() {
-        OtherClientPlayerEntity snapshot = body;
+        RemotePlayer snapshot = body;
         return snapshot != null
             && !snapshot.isRemoved()
-            && snapshot.getEntityWorld() instanceof ClientWorld world
-            && world.getEntityById(snapshot.getId()) == snapshot;
+            && snapshot.level() instanceof ClientLevel world
+            && world.getEntity(snapshot.getId()) == snapshot;
     }
 
     static boolean owns(Entity entity) {
@@ -102,21 +101,21 @@ final class FreecamVisualBody {
     }
 
     /** Renders normally but is excluded from crosshair picking, attacks, use, and collision. */
-    private static final class VisualBodyEntity extends OtherClientPlayerEntity {
-        private final SkinTextures skin;
+    private static final class VisualBodyEntity extends RemotePlayer {
+        private final PlayerSkin skin;
 
-        private VisualBodyEntity(ClientWorld world, GameProfile profile, SkinTextures skin) {
+        private VisualBodyEntity(ClientLevel world, GameProfile profile, PlayerSkin skin) {
             super(world, profile);
             this.skin = skin;
         }
 
         @Override
-        public SkinTextures getSkin() {
+        public PlayerSkin getSkin() {
             return skin;
         }
 
         @Override
-        public boolean canHit() {
+        public boolean isPickable() {
             return false;
         }
 
@@ -126,17 +125,17 @@ final class FreecamVisualBody {
         }
 
         @Override
-        public boolean isInteractable() {
+        public boolean canInteractWithLevel() {
             return false;
         }
 
         @Override
-        public boolean collidesWith(Entity other) {
+        public boolean canCollideWith(Entity other) {
             return false;
         }
 
         @Override
-        public boolean isCollidable(Entity other) {
+        public boolean canBeCollidedWith(Entity other) {
             return false;
         }
     }

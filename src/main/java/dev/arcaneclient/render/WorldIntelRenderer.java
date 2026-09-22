@@ -1,7 +1,5 @@
 package dev.arcaneclient.render;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.screen.ArcaneFont;
@@ -19,31 +17,24 @@ import java.util.Set;
 import java.util.UUID;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.network.AbstractClientPlayerEntity;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderSetup;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexRendering;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.chunk.WorldChunk;
-import org.joml.Quaternionfc;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * One bounded cache powers Search, Portal ESP, Breadcrumbs, Logout Spots, and Chunk Borders.
@@ -53,24 +44,16 @@ import org.joml.Quaternionfc;
 public final class WorldIntelRenderer {
     private static final int BLOCK_BUDGET_PER_TICK = 24_576;
     private static final int MAX_SEARCH_TARGETS = 4_096;
-    private static final VoxelShape BLOCK_BOX = VoxelShapes.cuboid(0.05, 0.05, 0.05, 0.95, 0.95, 0.95);
-    private static final VoxelShape PLAYER_BOX = VoxelShapes.cuboid(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3);
-    private static final RenderPipeline LINES = RenderPipelines.register(
-        RenderPipeline.builder(RenderPipelines.RENDERTYPE_LINES_SNIPPET)
-            .withLocation(ArcaneClient.id("pipeline/world_intel"))
-            .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-            .withDepthWrite(false)
-            .build()
-    );
-    private static final RenderLayer LINE_TYPE = RenderLayer.of("arcaneclient_world_intel", RenderSetup.builder(LINES).build());
+    private static final VoxelShape BLOCK_BOX = Shapes.box(0.05, 0.05, 0.05, 0.95, 0.95, 0.95);
+    private static final VoxelShape PLAYER_BOX = Shapes.box(-0.3, 0.0, -0.3, 0.3, 1.8, 0.3);
 
     private static final ArrayDeque<SearchJob> SEARCH_QUEUE = new ArrayDeque<>();
     private static final Set<Long> QUEUED_CHUNKS = new HashSet<>();
     private static final Map<Long, List<SearchTarget>> SEARCH_TARGETS = new LinkedHashMap<>();
-    private static final ArrayDeque<Vec3d> BREADCRUMBS = new ArrayDeque<>();
+    private static final ArrayDeque<Vec3> BREADCRUMBS = new ArrayDeque<>();
     private static final Map<UUID, PlayerSnapshot> VISIBLE_PLAYERS = new HashMap<>();
     private static final Map<UUID, LogoutSpot> LOGOUT_SPOTS = new LinkedHashMap<>();
-    private static ClientWorld activeWorld;
+    private static ClientLevel activeWorld;
     private static int indexedMode;
     private static long lastPlayerRefresh = Long.MIN_VALUE;
     private static long lastValidation = Long.MIN_VALUE;
@@ -79,10 +62,10 @@ public final class WorldIntelRenderer {
     }
 
     public static void register() {
-        WorldRenderEvents.END_MAIN.register(WorldIntelRenderer::render);
+        LevelRenderEvents.COLLECT_SUBMITS.register(WorldIntelRenderer::render);
     }
 
-    public static void onWorldChange(ClientWorld world) {
+    public static void onWorldChange(ClientLevel world) {
         activeWorld = world;
         SEARCH_QUEUE.clear();
         QUEUED_CHUNKS.clear();
@@ -95,26 +78,26 @@ public final class WorldIntelRenderer {
         lastValidation = Long.MIN_VALUE;
     }
 
-    public static void onChunkLoad(ClientWorld world, WorldChunk chunk) {
+    public static void onChunkLoad(ClientLevel world, LevelChunk chunk) {
         if (world != activeWorld) onWorldChange(world);
         ArcaneConfig config = ArcaneClient.config();
         if (config != null && (config.searchEsp || config.portalEsp)) enqueue(chunk);
     }
 
-    public static void onChunkUnload(ClientWorld world, WorldChunk chunk) {
-        long key = chunk.getPos().toLong();
+    public static void onChunkUnload(ClientLevel world, LevelChunk chunk) {
+        long key = chunk.getPos().pack();
         SEARCH_TARGETS.remove(key);
         QUEUED_CHUNKS.remove(key);
         SEARCH_QUEUE.removeIf(job -> job.chunkKey == key);
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         ArcaneConfig config = ArcaneClient.config();
-        if (config == null || client.world == null || client.player == null) {
+        if (config == null || client.level == null || client.player == null) {
             if (activeWorld != null) onWorldChange(null);
             return;
         }
-        if (activeWorld != client.world) onWorldChange(client.world);
+        if (activeWorld != client.level) onWorldChange(client.level);
         int requestedMode = (config.searchEsp ? 1 : 0) | (config.portalEsp ? 2 : 0);
         boolean searchEnabled = requestedMode != 0;
         if (requestedMode != indexedMode) {
@@ -132,34 +115,34 @@ public final class WorldIntelRenderer {
         }
 
         tickBreadcrumbs(client, config);
-        long time = client.world.getTime();
+        long time = client.level.getGameTime();
         if (time < lastPlayerRefresh || time - lastPlayerRefresh >= 20) {
             lastPlayerRefresh = time;
             refreshPlayers(client, config);
         }
         if (time < lastValidation || time - lastValidation >= 40) {
             lastValidation = time;
-            validateSearchTargets(client.world);
+            validateSearchTargets(client.level);
         }
     }
 
-    private static void queueLoadedChunks(MinecraftClient client, ArcaneConfig config) {
-        ChunkPos center = client.player.getChunkPos();
+    private static void queueLoadedChunks(Minecraft client, ArcaneConfig config) {
+        ChunkPos center = client.player.chunkPosition();
         int blocks = Math.max(config.searchEsp ? config.searchEspRange : 0, config.portalEsp ? config.portalEspRange : 0);
         int radius = Math.min(12, Math.max(1, (blocks + 15) / 16));
         for (int ring = 0; ring <= radius; ring++) {
             for (int dz = -ring; dz <= ring; dz++) {
                 for (int dx = -ring; dx <= ring; dx++) {
                     if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
-                    WorldChunk chunk = client.world.getChunkManager().getWorldChunk(center.x + dx, center.z + dz, false);
+                    LevelChunk chunk = client.level.getChunkSource().getChunk(center.x() + dx, center.z() + dz, false);
                     if (chunk != null) enqueue(chunk);
                 }
             }
         }
     }
 
-    private static void enqueue(WorldChunk chunk) {
-        long key = chunk.getPos().toLong();
+    private static void enqueue(LevelChunk chunk) {
+        long key = chunk.getPos().pack();
         ArcaneConfig config = ArcaneClient.config();
         if (config != null && QUEUED_CHUNKS.add(key)) SEARCH_QUEUE.addLast(new SearchJob(chunk, config.searchEsp, config.portalEsp));
     }
@@ -188,7 +171,7 @@ public final class WorldIntelRenderer {
         }
     }
 
-    private static void validateSearchTargets(ClientWorld world) {
+    private static void validateSearchTargets(ClientLevel world) {
         Iterator<Map.Entry<Long, List<SearchTarget>>> chunks = SEARCH_TARGETS.entrySet().iterator();
         while (chunks.hasNext()) {
             Map.Entry<Long, List<SearchTarget>> entry = chunks.next();
@@ -202,38 +185,39 @@ public final class WorldIntelRenderer {
         }
     }
 
-    private static void tickBreadcrumbs(MinecraftClient client, ArcaneConfig config) {
+    private static void tickBreadcrumbs(Minecraft client, ArcaneConfig config) {
         if (!config.breadcrumbs) {
             BREADCRUMBS.clear();
             return;
         }
-        Vec3d current = position(client.player).add(0.0, 0.12, 0.0);
-        Vec3d previous = BREADCRUMBS.peekLast();
-        if (previous == null || WorldIntelPolicy.recordBreadcrumb(previous.squaredDistanceTo(current), false)) {
+        Vec3 current = position(client.player).add(0.0, 0.12, 0.0);
+        Vec3 previous = BREADCRUMBS.peekLast();
+        if (previous == null || WorldIntelPolicy.recordBreadcrumb(previous.distanceToSqr(current), false)) {
             BREADCRUMBS.addLast(current);
         }
         while (BREADCRUMBS.size() > config.breadcrumbLength) BREADCRUMBS.removeFirst();
     }
 
-    private static void refreshPlayers(MinecraftClient client, ArcaneConfig config) {
+    private static void refreshPlayers(Minecraft client, ArcaneConfig config) {
         if (!config.logoutSpots) {
             VISIBLE_PLAYERS.clear();
             LOGOUT_SPOTS.clear();
             return;
         }
         Map<UUID, PlayerSnapshot> current = new HashMap<>();
-        for (AbstractClientPlayerEntity player : client.world.getPlayers()) {
+        for (AbstractClientPlayer player : client.level.players()) {
             if (player == client.player) continue;
-            current.put(player.getUuid(), new PlayerSnapshot(player.getName().getString(), position(player)));
-            LOGOUT_SPOTS.remove(player.getUuid());
+            current.put(player.getUUID(), new PlayerSnapshot(player.getName().getString(), position(player)));
+            LOGOUT_SPOTS.remove(player.getUUID());
         }
         for (Map.Entry<UUID, PlayerSnapshot> entry : VISIBLE_PLAYERS.entrySet()) {
             if (current.containsKey(entry.getKey())) continue;
             PlayerSnapshot before = entry.getValue();
-            ChunkPos chunk = new ChunkPos(BlockPos.ofFloored(before.pos));
-            boolean loaded = client.world.getChunkManager().getWorldChunk(chunk.x, chunk.z, false) != null;
-            boolean stillListed = client.getNetworkHandler() != null
-                && client.getNetworkHandler().getPlayerListEntry(entry.getKey()) != null;
+            BlockPos block = BlockPos.containing(before.pos);
+            ChunkPos chunk = new ChunkPos(SectionPos.blockToSectionCoord(block.getX()), SectionPos.blockToSectionCoord(block.getZ()));
+            boolean loaded = client.level.getChunkSource().getChunk(chunk.x(), chunk.z(), false) != null;
+            boolean stillListed = client.getConnection() != null
+                && client.getConnection().getPlayerInfo(entry.getKey()) != null;
             if (!stillListed && WorldIntelPolicy.probableLogout(true, false, loaded, false, false)) {
                 LOGOUT_SPOTS.put(entry.getKey(), new LogoutSpot(before.name, before.pos, System.currentTimeMillis()));
             }
@@ -244,132 +228,107 @@ public final class WorldIntelRenderer {
         LOGOUT_SPOTS.values().removeIf(spot -> !WorldIntelPolicy.liveSpot(now, spot.createdMillis, config.logoutSpotMinutes));
     }
 
-    private static void render(WorldRenderContext context) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    private static void render(LevelRenderContext context) {
+        Minecraft client = Minecraft.getInstance();
         ArcaneConfig config = ArcaneClient.config();
-        if (config == null || client.world == null || client.player == null || context.matrices() == null
+        if (config == null || client.level == null || client.player == null || context.poseStack() == null
             || ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
         if (!config.searchEsp && !config.portalEsp && !config.breadcrumbs && !config.logoutSpots && !config.chunkBorders && !config.waypoints) return;
 
-        MatrixStack matrices = context.matrices();
-        Vec3d camera = context.worldState().cameraRenderState.pos;
-        VertexConsumer lines = context.consumers().getBuffer(LINE_TYPE);
+        Vec3 camera = Render263.camera(context);
+        Vec3 playerPosition = position(client.player);
         double searchRangeSq = config.searchEspRange * (double)config.searchEspRange;
         double portalRangeSq = config.portalEspRange * (double)config.portalEspRange;
+        Render263.Batch batch = Render263.batch(context);
 
         for (List<SearchTarget> chunkTargets : SEARCH_TARGETS.values()) {
             for (SearchTarget target : chunkTargets) {
                 boolean portal = target.kind == WorldIntelPolicy.SearchKind.PORTAL;
                 boolean enabled = portal ? config.portalEsp : config.searchEsp;
                 double rangeSq = portal ? portalRangeSq : searchRangeSq;
-                if (!enabled || target.pos.getSquaredDistance(position(client.player)) > rangeSq) continue;
+                if (!enabled || target.pos.distToCenterSqr(playerPosition) > rangeSq) continue;
                 int color = portal ? config.portalEspColor : config.searchEspColor;
-                VertexRendering.drawOutline(
-                    matrices,
-                    lines,
-                    BLOCK_BOX,
-                    target.pos.getX() - camera.x,
-                    target.pos.getY() - camera.y,
-                    target.pos.getZ() - camera.z,
-                    color,
-                    1.6f
-                );
+                batch.outline(BLOCK_BOX, target.pos.getX(), target.pos.getY(), target.pos.getZ(), color, 1.6f, true);
             }
         }
         if (config.breadcrumbs && BREADCRUMBS.size() > 1) {
-            Vec3d before = null;
-            for (Vec3d point : BREADCRUMBS) {
+            Vec3 before = null;
+            for (Vec3 point : BREADCRUMBS) {
                 if (before != null) {
-                    TracerLines.draw(
-                        matrices.peek(), lines,
-                        before.x - camera.x, before.y - camera.y, before.z - camera.z,
-                        point.x - camera.x, point.y - camera.y, point.z - camera.z,
-                        0xB8000000 | config.breadcrumbColor & 0x00FFFFFF, 1.25f
-                    );
+                    batch.line(before.x, before.y, before.z, point.x, point.y, point.z,
+                        0xB8000000 | config.breadcrumbColor & 0x00FFFFFF, 1.25f, true);
                 }
                 before = point;
             }
         }
-        if (config.chunkBorders) drawChunkBorder(client, matrices, lines, camera, config.chunkBorderColor);
+        if (config.chunkBorders) drawChunkBorder(client, batch, config.chunkBorderColor);
         if (config.logoutSpots) {
             for (LogoutSpot spot : LOGOUT_SPOTS.values()) {
-                VertexRendering.drawOutline(
-                    matrices, lines, PLAYER_BOX,
-                    spot.pos.x - camera.x, spot.pos.y - camera.y, spot.pos.z - camera.z,
-                    config.logoutSpotColor, 1.8f
-                );
+                batch.outline(PLAYER_BOX, spot.pos.x, spot.pos.y, spot.pos.z,
+                    config.logoutSpotColor, 1.8f, true);
             }
         }
         List<WaypointStore.Waypoint> waypoints = config.waypoints ? WaypointStore.current(client) : List.of();
         for (WaypointStore.Waypoint waypoint : waypoints) {
             BlockPos pos = waypoint.pos();
-            VertexRendering.drawOutline(
-                matrices, lines, BLOCK_BOX,
-                pos.getX() - camera.x, pos.getY() - camera.y, pos.getZ() - camera.z,
-                config.waypointColor, 1.8f
-            );
+            batch.outline(BLOCK_BOX, pos.getX(), pos.getY(), pos.getZ(), config.waypointColor, 1.8f, true);
         }
+        batch.submit();
         if (config.logoutSpots) {
             for (LogoutSpot spot : LOGOUT_SPOTS.values()) {
                 String name = StreamerPrivacy.entityName(config.streamerMode, true, spot.name);
-                drawLabel(context, "LOGOUT · " + name, spot.pos.add(0, 2.1, 0), camera, config.logoutSpotColor);
+                drawLabel(context, "LOGOUT · " + name, spot.pos.add(0, 2.1, 0), config.logoutSpotColor);
             }
         }
         for (WaypointStore.Waypoint waypoint : waypoints) {
             BlockPos pos = waypoint.pos();
-            int distance = (int)Math.round(Math.sqrt(pos.getSquaredDistance(position(client.player))));
-            drawLabel(context, waypoint.name() + " · " + distance + "m", Vec3d.ofCenter(pos).add(0, 0.85, 0), camera, config.waypointColor);
+            int distance = (int)Math.round(Math.sqrt(pos.distToCenterSqr(playerPosition)));
+            drawLabel(context, waypoint.name() + " · " + distance + "m", Vec3.atCenterOf(pos).add(0, 0.85, 0), config.waypointColor);
         }
     }
 
-    private static void drawChunkBorder(MinecraftClient client, MatrixStack matrices, VertexConsumer lines, Vec3d camera, int color) {
-        ChunkPos chunk = client.player.getChunkPos();
-        double x0 = chunk.getStartX() - camera.x;
+    private static void drawChunkBorder(Minecraft client, Render263.Batch batch, int color) {
+        ChunkPos chunk = client.player.chunkPosition();
+        double x0 = chunk.getMinBlockX();
         double x1 = x0 + 16.0;
-        double z0 = chunk.getStartZ() - camera.z;
+        double z0 = chunk.getMinBlockZ();
         double z1 = z0 + 16.0;
-        double y = Math.floor(client.player.getY()) - camera.y;
-        line(matrices, lines, x0, y, z0, x1, y, z0, color);
-        line(matrices, lines, x1, y, z0, x1, y, z1, color);
-        line(matrices, lines, x1, y, z1, x0, y, z1, color);
-        line(matrices, lines, x0, y, z1, x0, y, z0, color);
-        line(matrices, lines, x0, y - 16, z0, x0, y + 16, z0, color);
-        line(matrices, lines, x1, y - 16, z0, x1, y + 16, z0, color);
-        line(matrices, lines, x1, y - 16, z1, x1, y + 16, z1, color);
-        line(matrices, lines, x0, y - 16, z1, x0, y + 16, z1, color);
+        double y = Math.floor(client.player.getY());
+        line(batch, x0, y, z0, x1, y, z0, color);
+        line(batch, x1, y, z0, x1, y, z1, color);
+        line(batch, x1, y, z1, x0, y, z1, color);
+        line(batch, x0, y, z1, x0, y, z0, color);
+        line(batch, x0, y - 16, z0, x0, y + 16, z0, color);
+        line(batch, x1, y - 16, z0, x1, y + 16, z0, color);
+        line(batch, x1, y - 16, z1, x1, y + 16, z1, color);
+        line(batch, x0, y - 16, z1, x0, y + 16, z1, color);
     }
 
-    private static void line(MatrixStack matrices, VertexConsumer lines, double x0, double y0, double z0, double x1, double y1, double z1, int color) {
-        TracerLines.draw(matrices.peek(), lines, x0, y0, z0, x1, y1, z1, color, 1.2f);
+    private static void line(Render263.Batch batch, double x0, double y0, double z0, double x1, double y1, double z1, int color) {
+        batch.line(x0, y0, z0, x1, y1, z1, color, 1.2f, true);
     }
 
-    private static void drawLabel(WorldRenderContext context, String label, Vec3d pos, Vec3d camera, int color) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        TextRenderer font = ArcaneFont.renderer(client);
-        MatrixStack matrices = context.matrices();
-        matrices.push();
-        matrices.translate(pos.x - camera.x, pos.y - camera.y, pos.z - camera.z);
-        matrices.multiply((Quaternionfc)context.worldState().cameraRenderState.orientation);
-        matrices.scale(-0.025f, -0.025f, 0.025f);
-        font.draw(label, -font.getWidth(label) / 2.0f, 0.0f, color, false, matrices.peek().getPositionMatrix(), context.consumers(), TextRenderer.TextLayerType.SEE_THROUGH, 0x90000000, 0xF000F0);
-        matrices.pop();
+    private static void drawLabel(LevelRenderContext context, String label, Vec3 pos, int color) {
+        Minecraft client = Minecraft.getInstance();
+        Font font = ArcaneFont.renderer(client);
+        Render263.text(context, font, label, pos, 0.025f, color, true);
     }
 
     private static WorldIntelPolicy.SearchKind classify(BlockState state) {
-        if (state.isOf(Blocks.NETHER_PORTAL) || state.isOf(Blocks.END_PORTAL) || state.isOf(Blocks.END_PORTAL_FRAME)) {
+        if (state.is(Blocks.NETHER_PORTAL) || state.is(Blocks.END_PORTAL) || state.is(Blocks.END_PORTAL_FRAME)) {
             return WorldIntelPolicy.SearchKind.PORTAL;
         }
-        if (state.isOf(Blocks.SPAWNER) || state.isOf(Blocks.TRIAL_SPAWNER) || state.isOf(Blocks.VAULT)
-            || state.isOf(Blocks.BEACON) || state.isOf(Blocks.LODESTONE) || state.isOf(Blocks.RESPAWN_ANCHOR)
-            || state.isOf(Blocks.ANCIENT_DEBRIS)) {
+        if (state.is(Blocks.SPAWNER) || state.is(Blocks.TRIAL_SPAWNER) || state.is(Blocks.VAULT)
+            || state.is(Blocks.BEACON) || state.is(Blocks.LODESTONE) || state.is(Blocks.RESPAWN_ANCHOR)
+            || state.is(Blocks.ANCIENT_DEBRIS)) {
             return WorldIntelPolicy.SearchKind.SEARCH;
         }
-        Identifier id = Registries.BLOCK.getId(state.getBlock());
+        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         return WorldIntelPolicy.classify(id == null ? "" : id.getPath());
     }
 
-    private static Vec3d position(net.minecraft.entity.Entity entity) {
-        return new Vec3d(entity.getX(), entity.getY(), entity.getZ());
+    private static Vec3 position(net.minecraft.world.entity.Entity entity) {
+        return new Vec3(entity.getX(), entity.getY(), entity.getZ());
     }
 
     public static int searchTargetCount() {
@@ -384,8 +343,8 @@ public final class WorldIntelRenderer {
     }
 
     private static final class SearchJob {
-        private final WorldChunk chunk;
-        private final ChunkSection[] sections;
+        private final LevelChunk chunk;
+        private final LevelChunkSection[] sections;
         private final long chunkKey;
         private final boolean includeSearch;
         private final boolean includePortal;
@@ -393,10 +352,10 @@ public final class WorldIntelRenderer {
         private int sectionIndex;
         private int blockIndex;
 
-        private SearchJob(WorldChunk chunk, boolean includeSearch, boolean includePortal) {
+        private SearchJob(LevelChunk chunk, boolean includeSearch, boolean includePortal) {
             this.chunk = chunk;
-            this.sections = chunk.getSectionArray();
-            this.chunkKey = chunk.getPos().toLong();
+            this.sections = chunk.getSections();
+            this.chunkKey = chunk.getPos().pack();
             this.includeSearch = includeSearch;
             this.includePortal = includePortal;
         }
@@ -404,8 +363,8 @@ public final class WorldIntelRenderer {
         private int step(int budget) {
             int visited = 0;
             while (sectionIndex < sections.length && visited < budget) {
-                ChunkSection section = sections[sectionIndex];
-                if (section.isEmpty() || blockIndex == 0 && !section.hasAny(state -> included(classify(state)))) {
+                LevelChunkSection section = sections[sectionIndex];
+                if (section.hasOnlyAir() || blockIndex == 0 && !section.maybeHas(state -> included(classify(state)))) {
                     sectionIndex++;
                     blockIndex = 0;
                     continue;
@@ -415,8 +374,8 @@ public final class WorldIntelRenderer {
                 int y = blockIndex >>> 8 & 15;
                 WorldIntelPolicy.SearchKind kind = classify(section.getBlockState(x, y, z));
                 if (included(kind) && targets.size() < 512) {
-                    int worldY = ChunkSectionPos.getBlockCoord(chunk.sectionIndexToCoord(sectionIndex)) + y;
-                    targets.add(new SearchTarget(new BlockPos(chunk.getPos().getStartX() + x, worldY, chunk.getPos().getStartZ() + z), kind));
+                    int worldY = SectionPos.sectionToBlockCoord(chunk.getSectionYFromSectionIndex(sectionIndex)) + y;
+                    targets.add(new SearchTarget(new BlockPos(chunk.getPos().getMinBlockX() + x, worldY, chunk.getPos().getMinBlockZ() + z), kind));
                 }
                 blockIndex++;
                 visited++;
@@ -441,9 +400,9 @@ public final class WorldIntelRenderer {
     private record SearchTarget(BlockPos pos, WorldIntelPolicy.SearchKind kind) {
     }
 
-    private record PlayerSnapshot(String name, Vec3d pos) {
+    private record PlayerSnapshot(String name, Vec3 pos) {
     }
 
-    private record LogoutSpot(String name, Vec3d pos, long createdMillis) {
+    private record LogoutSpot(String name, Vec3 pos, long createdMillis) {
     }
 }

@@ -2,11 +2,11 @@ package dev.arcaneclient.esp;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.block.ShulkerBoxBlock;
-import net.minecraft.item.BlockItem;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.ShulkerBoxBlock;
 
 @Environment(value=EnvType.CLIENT)
 public enum ItemEspCategory {
@@ -36,9 +36,9 @@ public enum ItemEspCategory {
     public boolean matches(ItemStack stack) {
         return switch (this.ordinal()) {
             default -> throw new MatchException(null, null);
-            case 0 -> stack.isOf(Items.TOTEM_OF_UNDYING);
-            case 1 -> stack.isOf(Items.END_CRYSTAL);
-            case 2 -> stack.isOf(Items.ELYTRA);
+            case 0 -> stack.is(Items.TOTEM_OF_UNDYING);
+            case 1 -> stack.is(Items.END_CRYSTAL);
+            case 2 -> stack.is(Items.ELYTRA);
             case 3 -> {
                 BlockItem blockItem;
                 Item var3_2 = stack.getItem();
@@ -48,12 +48,12 @@ public enum ItemEspCategory {
                 yield false;
             }
             case 4 -> {
-                if (stack.isOf(Items.GOLDEN_APPLE) || stack.isOf(Items.ENCHANTED_GOLDEN_APPLE)) {
+                if (stack.is(Items.GOLDEN_APPLE) || stack.is(Items.ENCHANTED_GOLDEN_APPLE)) {
                     yield true;
                 }
                 yield false;
             }
-            case 5 -> stack.isOf(Items.DIAMOND) || stack.isOf(Items.DIAMOND_BLOCK) || stack.isOf(Items.NETHERITE_INGOT) || stack.isOf(Items.NETHERITE_BLOCK) || stack.isOf(Items.NETHERITE_SCRAP) || stack.isOf(Items.ANCIENT_DEBRIS);
+            case 5 -> stack.is(Items.DIAMOND) || stack.is(Items.DIAMOND_BLOCK) || stack.is(Items.NETHERITE_INGOT) || stack.is(Items.NETHERITE_BLOCK) || stack.is(Items.NETHERITE_SCRAP) || stack.is(Items.ANCIENT_DEBRIS);
         };
     }
 

@@ -1,8 +1,9 @@
 {
   "required": true,
   "package": "dev.arcaneclient.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "client": [
+    "ArcaneTextFieldAccessor",
     "CameraMixin",
     "ClientCommonNetworkHandlerMixin",
     "ClientConnectionMixin",
@@ -16,13 +17,17 @@
     "InGameOverlayRendererMixin",
     "KeyboardMixin",
     "KeyboardInputMixin",
+    "KeyMappingMixin",
     "KeyBindingAccessor",
     "LivingEntityMixin",
     "LightmapTextureManagerMixin",
     "MinecraftClientAccessor",
     "MinecraftClientMixin",
     "MouseMixin",
-    "WorldRendererMixin"
+    "RenderPipelinesAccessor",
+    "RenderTypeAccessor",
+    "WorldRendererMixin",
+    "VectorUiRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1

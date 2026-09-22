@@ -20,8 +20,17 @@ public final class InventoryActionScheduler {
 
     public enum Owner {
         AUTO_TOTEM(100),
+        HOVER_TOTEM(95),
+        SHIELD_BREAKER(88),
+        ELYTRA_SWAP(80),
+        AIM_ACTION(58),
+        CRYSTAL_ACTION(58),
+        ANCHOR_ACTION(58),
+        INVENTORY_TOTEM(55),
         AUTO_ARMOR(90),
         MACE_SWITCH(85),
+        MACE_BOMBER(86),
+        DISPENSER_HELPER(30),
         SPEAR_SWITCH(80),
         SMART_WEAPON(75),
         AUTO_MEND(70),

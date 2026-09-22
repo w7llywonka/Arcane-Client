@@ -1,0 +1,11 @@
+{
+  "name": "arcane-client-site",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/prepare-public.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

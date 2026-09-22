@@ -1,6 +1,6 @@
 package dev.arcaneclient.freecam;
 
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.phys.Vec3;
 
 /** Pure freecam acceleration/drag math, separated for deterministic testing. */
 public final class FreecamMotion {
@@ -10,11 +10,11 @@ public final class FreecamMotion {
     private FreecamMotion() {
     }
 
-    public static Vec3d step(Vec3d velocity, Vec3d target, boolean receivingInput) {
+    public static Vec3 step(Vec3 velocity, Vec3 target, boolean receivingInput) {
         if (!receivingInput) {
-            Vec3d slowed = velocity.multiply(DRAG);
-            return slowed.lengthSquared() < 0.000025 ? Vec3d.ZERO : slowed;
+            Vec3 slowed = velocity.scale(DRAG);
+            return slowed.lengthSqr() < 0.000025 ? Vec3.ZERO : slowed;
         }
-        return velocity.multiply(1.0 - RESPONSE).add(target.multiply(RESPONSE));
+        return velocity.scale(1.0 - RESPONSE).add(target.scale(RESPONSE));
     }
 }

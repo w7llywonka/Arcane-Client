@@ -43,7 +43,8 @@ final class ModuleCatalogContractTest {
         assertFalse(config.accessTrailEsp, "access-trail observations should be opt-in");
         assertFalse(config.statusHud, "status lines must be explicitly enabled");
         assertFalse(config.inventoryHud, "inventory totals must be explicitly enabled");
-        assertTrue(config.uiOpacityPercent >= 94, "the overlay should be substantially opaque by default");
-        assertTrue(config.uiCornerRadius <= 3, "the overlay should retain its compact square silhouette");
+        assertEquals(82, config.uiOpacityPercent, "glass panels should leave the world subtly visible");
+        assertEquals(10, config.uiCornerRadius, "panels should have a consistent rounded silhouette");
+        assertFalse(config.blockEntityDebugTracers, "deepslate tracers must be opt-in");
     }
 }

@@ -4,12 +4,12 @@ import dev.arcaneclient.inventory.InventoryActionScheduler;
 import dev.arcaneclient.inventory.InventoryAutomationSupport;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.projectile.FishingBobberEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.util.Hand;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.projectile.FishingHook;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 /** Bobber-state Auto Fish with bounded cast/recast timing and hotbar arbitration. */
 @Environment(EnvType.CLIENT)
@@ -40,30 +40,30 @@ public final class AutoFishController {
     private AutoFishController() {
     }
 
-    public static void tick(MinecraftClient client, Settings settings) {
-        ClientPlayerEntity player = client.player;
-        if (player == null || client.world == null || client.interactionManager == null || client.currentScreen != null) {
-            if (player != null) POLICY.reset(player.age);
+    public static void tick(Minecraft client, Settings settings) {
+        LocalPlayer player = client.player;
+        if (player == null || client.level == null || client.gameMode == null || client.gui.screen() != null) {
+            if (player != null) POLICY.reset(player.tickCount);
             InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_FISH);
             return;
         }
         if (!settings.enabled() || player.isUsingItem()) {
-            POLICY.reset(player.age);
+            POLICY.reset(player.tickCount);
             InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_FISH);
             return;
         }
         int rodSlot = findRod(player, settings.minimumDurabilityPercent());
-        boolean holdingRod = player.getMainHandStack().isOf(Items.FISHING_ROD);
+        boolean holdingRod = player.getMainHandItem().is(Items.FISHING_ROD);
         boolean rodAvailable = holdingRod || (settings.autoSwitch() && rodSlot >= 0);
-        FishingBobberEntity bobber = player.fishHook;
+        FishingHook bobber = player.fishing;
         AutoFishPolicy.Action action = POLICY.decide(
-            player.age,
+            player.tickCount,
             settings.enabled(),
             rodAvailable,
             bobber != null,
-            bobber != null && bobber.isTouchingWater(),
-            bobber != null && bobber.getHookedEntity() != null,
-            bobber == null ? 0.0 : bobber.getVelocity().y,
+            bobber != null && bobber.isInWater(),
+            bobber != null && bobber.getHookedIn() != null,
+            bobber == null ? 0.0 : bobber.getDeltaMovement().y,
             new AutoFishPolicy.Settings(
                 settings.castDelayTicks(),
                 settings.recastDelayTicks(),
@@ -83,11 +83,11 @@ public final class AutoFishController {
         } else if (!InventoryActionScheduler.shared().tryAcquire(
             InventoryActionScheduler.Owner.AUTO_FISH,
             InventoryActionScheduler.Channel.HOTBAR_SELECTION,
-            player.age,
+            player.tickCount,
             2
         )) return;
-        client.interactionManager.interactItem(player, Hand.MAIN_HAND);
-        player.swingHand(Hand.MAIN_HAND);
+        client.gameMode.useItem(player, InteractionHand.MAIN_HAND);
+        player.swing(InteractionHand.MAIN_HAND, player.getMainHandItem().getInteractAnimation(), false);
     }
 
     public static void reset(long tick) {
@@ -95,14 +95,14 @@ public final class AutoFishController {
         InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_FISH);
     }
 
-    private static int findRod(ClientPlayerEntity player, int minimumDurabilityPercent) {
+    private static int findRod(LocalPlayer player, int minimumDurabilityPercent) {
         int bestSlot = -1;
         int bestDurability = -1;
         for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
-            if (!stack.isOf(Items.FISHING_ROD)) continue;
-            int durability = stack.isDamageable()
-                ? (int) Math.floor((stack.getMaxDamage() - stack.getDamage()) * 100.0 / stack.getMaxDamage())
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (!stack.is(Items.FISHING_ROD)) continue;
+            int durability = stack.isDamageableItem()
+                ? (int) Math.floor((stack.getMaxDamage() - stack.getDamageValue()) * 100.0 / stack.getMaxDamage())
                 : 100;
             if (durability >= minimumDurabilityPercent && durability > bestDurability) {
                 bestSlot = slot;

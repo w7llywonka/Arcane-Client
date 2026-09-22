@@ -8,7 +8,7 @@ import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.KeyMapping;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,8 +25,12 @@ public abstract sealed class GuiSetting {
     private final String searchText;
 
     private GuiSetting(String label) {
+        this(label, "");
+    }
+
+    private GuiSetting(String label, String searchTerms) {
         this.label = label;
-        this.searchText = label.toLowerCase(Locale.ROOT);
+        this.searchText = (label + " " + searchTerms).toLowerCase(Locale.ROOT);
     }
 
     public String label() {
@@ -39,16 +43,40 @@ public abstract sealed class GuiSetting {
 
     public abstract int height();
 
+    /** A compact, non-interactive label separating controls inside a grouped module. */
+    @Environment(EnvType.CLIENT)
+    public static final class Section extends GuiSetting {
+        public Section(String label) {
+            super(label);
+        }
+
+        @Override
+        public int height() {
+            return 12;
+        }
+    }
+
     /** A checkbox row. */
     @Environment(EnvType.CLIENT)
     public static final class Toggle extends GuiSetting {
         private final BooleanSupplier value;
         private final Consumer<Boolean> setter;
+        private final boolean groupHeader;
 
         public Toggle(String label, BooleanSupplier value, Consumer<Boolean> setter) {
-            super(label);
+            this(label, "", value, setter, false);
+        }
+
+        /** A child module compressed into one named toggle row inside a module group. */
+        public Toggle(String label, String searchTerms, BooleanSupplier value, Consumer<Boolean> setter) {
+            this(label, searchTerms, value, setter, true);
+        }
+
+        private Toggle(String label, String searchTerms, BooleanSupplier value, Consumer<Boolean> setter, boolean groupHeader) {
+            super(label, searchTerms);
             this.value = value;
             this.setter = setter;
+            this.groupHeader = groupHeader;
         }
 
         public boolean value() {
@@ -57,6 +85,10 @@ public abstract sealed class GuiSetting {
 
         public void toggle() {
             this.setter.accept(!this.value.getAsBoolean());
+        }
+
+        public boolean groupHeader() {
+            return this.groupHeader;
         }
 
         @Override
@@ -205,14 +237,14 @@ public abstract sealed class GuiSetting {
     /** A rebindable key. */
     @Environment(EnvType.CLIENT)
     public static final class Bind extends GuiSetting {
-        private final KeyBinding mapping;
+        private final KeyMapping mapping;
 
-        public Bind(String label, KeyBinding mapping) {
+        public Bind(String label, KeyMapping mapping) {
             super(label);
             this.mapping = mapping;
         }
 
-        public KeyBinding mapping() {
+        public KeyMapping mapping() {
             return this.mapping;
         }
 
@@ -246,9 +278,9 @@ public abstract sealed class GuiSetting {
     @Environment(EnvType.CLIENT)
     public static final class Message extends GuiSetting {
         private final int slot;
-        private final @Nullable KeyBinding mapping;
+        private final @Nullable KeyMapping mapping;
 
-        public Message(String label, int slot, @Nullable KeyBinding mapping) {
+        public Message(String label, int slot, @Nullable KeyMapping mapping) {
             super(label);
             this.slot = slot;
             this.mapping = mapping;
@@ -258,7 +290,7 @@ public abstract sealed class GuiSetting {
             return this.slot;
         }
 
-        public @Nullable KeyBinding mapping() {
+        public @Nullable KeyMapping mapping() {
             return this.mapping;
         }
 

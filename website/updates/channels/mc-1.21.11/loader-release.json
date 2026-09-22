@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "artifactType": "arcane-loader",
+  "version": "1.2.4+mc1.21.11",
+  "minecraftVersion": "1.21.11",
+  "downloadUrl": "https://www.arcaneclient.shop/updates/channels/mc-1.21.11/ARCLoader.jar",
+  "sha256": "068b549dca41a16617f2fdb0fd214f93b9fe4479f389e326b1b1768fdf79b9bf",
+  "signature": "fY69CCIqsxYPuTjPI+h+C82fKhkEYAx6/Mpd4QF95pElPp4fXS6d8cWzX/5a8y3fiPIKQYLMmGsf42709LqADQ==",
+  "size": 2538650
+}

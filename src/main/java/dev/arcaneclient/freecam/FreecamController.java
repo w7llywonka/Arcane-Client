@@ -7,35 +7,35 @@ import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.event.client.player.ClientPreAttackCallback;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.option.Perspective;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.CameraType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.util.Mth;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
 
 /** Smooth detached camera with server-valid directional mining from the player's body. */
 @Environment(EnvType.CLIENT)
 public final class FreecamController {
     private static boolean active;
     private static boolean previousChunkCullingEnabled = true;
-    private static Perspective previousPerspective = Perspective.FIRST_PERSON;
+    private static CameraType previousPerspective = CameraType.FIRST_PERSON;
     private static float playerYaw;
     private static float playerPitch;
     private static float cameraYaw;
     private static float cameraPitch;
-    private static Vec3d previousPosition = Vec3d.ZERO;
-    private static Vec3d position = Vec3d.ZERO;
-    private static Vec3d velocity = Vec3d.ZERO;
+    private static Vec3 previousPosition = Vec3.ZERO;
+    private static Vec3 position = Vec3.ZERO;
+    private static Vec3 velocity = Vec3.ZERO;
 
     private FreecamController() {
     }
 
     public static void register() {
         ClientPreAttackCallback.EVENT.register((client, player, clickCount) -> DetachedCameraInteraction.isActive());
-        UseBlockCallback.EVENT.register((player, world, hand, hit) -> world.isClient() && FreecamController.isActive() ? ActionResult.FAIL : ActionResult.PASS);
-        UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> world.isClient() && FreecamController.isActive() ? ActionResult.FAIL : ActionResult.PASS);
+        UseBlockCallback.EVENT.register((player, world, hand, hit) -> world.isClientSide() && FreecamController.isActive() ? InteractionResult.FAIL : InteractionResult.PASS);
+        UseEntityCallback.EVENT.register((player, world, hand, entity, hit) -> world.isClientSide() && FreecamController.isActive() ? InteractionResult.FAIL : InteractionResult.PASS);
     }
 
     public static boolean isActive() {
@@ -54,38 +54,38 @@ public final class FreecamController {
         return FreecamVisualBody.entity();
     }
 
-    public static void toggle(MinecraftClient client) {
+    public static void toggle(Minecraft client) {
         if (isActive()) disable(client); else enable(client);
     }
 
-    public static void enable(MinecraftClient client) {
-        ClientPlayerEntity player = client.player;
-        if (active || player == null || client.world == null) return;
+    public static void enable(Minecraft client) {
+        LocalPlayer player = client.player;
+        if (active || player == null || client.level == null) return;
         FreelookController.disable(client);
         AutoToolController.restore(client);
-        playerYaw = player.getYaw();
-        playerPitch = player.getPitch();
+        playerYaw = player.getYRot();
+        playerPitch = player.getXRot();
         cameraYaw = playerYaw;
         cameraPitch = playerPitch;
-        previousPerspective = client.options.getPerspective();
-        previousChunkCullingEnabled = client.chunkCullingEnabled;
-        position = player.getEyePos();
+        previousPerspective = client.options.getCameraType();
+        previousChunkCullingEnabled = client.smartCull;
+        position = player.getEyePosition();
         previousPosition = position;
         active = true;
         FreecamVisualBody.spawn(client, player);
-        velocity = Vec3d.ZERO;
+        velocity = Vec3.ZERO;
         DetachedCameraInteraction.stopMining(client);
-        client.options.setPerspective(Perspective.FIRST_PERSON);
+        client.options.setCameraType(CameraType.FIRST_PERSON);
         client.setCameraEntity(player);
         // Vanilla's section-occlusion graph assumes an ordinary player camera. Underground,
         // that graph can hide loaded sections behind solid chunks and leave large black gaps
         // when our rendered camera moves through walls. Freecam needs the complete frustum.
-        client.chunkCullingEnabled = false;
-        client.worldRenderer.scheduleTerrainUpdate();
+        client.smartCull = false;
+        client.levelRenderer.invalidateCompiledGeometry(client.level, client.options, client.gameRenderer.mainCamera(), client.getBlockColors());
         ArcaneClient.LOGGER.info("Freecam enabled");
     }
 
-    public static void disable(MinecraftClient client) {
+    public static void disable(Minecraft client) {
         DetachedCameraInteraction.stopMining(client);
         if (!active) {
             FreecamVisualBody.remove();
@@ -93,28 +93,30 @@ public final class FreecamController {
         }
         active = false;
         FreecamVisualBody.remove();
-        client.chunkCullingEnabled = previousChunkCullingEnabled;
-        client.worldRenderer.scheduleTerrainUpdate();
+        client.smartCull = previousChunkCullingEnabled;
+        if (client.level != null) {
+            client.levelRenderer.invalidateCompiledGeometry(client.level, client.options, client.gameRenderer.mainCamera(), client.getBlockColors());
+        }
         if (client.player != null) {
-            client.player.setYaw(playerYaw);
-            client.player.setPitch(playerPitch);
-            client.player.lastYaw = playerYaw;
-            client.player.lastPitch = playerPitch;
+            client.player.setYRot(playerYaw);
+            client.player.setXRot(playerPitch);
+            client.player.yRotO = playerYaw;
+            client.player.xRotO = playerPitch;
             client.setCameraEntity(client.player);
         } else {
             client.setCameraEntity(null);
         }
-        client.options.setPerspective(previousPerspective);
-        previousPosition = Vec3d.ZERO;
-        position = Vec3d.ZERO;
-        velocity = Vec3d.ZERO;
+        client.options.setCameraType(previousPerspective);
+        previousPosition = Vec3.ZERO;
+        position = Vec3.ZERO;
+        velocity = Vec3.ZERO;
         ArcaneClient.LOGGER.info("Freecam disabled");
     }
 
-    public static void tick(MinecraftClient client) {
-        ClientPlayerEntity player = client.player;
+    public static void tick(Minecraft client) {
+        LocalPlayer player = client.player;
         if (!active) return;
-        if (player == null || client.world == null) {
+        if (player == null || client.level == null) {
             disable(client);
             return;
         }
@@ -123,23 +125,23 @@ public final class FreecamController {
         // Keep this authoritative if another mod or a vanilla debug toggle changes it while
         // Freecam is active. WorldRenderer already recenters its section graph from CameraMixin's
         // detached position every eight blocks.
-        client.chunkCullingEnabled = false;
+        client.smartCull = false;
         // The real player still receives gravity and server corrections while movement input is
         // detached. Keep the rendered copy on that authoritative position so it cannot hover at
         // the activation coordinate after the player lands or is moved by the server.
         FreecamVisualBody.sync(player);
 
         player.setSprinting(false);
-        double forward = axis(client.options.forwardKey.isPressed(), client.options.backKey.isPressed());
-        double sideways = axis(client.options.rightKey.isPressed(), client.options.leftKey.isPressed());
-        double vertical = axis(client.options.jumpKey.isPressed(), client.options.sneakKey.isPressed());
+        double forward = axis(client.options.keyUp.isDown(), client.options.keyDown.isDown());
+        double sideways = axis(client.options.keyRight.isDown(), client.options.keyLeft.isDown());
+        double vertical = axis(client.options.keyJump.isDown(), client.options.keyShift.isDown());
         boolean moving = forward != 0.0 || sideways != 0.0 || vertical != 0.0;
-        Vec3d target = Vec3d.ZERO;
+        Vec3 target = Vec3.ZERO;
         if (moving) {
-            Vec3d direction = FreecamNavigation.direction(cameraYaw, forward, sideways, vertical);
+            Vec3 direction = FreecamNavigation.direction(cameraYaw, forward, sideways, vertical);
             double speed = FreecamSpeed.blocksPerTick(ArcaneClient.config().freecamSpeed);
-            if (client.options.sprintKey.isPressed()) speed *= 3.0;
-            target = direction.multiply(speed);
+            if (client.options.keySprint.isDown()) speed *= 3.0;
+            target = direction.scale(speed);
         }
         velocity = FreecamMotion.step(velocity, target, moving);
         previousPosition = position;
@@ -180,12 +182,12 @@ public final class FreecamController {
         return playerPitch;
     }
 
-    public static Vec3d cameraPosition(float tickProgress) {
+    public static Vec3 cameraPosition(float tickProgress) {
         double progress = Math.clamp(tickProgress, 0.0f, 1.0f);
-        return new Vec3d(
-            MathHelper.lerp(progress, previousPosition.x, position.x),
-            MathHelper.lerp(progress, previousPosition.y, position.y),
-            MathHelper.lerp(progress, previousPosition.z, position.z)
+        return new Vec3(
+            Mth.lerp(progress, previousPosition.x, position.x),
+            Mth.lerp(progress, previousPosition.y, position.y),
+            Mth.lerp(progress, previousPosition.z, position.z)
         );
     }
 
@@ -196,9 +198,9 @@ public final class FreecamController {
         ArcaneClient.config().freecamSpeed = FreecamSpeed.adjust(previous, vertical);
         if (ArcaneClient.config().freecamSpeed != previous) {
             ArcaneClient.config().save();
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client.player != null) {
-                client.player.sendMessage(net.minecraft.text.Text.literal("Freecam speed: " + ArcaneClient.config().freecamSpeed), true);
+                client.player.sendOverlayMessage(net.minecraft.network.chat.Component.literal("Freecam speed: " + ArcaneClient.config().freecamSpeed));
             }
         }
         return true;

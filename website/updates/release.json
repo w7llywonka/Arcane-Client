@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "version": "2.9.3+mc1.21.11",
+  "minecraftVersion": "1.21.11",
+  "downloadUrl": "https://arcane-client-puce.vercel.app/updates/Arcane-Client-2.9.3+mc1.21.11.jar",
+  "sha256": "29110613cc080c31a9404df8727f16f73e27d7d773d86cf0e7f8cd68e77730ce",
+  "signature": "PTeeYgn6IptkZTd3fRySDVHUeaulMnFINwiwLGfkCP6QbT1HhS2NaiVoT93AszSavnw7OThwb308A/zgyGvEDA==",
+  "size": 2541309
+}

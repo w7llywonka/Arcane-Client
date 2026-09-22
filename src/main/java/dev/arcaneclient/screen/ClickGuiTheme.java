@@ -3,15 +3,15 @@ package dev.arcaneclient.screen;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
-/** Accent palettes drawn over one neutral graphite foundation. */
+/** Accent presets over a quiet, neutral foundation. */
 @Environment(EnvType.CLIENT)
 public enum ClickGuiTheme {
-    ARCANE("ARCANE", 0xFF8DBDCE, 0xFFBDE9ED, 0xFF426978, 0xFF202D35),
-    FROST("FROST", 0xFF76A9FF, 0xFFB8D0FF, 0xFF4E78BD, 0xE62D4165),
-    ROSE("ROSE", 0xFFF08AA0, 0xFFF6B4C1, 0xFFB85D72, 0xE6633440),
-    EMBER("EMBER", 0xFFFFA24A, 0xFFFFD1A3, 0xFFB66A27, 0xE6603719),
-    AETHER("AETHER", 0xFF45E2D5, 0xFFA8FFF7, 0xFF278E88, 0xE61B5350),
-    ULTRAVIOLET("ULTRAVIOLET", 0xFFB594FF, 0xFFD9CAFF, 0xFF7459BA, 0xE640315F);
+    ARCANE("PINK", 0xFFFF3E9C, 0xFFFF82BF, 0xFF922957, 0xF2461A33),
+    FROST("BLUE", 0xFF4D9FFF, 0xFF8BC1FF, 0xFF325C92, 0xF21F2F49),
+    ROSE("RED", 0xFFFF4D6D, 0xFFFF8BA0, 0xFF922E42, 0xF2461D29),
+    EMBER("AMBER", 0xFFFFB84D, 0xFFFFD18B, 0xFF926F32, 0xF2463522),
+    AETHER("EMERALD", 0xFF3EE690, 0xFF82EFB7, 0xFF298751, 0xF21C3F31),
+    ULTRAVIOLET("PURPLE", 0xFFA85CFF, 0xFFC695FF, 0xFF663692, 0xF2332149);
 
     private static final ClickGuiTheme[] VALUES = values();
 
@@ -20,15 +20,15 @@ public enum ClickGuiTheme {
     private final int accentBright;
     private final int accentDim;
     private final int active;
-    private final int backdrop = 0x70000000;
-    private final int bar = 0xFF17191F;
-    private final int window = 0xFF17191F;
-    private final int header = 0xFF17191F;
-    private final int row = 0xFF17191F;
-    private final int nest = 0xFF11141A;
-    private final int outline = 0xFF414C55;
-    private final int text = 0xFFF4F4F5;
-    private final int muted = 0xFFB8C0BE;
+    private final int backdrop = 0x380A070E;
+    private final int bar = 0xF215181D;
+    private final int window = 0xE612151A;
+    private final int header = 0xF21B1F25;
+    private final int row = 0x00181B20;
+    private final int nest = 0xCE101318;
+    private final int outline = 0x3D88939E;
+    private final int text = 0xFFF0F2F5;
+    private final int muted = 0xFFADB4BE;
     private final int hover;
     private final int activeHover;
     private final int outlineSoft;
@@ -40,10 +40,10 @@ public enum ClickGuiTheme {
         this.accentBright = accentBright;
         this.accentDim = accentDim;
         this.active = active;
-        this.hover = shade(this.row, 1.34f);
+        this.hover = 0x66383E47;
         this.activeHover = shade(active, 1.15f);
-        this.outlineSoft = withAlpha(shade(this.outline, 0.72f), 0x28);
-        this.faint = shade(this.muted, 0.82f);
+        this.outlineSoft = withAlpha(this.outline, 0x24);
+        this.faint = 0xFF7E8793;
     }
 
     public String label() { return this.label; }

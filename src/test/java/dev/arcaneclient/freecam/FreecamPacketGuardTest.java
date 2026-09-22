@@ -3,22 +3,22 @@ package dev.arcaneclient.freecam;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import net.minecraft.network.packet.c2s.play.PlayerActionC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractBlockC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractEntityC2SPacket;
-import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
+import net.minecraft.network.protocol.game.ServerboundInteractPacket;
+import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
+import net.minecraft.network.protocol.game.ServerboundUseItemPacket;
 import org.junit.jupiter.api.Test;
 
 final class FreecamPacketGuardTest {
     @Test
     void blocksCameraOriginWorldTargetsButAllowsHeldItemUse() {
-        assertTrue(FreecamPacketGuard.isUnsafeInteractionType(PlayerInteractEntityC2SPacket.class));
-        assertTrue(FreecamPacketGuard.isUnsafeInteractionType(PlayerInteractBlockC2SPacket.class));
-        assertFalse(FreecamPacketGuard.isUnsafeInteractionType(PlayerInteractItemC2SPacket.class));
+        assertTrue(FreecamPacketGuard.isUnsafeInteractionType(ServerboundInteractPacket.class));
+        assertTrue(FreecamPacketGuard.isUnsafeInteractionType(ServerboundUseItemOnPacket.class));
+        assertFalse(FreecamPacketGuard.isUnsafeInteractionType(ServerboundUseItemPacket.class));
     }
 
     @Test
     void preservesPlayerActionPacketsUsedByBodyOriginMining() {
-        assertFalse(FreecamPacketGuard.isUnsafeInteractionType(PlayerActionC2SPacket.class));
+        assertFalse(FreecamPacketGuard.isUnsafeInteractionType(ServerboundPlayerActionPacket.class));
     }
 }

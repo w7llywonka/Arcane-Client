@@ -5,16 +5,15 @@ import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.utility.AutoToolController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 /** Safe body-origin interactions shared by Freecam and Freelook. */
 @Environment(EnvType.CLIENT)
@@ -28,50 +27,50 @@ public final class DetachedCameraInteraction {
         return FreecamController.isActive() || FreelookController.isActive();
     }
 
-    public static HitResult itemUseTarget(MinecraftClient client) {
-        ClientPlayerEntity player = client.player;
-        if (player == null || client.world == null) {
-            return client.crosshairTarget;
+    public static HitResult itemUseTarget(Minecraft client) {
+        LocalPlayer player = client.player;
+        if (player == null || client.level == null) {
+            return client.hitResult;
         }
-        float yaw = FreecamController.isActive() ? FreecamController.playerYaw() : player.getYaw();
-        float pitch = FreecamController.isActive() ? FreecamController.playerPitch() : player.getPitch();
-        Vec3d start = player.getEyePos();
-        Vec3d end = FreecamMining.rayEnd(start, yaw, pitch, player.getBlockInteractionRange());
+        float yaw = FreecamController.isActive() ? FreecamController.playerYaw() : player.getYRot();
+        float pitch = FreecamController.isActive() ? FreecamController.playerPitch() : player.getXRot();
+        Vec3 start = player.getEyePosition();
+        Vec3 end = FreecamMining.rayEnd(start, yaw, pitch, player.blockInteractionRange());
         if (FreecamController.isActive()) {
-            Vec3d direction = end.subtract(start);
-            return BlockHitResult.createMissed(end, Direction.getFacing(direction), BlockPos.ofFloored(end));
+            Vec3 direction = end.subtract(start);
+            return BlockHitResult.miss(end, Direction.getApproximateNearest(direction), BlockPos.containing(end));
         }
-        return client.world.raycast(new RaycastContext(
+        return client.level.clip(new ClipContext(
             start,
             end,
-            RaycastContext.ShapeType.OUTLINE,
-            RaycastContext.FluidHandling.NONE,
+            ClipContext.Block.OUTLINE,
+            ClipContext.Fluid.NONE,
             player
         ));
     }
 
     static void tickMining(
-        MinecraftClient client,
-        ClientPlayerEntity player,
+        Minecraft client,
+        LocalPlayer player,
         float yaw,
         float pitch,
         boolean enabled
     ) {
         if (!enabled
-            || !client.options.attackKey.isPressed()
-            || client.interactionManager == null
-            || client.world == null) {
+            || !client.options.keyAttack.isDown()
+            || client.gameMode == null
+            || client.level == null) {
             stopMining(client);
             return;
         }
 
-        Vec3d start = player.getEyePos();
-        Vec3d end = FreecamMining.rayEnd(start, yaw, pitch, player.getBlockInteractionRange());
-        HitResult result = client.world.raycast(new RaycastContext(
+        Vec3 start = player.getEyePosition();
+        Vec3 end = FreecamMining.rayEnd(start, yaw, pitch, player.blockInteractionRange());
+        HitResult result = client.level.clip(new ClipContext(
             start,
             end,
-            RaycastContext.ShapeType.OUTLINE,
-            RaycastContext.FluidHandling.NONE,
+            ClipContext.Block.OUTLINE,
+            ClipContext.Fluid.NONE,
             player
         ));
         if (!(result instanceof BlockHitResult blockHit) || result.getType() != HitResult.Type.BLOCK) {
@@ -84,23 +83,23 @@ public final class DetachedCameraInteraction {
             AutoToolController.selectForState(
                 client,
                 player,
-                client.world.getBlockState(blockHit.getBlockPos()),
+                client.level.getBlockState(blockHit.getBlockPos()),
                 config.autoToolPreserveDurability
             );
         } else {
             AutoToolController.restore(client);
         }
-        boolean progressed = client.interactionManager.updateBlockBreakingProgress(
+        boolean progressed = client.gameMode.continueDestroyBlock(
             blockHit.getBlockPos(),
-            blockHit.getSide()
+            blockHit.getDirection()
         );
         breaking = true;
-        if (progressed) player.swingHand(Hand.MAIN_HAND);
+        if (progressed) player.swing(InteractionHand.MAIN_HAND, player.getMainHandItem().getAttackAnimation(), false);
     }
 
-    public static void stopMining(MinecraftClient client) {
-        if (breaking && client.interactionManager != null) {
-            client.interactionManager.cancelBlockBreaking();
+    public static void stopMining(Minecraft client) {
+        if (breaking && client.gameMode != null) {
+            client.gameMode.stopDestroyBlock();
         }
         breaking = false;
         AutoToolController.restore(client);

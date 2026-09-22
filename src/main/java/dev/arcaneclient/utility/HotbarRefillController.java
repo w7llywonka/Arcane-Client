@@ -6,10 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.ingame.InventoryScreen;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.item.ItemStack;
 
 /** Replenishes partial hotbar stacks using one cursor-safe transaction at a time. */
 @Environment(EnvType.CLIENT)
@@ -31,34 +31,34 @@ public final class HotbarRefillController {
     private HotbarRefillController() {
     }
 
-    public static void tick(MinecraftClient client, Settings settings) {
-        ClientPlayerEntity player = client.player;
-        if (!settings.enabled() || player == null || client.world == null) {
+    public static void tick(Minecraft client, Settings settings) {
+        LocalPlayer player = client.player;
+        if (!settings.enabled() || player == null || client.level == null) {
             InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.HOTBAR_REFILL);
             return;
         }
         long tick = InventoryAutomationSupport.tick(player);
         if (tick < nextActionTick || player.isUsingItem()) return;
-        if (settings.requireInventoryScreen() && !(client.currentScreen instanceof InventoryScreen)) return;
+        if (settings.requireInventoryScreen() && !(client.gui.screen() instanceof InventoryScreen)) return;
         if (!InventoryAutomationSupport.canUsePlayerInventory(client, player)) return;
 
         List<HotbarRefillPolicy.Target> targets = new ArrayList<>();
         List<HotbarRefillPolicy.Source> sources = new ArrayList<>();
         int selected = player.getInventory().getSelectedSlot();
         for (int hotbarSlot = 0; hotbarSlot < 9; hotbarSlot++) {
-            ItemStack target = player.getInventory().getStack(hotbarSlot);
-            if (target.isEmpty() || target.getMaxCount() <= 1) continue;
+            ItemStack target = player.getInventory().getItem(hotbarSlot);
+            if (target.isEmpty() || target.getMaxStackSize() <= 1) continue;
             String key = "target:" + hotbarSlot;
             targets.add(new HotbarRefillPolicy.Target(
                 hotbarSlot,
                 target.getCount(),
-                target.getMaxCount(),
+                target.getMaxStackSize(),
                 hotbarSlot == selected,
                 key
             ));
             for (int inventoryIndex = 9; inventoryIndex < 36; inventoryIndex++) {
-                ItemStack source = player.getInventory().getStack(inventoryIndex);
-                if (!source.isEmpty() && ItemStack.areItemsAndComponentsEqual(target, source)) {
+                ItemStack source = player.getInventory().getItem(inventoryIndex);
+                if (!source.isEmpty() && ItemStack.isSameItemSameComponents(target, source)) {
                     sources.add(new HotbarRefillPolicy.Source(inventoryIndex, source.getCount(), key));
                 }
             }

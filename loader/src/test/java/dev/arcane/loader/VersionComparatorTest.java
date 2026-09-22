@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test;
 final class VersionComparatorTest {
     @Test
     void ignoresMinecraftBuildMetadataForLoaderOrdering() {
-        assertEquals(0, VersionComparator.compare("1.2.2+mc1.21.11", "1.2.2+other"));
-        assertTrue(VersionComparator.compare("1.2.10+mc1.21.11", "1.2.9+mc1.21.11") > 0);
+        assertEquals(0, VersionComparator.compare("1.2.2+mc26.3", "1.2.2+other"));
+        assertTrue(VersionComparator.compare("1.2.10+mc26.3", "1.2.9+mc26.3") > 0);
     }
 
     @Test

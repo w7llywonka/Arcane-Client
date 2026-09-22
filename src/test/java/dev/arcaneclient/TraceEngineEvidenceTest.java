@@ -17,7 +17,8 @@ final class TraceEngineEvidenceTest {
         TraceEngine engine = new TraceEngine(new ArcaneConfig());
         assertFalse(engine.allowsEvidence(evidence(EvidenceFamily.AMETHYST_ACTIVITY)));
         assertFalse(engine.allowsEvidence(evidence(EvidenceFamily.ACCESS_TRAIL)));
-        assertTrue(engine.allowsEvidence(evidence(EvidenceFamily.GROWTH)));
+        assertFalse(engine.allowsEvidence(evidence(EvidenceFamily.GROWTH)));
+        assertTrue(engine.allowsEvidence(growth()));
     }
 
     @Test
@@ -34,10 +35,10 @@ final class TraceEngineEvidenceTest {
             0,
             20,
             List.of("aligned crop row"),
-            Map.of(SignalCategory.CULTIVATION, 12, SignalCategory.NATURAL_GROWTH, 5)
+            Map.of(SignalCategory.GROWN_PLANTS, 50)
         );
         assertEquals(0, TraceEngine.growthScore(liveOnly));
-        assertEquals(17, TraceEngine.growthScore(growth));
+        assertEquals(50, TraceEngine.growthScore(growth));
     }
 
     @Test
@@ -57,6 +58,37 @@ final class TraceEngineEvidenceTest {
 
     private static dev.arcaneclient.model.ScanEvidence evidence(EvidenceFamily family) {
         return evidence(SignalCategory.NATURAL_GROWTH, family);
+    }
+
+    @Test
+    void oldConfigCannotReenableContainersSoundsOrStaticPlants() {
+        ArcaneConfig config = new ArcaneConfig();
+        config.machineSignals = config.playerBlockSignals = config.packetSignals = true;
+        TraceEngine engine = new TraceEngine(config);
+        for (SignalCategory category : SignalCategory.values()) {
+            if (category == SignalCategory.GROWTH_ACTIVITY || category == SignalCategory.PLANT_HARVEST) continue;
+            for (EvidenceFamily family : EvidenceFamily.values()) {
+                assertFalse(engine.allowsEvidence(dev.arcaneclient.model.ScanEvidence.liveSignal(
+                    category, new BlockPosition(0, -30, 0), "growth harvest chest sound", 200, 0, 12000, family)));
+            }
+        }
+        config.growthChronicle = false;
+        assertTrue(engine.allowsEvidence(growth()), "Old live-growth switches cannot disable loaded plant counts");
+    }
+
+    @Test
+    void freshEmptySnapshotRemovesOldPlantEvidence() {
+        var trace = new dev.arcaneclient.model.ChunkTrace();
+        trace.merge(dev.arcaneclient.model.ScanResult.builder().add(growth()).completeSnapshot(0, 24, 24).build());
+        TraceEngine engine = new TraceEngine(new ArcaneConfig());
+        assertTrue(trace.summarizeEvidenceAt(0, engine::allowsEvidence, true).score() > 0);
+        trace.merge(dev.arcaneclient.model.ScanResult.builder().completeSnapshot(1, 24, 24).build());
+        assertEquals(0, trace.summarizeEvidenceAt(1, engine::allowsEvidence, true).score());
+    }
+
+    private static dev.arcaneclient.model.ScanEvidence growth() {
+        return dev.arcaneclient.model.ScanEvidence.staticSignal(SignalCategory.GROWN_PLANTS,
+            new BlockPosition(0, 70, 0), "grown wheat", 1, EvidenceFamily.GROWTH);
     }
 
     private static dev.arcaneclient.model.ScanEvidence evidence(SignalCategory category, EvidenceFamily family) {

@@ -14,17 +14,17 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.EntityHitResult;
 
 /**
  * Two grouped, configurable panels: live player status and one-pass inventory totals.
@@ -56,9 +56,9 @@ public final class AdvancedHudController {
         cachedInventoryHud = false;
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         ArcaneConfig config = ArcaneClient.config();
-        if (config == null || client.player == null || client.world == null || (!config.statusHud && !config.inventoryHud)) {
+        if (config == null || client.player == null || client.level == null || (!config.statusHud && !config.inventoryHud)) {
             reset();
             return;
         }
@@ -76,16 +76,16 @@ public final class AdvancedHudController {
         refreshIn = SNAPSHOT_INTERVAL_TICKS - 1;
     }
 
-    private static void render(DrawContext graphics) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    private static void render(GuiGraphicsExtractor graphics) {
+        Minecraft client = Minecraft.getInstance();
         ArcaneConfig config = ArcaneClient.config();
-        if (config == null || client.player == null || client.world == null || ArcaneVisibility.overlaysHidden()
+        if (config == null || client.player == null || client.level == null || ArcaneVisibility.overlaysHidden()
             || ArcaneSettingsScreen.isOpen(client)) return;
         if (cachedStreamerMode != config.streamerMode) return;
         List<String> lines = cachedLines;
         if (lines.isEmpty()) return;
 
-        TextRenderer font = ArcaneFont.renderer(client);
+        Font font = ArcaneFont.renderer(client);
         ClickGuiColors colors = ClickGuiColors.resolve(config);
         int columnCount = lines.size() > 10 ? 2 : 1;
         int rows = (lines.size() + columnCount - 1) / columnCount;
@@ -96,10 +96,10 @@ public final class AdvancedHudController {
         int totalWidth = 0;
         for (int width : widths) totalWidth += Math.max(92, width);
         totalWidth += (columnCount - 1) * 5;
-        int totalHeight = rows * (font.fontHeight + 3) + 9;
+        int totalHeight = rows * (font.lineHeight + 3) + 9;
 
-        int screenWidth = graphics.getScaledWindowWidth();
-        int screenHeight = graphics.getScaledWindowHeight();
+        int screenWidth = graphics.guiWidth();
+        int screenHeight = graphics.guiHeight();
         float requestedScale = config.hudScalePercent / 100.0f;
         float fitScale = Math.min((screenWidth - 14.0f) / totalWidth, (screenHeight - 14.0f) / totalHeight);
         float scale = Math.max(0.5f, Math.min(requestedScale, fitScale));
@@ -110,9 +110,9 @@ public final class AdvancedHudController {
         int originX = right ? screenWidth - scaledWidth - 7 : 7;
         int originY = bottom ? screenHeight - scaledHeight - 7 : 7;
 
-        graphics.getMatrices().pushMatrix();
-        graphics.getMatrices().translate(originX, originY);
-        graphics.getMatrices().scale(scale, scale);
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(originX, originY);
+        graphics.pose().scale(scale, scale);
         int x = 0;
         int alpha = Math.clamp(config.uiOpacityPercent * 255 / 100, 0, 255);
         int panel = alpha << 24 | colors.window() & 0x00FFFFFF;
@@ -124,21 +124,21 @@ public final class AdvancedHudController {
             int start = column * rows;
             int end = Math.min(lines.size(), start + rows);
             for (int index = start; index < end; index++) {
-                graphics.drawText(font, ArcaneFont.trimmed(font, lines.get(index), width - 14), x + 7, y, colors.text(), false);
-                y += font.fontHeight + 3;
+                graphics.text(font, ArcaneFont.trimmed(font, lines.get(index), width - 14), x + 7, y, colors.text(), false);
+                y += font.lineHeight + 3;
             }
             x += width + 5;
         }
-        graphics.getMatrices().popMatrix();
+        graphics.pose().popMatrix();
     }
 
-    static List<String> lines(MinecraftClient client, ArcaneConfig config) {
+    static List<String> lines(Minecraft client, ArcaneConfig config) {
         return buildLines(client, config);
     }
 
-    private static List<String> buildLines(MinecraftClient client, ArcaneConfig config) {
-        ClientPlayerEntity player = client.player;
-        if (player == null || client.world == null) return List.of();
+    private static List<String> buildLines(Minecraft client, ArcaneConfig config) {
+        LocalPlayer player = client.player;
+        if (player == null || client.level == null) return List.of();
         ArrayList<String> lines = new ArrayList<>(18);
         if (config.statusHud) addStatusLines(lines, client, player, config);
         if (config.inventoryHud) addInventoryLines(lines, player, config, InventorySnapshot.capture(player));
@@ -147,38 +147,38 @@ public final class AdvancedHudController {
 
     private static void addStatusLines(
         List<String> lines,
-        MinecraftClient client,
-        ClientPlayerEntity player,
+        Minecraft client,
+        LocalPlayer player,
         ArcaneConfig config
     ) {
         if (config.hudHealth) lines.add(String.format(Locale.ROOT, "HEALTH  %.1f ♥", player.getHealth() / 2.0f));
-        if (config.hudHunger) lines.add("HUNGER  " + player.getHungerManager().getFoodLevel() + "/20");
-        if (config.hudArmor) lines.add("ARMOR  " + player.getArmor() + " PTS · MIN " + minimumArmorDurability(player) + "%");
-        if (config.hudAir && player.getAir() < player.getMaxAir()) {
-            lines.add("AIR  " + Math.max(0, player.getAir()) * 100 / Math.max(1, player.getMaxAir()) + "%");
+        if (config.hudHunger) lines.add("HUNGER  " + player.getFoodData().getFoodLevel() + "/20");
+        if (config.hudArmor) lines.add("ARMOR  " + player.getArmorValue() + " PTS · MIN " + minimumArmorDurability(player) + "%");
+        if (config.hudAir && player.getAirSupply() < player.getMaxAirSupply()) {
+            lines.add("AIR  " + Math.max(0, player.getAirSupply()) * 100 / Math.max(1, player.getMaxAirSupply()) + "%");
         }
         if (config.hudExperience) lines.add("XP  " + player.experienceLevel + " · " + Math.round(player.experienceProgress * 100.0f) + "%");
         if (config.hudTarget) addIfPresent(lines, targetLine(client, config.streamerMode));
-        ItemStack elytra = player.getEquippedStack(EquipmentSlot.CHEST);
-        if (config.hudElytra && elytra.isOf(Items.ELYTRA)) {
-            lines.add("ELYTRA  " + (player.isGliding() ? "GLIDING · " : "READY · ")
-                + (elytra.isDamageable() ? durability(elytra) + "%" : "NONE"));
+        ItemStack elytra = player.getItemBySlot(EquipmentSlot.CHEST);
+        if (config.hudElytra && elytra.is(Items.ELYTRA)) {
+            lines.add("ELYTRA  " + (player.isFallFlying() ? "GLIDING · " : "READY · ")
+                + (elytra.isDamageableItem() ? durability(elytra) + "%" : "NONE"));
         }
         if (config.hudMount) addIfPresent(lines, mountLine(player));
         if (config.hudPotionTimers) addIfPresent(lines, potionLine(player));
         if (config.deathCoordinates && config.hudDeathBeacon && QualityOfLifeController.lastDeath() != null) {
-            addIfPresent(lines, config.streamerMode ? "DEATH  REDACTED" : deathBeaconLine(player, client.world.getRegistryKey().getValue().getPath()));
+            addIfPresent(lines, config.streamerMode ? "DEATH  REDACTED" : deathBeaconLine(player, client.level.dimension().identifier().getPath()));
         }
     }
 
     private static void addInventoryLines(
         List<String> lines,
-        ClientPlayerEntity player,
+        LocalPlayer player,
         ArcaneConfig config,
         InventorySnapshot snapshot
     ) {
-        ItemStack held = player.getMainHandStack();
-        if (config.hudHeldDurability && held.isDamageable()) lines.add("HELD  " + durability(held) + "%");
+        ItemStack held = player.getMainHandItem();
+        if (config.hudHeldDurability && held.isDamageableItem()) lines.add("HELD  " + durability(held) + "%");
         if (config.hudTotems) addCount(lines, "TOTEMS", snapshot.totems());
         if (config.hudRockets) addCount(lines, "ROCKETS", snapshot.rockets());
         if (config.hudPearls) addCount(lines, "PEARLS", snapshot.pearls());
@@ -188,9 +188,9 @@ public final class AdvancedHudController {
         if (config.hudInventorySpace) lines.add("SLOTS  " + snapshot.emptySlots() + "/36");
     }
 
-    private static String targetLine(MinecraftClient client, boolean streamerMode) {
-        if (!(client.crosshairTarget instanceof EntityHitResult hit)) return null;
-        boolean playerTarget = hit.getEntity() instanceof net.minecraft.entity.player.PlayerEntity;
+    private static String targetLine(Minecraft client, boolean streamerMode) {
+        if (!(client.hitResult instanceof EntityHitResult hit)) return null;
+        boolean playerTarget = hit.getEntity() instanceof net.minecraft.world.entity.player.Player;
         String name = StreamerPrivacy.entityName(streamerMode, playerTarget, hit.getEntity().getName().getString());
         if (hit.getEntity() instanceof LivingEntity living) {
             return String.format(Locale.ROOT, "TARGET  %s · %.1f ♥", name, living.getHealth() / 2.0f);
@@ -198,28 +198,28 @@ public final class AdvancedHudController {
         return "TARGET  " + name;
     }
 
-    private static String mountLine(ClientPlayerEntity player) {
+    private static String mountLine(LocalPlayer player) {
         if (!(player.getVehicle() instanceof LivingEntity living)) return null;
         return String.format(Locale.ROOT, "MOUNT  %s · %.1f ♥", living.getName().getString(), living.getHealth() / 2.0f);
     }
 
-    private static String potionLine(ClientPlayerEntity player) {
-        List<StatusEffectInstance> effects = player.getStatusEffects().stream()
-            .sorted(Comparator.comparingInt(StatusEffectInstance::getDuration))
+    private static String potionLine(LocalPlayer player) {
+        List<MobEffectInstance> effects = player.getActiveEffects().stream()
+            .sorted(Comparator.comparingInt(MobEffectInstance::getDuration))
             .limit(3)
             .toList();
         if (effects.isEmpty()) return null;
         StringBuilder value = new StringBuilder("POTIONS  ");
         for (int i = 0; i < effects.size(); i++) {
             if (i > 0) value.append(" · ");
-            StatusEffectInstance effect = effects.get(i);
-            value.append(effect.getEffectType().value().getName().getString())
+            MobEffectInstance effect = effects.get(i);
+            value.append(effect.getEffect().value().getDisplayName().getString())
                 .append(' ').append(AdvancedHudFormatter.duration(effect.getDuration() / 20L));
         }
         return value.toString();
     }
 
-    private static String deathBeaconLine(ClientPlayerEntity player, String dimension) {
+    private static String deathBeaconLine(LocalPlayer player, String dimension) {
         QualityOfLifeController.LastDeath death = QualityOfLifeController.lastDeath();
         if (death == null) return null;
         if (!death.dimension().equals(dimension)) return "DEATH  " + readable(death.dimension());
@@ -231,11 +231,11 @@ public final class AdvancedHudController {
         return "DEATH  " + direction + " · " + AdvancedHudFormatter.distance(distance);
     }
 
-    private static int minimumArmorDurability(ClientPlayerEntity player) {
+    private static int minimumArmorDurability(LocalPlayer player) {
         int minimum = 100;
         for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
-            ItemStack stack = player.getEquippedStack(slot);
-            if (!stack.isDamageable()) return 0;
+            ItemStack stack = player.getItemBySlot(slot);
+            if (!stack.isDamageableItem()) return 0;
             minimum = Math.min(minimum, durability(stack));
         }
         return minimum;
@@ -250,7 +250,7 @@ public final class AdvancedHudController {
     }
 
     private static int durability(ItemStack stack) {
-        return AdvancedHudFormatter.durabilityPercent(stack.getDamage(), stack.getMaxDamage());
+        return AdvancedHudFormatter.durabilityPercent(stack.getDamageValue(), stack.getMaxDamage());
     }
 
     private static String readable(String id) {
@@ -266,7 +266,7 @@ public final class AdvancedHudController {
         int arrows,
         int emptySlots
     ) {
-        private static InventorySnapshot capture(ClientPlayerEntity player) {
+        private static InventorySnapshot capture(LocalPlayer player) {
             int totems = 0;
             int rockets = 0;
             int pearls = 0;
@@ -274,15 +274,15 @@ public final class AdvancedHudController {
             int crystals = 0;
             int arrows = 0;
             int empty = 0;
-            for (int slot = 0; slot < player.getInventory().size(); slot++) {
-                ItemStack stack = player.getInventory().getStack(slot);
+            for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+                ItemStack stack = player.getInventory().getItem(slot);
                 if (slot < 36 && stack.isEmpty()) empty++;
-                if (stack.isOf(Items.TOTEM_OF_UNDYING)) totems += stack.getCount();
-                else if (stack.isOf(Items.FIREWORK_ROCKET)) rockets += stack.getCount();
-                else if (stack.isOf(Items.ENDER_PEARL)) pearls += stack.getCount();
-                else if (stack.isOf(Items.GOLDEN_APPLE) || stack.isOf(Items.ENCHANTED_GOLDEN_APPLE)) gapples += stack.getCount();
-                else if (stack.isOf(Items.END_CRYSTAL)) crystals += stack.getCount();
-                else if (stack.isOf(Items.ARROW) || stack.isOf(Items.SPECTRAL_ARROW) || stack.isOf(Items.TIPPED_ARROW)) arrows += stack.getCount();
+                if (stack.is(Items.TOTEM_OF_UNDYING)) totems += stack.getCount();
+                else if (stack.is(Items.FIREWORK_ROCKET)) rockets += stack.getCount();
+                else if (stack.is(Items.ENDER_PEARL)) pearls += stack.getCount();
+                else if (stack.is(Items.GOLDEN_APPLE) || stack.is(Items.ENCHANTED_GOLDEN_APPLE)) gapples += stack.getCount();
+                else if (stack.is(Items.END_CRYSTAL)) crystals += stack.getCount();
+                else if (stack.is(Items.ARROW) || stack.is(Items.SPECTRAL_ARROW) || stack.is(Items.TIPPED_ARROW)) arrows += stack.getCount();
             }
             return new InventorySnapshot(totems, rockets, pearls, gapples, crystals, arrows, empty);
         }

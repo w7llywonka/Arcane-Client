@@ -10,8 +10,8 @@ class ReleaseManifestTest {
         {
           "schemaVersion": 2,
           "artifactType": "arcane-loader",
-          "version": "1.2.2+mc1.21.11",
-          "minecraftVersion": "1.21.11",
+          "version": "1.2.2+mc26.3",
+          "minecraftVersion": "26.3",
           "downloadUrl": "https://example.com/arcane.jar",
           "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
@@ -22,7 +22,7 @@ class ReleaseManifestTest {
     @Test
     void parsesSupportedManifest() {
         ReleaseManifest release = ReleaseManifest.parse(VALID);
-        assertEquals("1.2.2+mc1.21.11", release.version());
+        assertEquals("1.2.2+mc26.3", release.version());
         assertEquals("arcane-loader", release.artifactType());
         assertEquals(789851L, release.size());
     }

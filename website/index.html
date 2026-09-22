@@ -1,446 +1,391 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Arcane Client tracks growth activity from selected crops and plants to surface possible base locations.">
-  <meta name="theme-color" content="#08110d">
-  <title>Arcane Client — Growth-Based Base Finder</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="icon" href="assets/arcane-mark.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
-  <script>
-    document.documentElement.classList.add("js");
-    try {
-      if (sessionStorage.getItem("arcane-intro-seen")) {
-        document.documentElement.classList.add("intro-seen");
-      } else {
-        sessionStorage.setItem("arcane-intro-seen", "1");
-      }
-    } catch (error) {
-      document.documentElement.dataset.storage = "unavailable";
-    }
-  </script>
-</head>
-<body>
-  <div class="site-startup" aria-hidden="true">
-    <div class="site-startup-copy">
-      <strong>ARCANE CLIENT</strong>
-    </div>
-    <span class="site-startup-rule"></span>
-  </div>
-  <a class="skip-link" href="#main-content">Skip to content</a>
-
-  <nav class="site-nav" aria-label="Primary navigation">
-    <div class="nav-shell">
-      <a class="brand" href="#home" aria-label="Arcane Client home">
-        <img src="assets/arcane-mark.svg" width="46" height="32" alt="">
-        <span>Arcane Client</span>
-      </a>
-
-      <div class="desktop-nav">
-        <a href="#home">Home</a>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0d100d" />
+    <meta
+      name="description"
+      content="Arcane Client for Minecraft. Growth-based base finding, freecam, freelook and practical utilities. Download for Fabric 1.21.11 or 26.3."
+    />
+    <meta
+      property="og:title"
+      content="Arcane Client — Minecraft utility client"
+    />
+    <meta
+      property="og:description"
+      content="Growth-based scanning, camera controls and everyday utilities for Minecraft. Fabric 1.21.11 and 26.3."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://arcaneclient.shop/" />
+    <link rel="canonical" href="https://arcaneclient.shop/" />
+    <title>Arcane Client — Minecraft utility client</title>
+    <link rel="icon" href="assets/arcane.svg?v=2.9.1-2" type="image/svg+xml" />
+    <link
+      rel="preload"
+      href="assets/sora.ttf?v=2.9.1-2"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
+    <link rel="stylesheet" href="styles.css?v=2.9.1-2" />
+    <script src="script.js?v=2.9.1-3" defer></script>
+  </head>
+  <body id="top">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header shell">
+      <a class="brand" href="#top" aria-label="Arcane Client home"
+        ><img src="assets/arcane.svg?v=2.9.1-2" alt="" width="22" height="22" /><span
+          >arcane client</span
+        ></a
+      >
+      <nav aria-label="Main navigation">
         <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#faq">FAQ</a>
-      </div>
+        <a href="#install">Install</a>
+        <a href="help.html">Help</a>
+        <a
+          href="https://discord.gg/DvfZW4Fk5"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Discord <span aria-hidden="true">↗</span></a
+        >
+      </nav>
+    </header>
 
-      <button class="nav-action" type="button" data-download-open>Download</button>
-
-      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-    </div>
-
-    <div class="mobile-menu" id="mobile-menu" hidden>
-      <a href="#home">Home</a>
-      <a href="#features">Features</a>
-      <a href="#pricing">Pricing</a>
-      <a href="#faq">FAQ</a>
-      <button class="mobile-menu-action" type="button" data-download-open>Download Arcane</button>
-      <a class="mobile-menu-discord" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
-    </div>
-  </nav>
-
-  <main id="main-content">
-    <section class="hero" id="home" aria-labelledby="hero-title">
-      <div class="hero-beams" aria-hidden="true">
-        <span class="beam beam-left beam-wide"></span>
-        <span class="beam beam-left beam-thin"></span>
-        <span class="beam beam-right beam-wide"></span>
-        <span class="beam beam-right beam-thin"></span>
-      </div>
-
-      <div class="hero-copy">
-        <h1 id="hero-title">
-          <span class="hero-word hero-accent" style="--word-delay: 120ms">Growth</span>
-          <span class="hero-word" style="--word-delay: 190ms">leads</span><br>
-          <span class="hero-word" style="--word-delay: 260ms">to</span>
-          <span class="hero-word" style="--word-delay: 330ms">bases.</span>
-        </h1>
-        <p>Tracks changes from selected crops, saplings, sugar cane, cactus, and other growth states to surface possible base locations. Storage and light never affect a lead.</p>
-        <div class="hero-actions">
-          <button class="pill pill-primary pill-glint" type="button" data-download-open>Download 2.3.6</button>
-          <a class="pill pill-secondary" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Discord</a>
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-heading">
+        <div class="hero-art" aria-hidden="true">
+          <div class="scene scene-one">
+            <img
+              src="assets/minecraft-night.png?v=2.9.1-2"
+              alt=""
+              width="1024"
+              height="1024"
+              fetchpriority="high"
+            />
+          </div>
+          <div class="scene scene-two">
+            <img
+              src="assets/minecraft-cave.png?v=2.9.1-2"
+              alt=""
+              width="1024"
+              height="1024"
+            />
+          </div>
+          <div class="scene scene-three">
+            <img
+              src="assets/minecraft-cave.png?v=2.9.1-2"
+              alt=""
+              width="1024"
+              height="1024"
+            />
+          </div>
+          <div class="scene scene-four">
+            <img
+              src="assets/minecraft-night.png?v=2.9.1-2"
+              alt=""
+              width="1024"
+              height="1024"
+            />
+          </div>
         </div>
-        <div class="hero-meta" role="group" aria-label="Client compatibility">
-          <span>Fabric 1.21.11</span>
-          <i></i>
-          <span>Client-side</span>
-          <i></i>
-          <span>Right Shift GUI</span>
+        <div class="hero-copy">
+          <p class="eyebrow">ARCANE CLIENT</p>
+          <h1 id="hero-heading">
+            A Minecraft client,<br />focused on base finding.
+          </h1>
+          <p class="hero-description">
+            Growth-based scanning, freecam, and practical utilities.<br
+              class="desktop-break"
+            />
+            All in one Fabric client.
+          </p>
+          <div class="actions">
+            <a class="button button-primary" href="#download" data-download-open
+              >Download Arcane <span aria-hidden="true">↓</span></a
+            >
+            <a
+              class="button button-secondary"
+              href="https://discord.gg/DvfZW4Fk5"
+              target="_blank"
+              rel="noopener noreferrer"
+              >Join Discord <span aria-hidden="true">↗</span></a
+            >
+          </div>
+          <a class="explore-link" href="#features"
+            >Explore features <span aria-hidden="true">↓</span></a
+          >
         </div>
+      </section>
+
+      <div class="compatibility shell" aria-label="Release compatibility">
+        <span>ARCANE <strong>2.9.3</strong></span
+        ><span>MINECRAFT <strong>1.21.11 / 26.3</strong></span
+        ><span>MOD LOADER <strong>Fabric</strong></span
+        ><span>JAVA <strong>21+ / 25+</strong></span>
       </div>
-    </section>
 
-    <section class="section section-large" id="features" aria-labelledby="features-title">
-      <div class="container container-medium">
-        <header class="section-heading reveal">
-          <span class="section-kicker">Built with a clear signal</span>
-          <h2 id="features-title">Why choose <em>Arcane?</em></h2>
-        </header>
-
+      <section
+        class="features shell"
+        id="features"
+        aria-labelledby="features-heading"
+      >
+        <div class="signals-stage">
+          <div class="signal-items" aria-hidden="true">
+            <img
+              class="signal-item item-one"
+              src="assets/sugar_cane.png?v=2.9.1-2"
+              alt=""
+              width="56"
+              height="56"
+              loading="lazy"
+            />
+            <img
+              class="signal-item item-two"
+              src="assets/bamboo.png?v=2.9.1-2"
+              alt=""
+              width="48"
+              height="48"
+              loading="lazy"
+            />
+            <img
+              class="signal-item item-three"
+              src="assets/wheat.png?v=2.9.1-2"
+              alt=""
+              width="56"
+              height="56"
+              loading="lazy"
+            />
+            <img
+              class="signal-item item-four"
+              src="assets/kelp.png?v=2.9.1-2"
+              alt=""
+              width="48"
+              height="48"
+              loading="lazy"
+            />
+          </div>
+          <div class="signals-copy">
+            <p class="eyebrow">BASE FINDING</p>
+            <h2 id="features-heading">
+              Start with the growth.<br />Look at the bigger picture.
+            </h2>
+            <p>
+              Compare growth and activity signals across nearby chunks, then use
+              the radar to decide where to look.
+            </p>
+            <span class="signal-note"
+              >Possible leads, not guaranteed finds.</span
+            >
+          </div>
+        </div>
         <div class="feature-grid">
-          <article class="feature-card reveal" style="--reveal-delay: 0ms">
-            <span class="card-orbit" aria-hidden="true"></span>
-            <div class="feature-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M12 21v-9m0 1C8 13 5 10 5 6c4 0 7 2 7 7Zm0 3c3 0 6-2 7-6-4 0-7 2-7 6Z"/>
-              </svg>
+          <article>
+            <img
+              class="item-icon"
+              src="assets/ender_eye.png?v=2.9.1-2"
+              width="28"
+              height="28"
+              alt=""
+              loading="lazy"
+            />
+            <h3>Growth-based scanning</h3>
+            <p>
+              Chunk scores and a compact base radar help you keep track of
+              promising areas as you explore.
+            </p>
+            <span class="feature-detail">Chunk Finder · Base Radar</span>
+          </article>
+          <article>
+            <img
+              class="item-icon"
+              src="assets/elytra.png?v=2.9.1-2"
+              width="28"
+              height="28"
+              alt=""
+              loading="lazy"
+            />
+            <h3>Camera &amp; visibility</h3>
+            <p>
+              Move your camera independently, look around with Freelook, and
+              choose your ESP overlays.
+            </p>
+            <span class="feature-detail">Freecam · Freelook · ESP</span>
+          </article>
+          <article>
+            <img
+              class="item-icon"
+              src="assets/diamond_pickaxe.png?v=2.9.1-2"
+              width="28"
+              height="28"
+              alt=""
+              loading="lazy"
+            />
+            <h3>Flight &amp; tools</h3>
+            <p>
+              Automate rockets on long flights, select the right tool, and keep
+              an eye on durability.
+            </p>
+            <span class="feature-detail"
+              >Elytra Assist · Auto Tool · Durability Guard</span
+            >
+          </article>
+        </div>
+      </section>
+
+      <section
+        class="install shell"
+        id="install"
+        aria-labelledby="install-heading"
+      >
+        <div class="install-copy">
+          <p class="eyebrow">GET STARTED</p>
+          <h2 id="install-heading">Add Arcane to<br />your next session.</h2>
+          <p>Minecraft Java Edition · Fabric 1.21.11 or 26.3</p>
+          <a
+            id="download"
+            class="button button-primary"
+            href="#install"
+            data-download-open
+            >Download v2.9.3 <span aria-hidden="true">↓</span></a
+          >
+          <noscript
+            ><p>
+              Enable JavaScript to enter your download code, or
+              <a href="https://discord.gg/DvfZW4Fk5">get help on Discord</a>.
+            </p></noscript
+          >
+        </div>
+        <ol class="install-steps">
+          <li>
+            <span class="step-number" aria-hidden="true">01</span>
+            <div>
+              <h3>Install Fabric</h3>
+              <p>
+                Choose the matching Arcane download. Use Java 21+ for Minecraft
+                1.21.11, or Java 25+ for Minecraft 26.3.
+              </p>
             </div>
-            <h3>Tracked growth signals</h3>
-            <p>Monitors selected crops, saplings, sugar cane, cactus, stage changes, and repeated harvest activity across loaded chunks.</p>
-            <span class="card-note">Growth activity only</span>
-          </article>
-
-          <article class="feature-card reveal" style="--reveal-delay: 80ms">
-            <span class="card-orbit card-orbit-purple" aria-hidden="true"></span>
-            <div class="feature-icon feature-icon-purple" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <path d="M4 13a8 8 0 1 1 16 0"/>
-                <path d="m12 13 4-4"/>
-                <path d="M5 18h14"/>
-              </svg>
+          </li>
+          <li>
+            <span class="step-number" aria-hidden="true">02</span>
+            <div>
+              <h3>Add ARCLoader</h3>
+              <p>
+                Import <code>ARCLoader.jar</code> into Modrinth or Prism, or place it
+                in your Fabric <code>mods</code> folder. Keep the matching Fabric
+                API installed. For Arcane, only the loader JAR belongs in
+                <code>mods</code>—do not add a loose Arcane Client JAR.
+              </p>
             </div>
-            <h3>Built to stay light</h3>
-            <p>High FPS is the default profile, with a focused scan pipeline and a 1.0 ms-per-tick default budget.</p>
-            <span class="card-note">Three performance profiles</span>
-          </article>
-
-          <article class="feature-card reveal" style="--reveal-delay: 160ms">
-            <span class="card-orbit" aria-hidden="true"></span>
-            <div class="feature-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <rect x="4" y="4" width="6" height="6" rx="1"/>
-                <rect x="14" y="4" width="6" height="6" rx="1"/>
-                <rect x="4" y="14" width="6" height="6" rx="1"/>
-                <path d="M14 17h6m-3-3v6"/>
-              </svg>
+          </li>
+          <li>
+            <span class="step-number" aria-hidden="true">03</span>
+            <div>
+              <h3>Launch Arcane</h3>
+              <p>
+                Start Minecraft with Fabric. Arcane loads on the first launch;
+                press <kbd>Right Shift</kbd> to open it. A future signed update
+                may ask for one restart.
+              </p>
             </div>
-            <h3>Clear evidence</h3>
-            <p>Chunk tiles, radar, labels, alerts, and a current-chunk readout show which tracked changes created each possible base lead.</p>
-            <span class="card-note">Every lead explained</span>
-          </article>
-        </div>
+          </li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="site-footer shell">
+      <div>
+        <a class="brand footer-brand" href="#top"
+          ><img src="assets/arcane.svg?v=2.9.1-2" alt="" width="19" height="19" /><span
+            >arcane client</span
+          ></a
+        >
+        <p>Not affiliated with Mojang or Microsoft.</p>
       </div>
-    </section>
+      <a
+        href="https://discord.gg/DvfZW4Fk5"
+        target="_blank"
+        rel="noopener noreferrer"
+        >Support &amp; updates <span aria-hidden="true">↗</span></a
+      >
+    </footer>
 
-    <section class="section section-medium" id="install" aria-label="Installation and compatibility">
-      <div class="container container-medium">
-        <div class="setup-grid">
-          <article class="setup-main surface-card reveal">
-            <span class="section-kicker">Easy to set up</span>
-            <h2>Drop it in.<br>Start tracking.</h2>
-            <p class="setup-intro">Arcane is a client-side Fabric mod that tracks growth activity in loaded chunks. No installer maze and no extra storage service.</p>
-
-            <ol class="setup-steps">
-              <li>
-                <span class="step-number">01</span>
-                <div>
-                  <h3>Install Fabric</h3>
-                  <p>Use a Fabric 1.21.11 profile.</p>
-                </div>
-              </li>
-              <li>
-                <span class="step-number">02</span>
-                <div>
-                  <h3>Drop in the JAR</h3>
-                  <p>Place Arcane in your mods folder.</p>
-                </div>
-              </li>
-              <li>
-                <span class="step-number">03</span>
-                <div>
-                  <h3>Launch</h3>
-                  <p>Join a world and press Right Shift.</p>
-                </div>
-              </li>
-            </ol>
-          </article>
-
-          <article class="stat-card surface-card reveal" style="--reveal-delay: 80ms">
-            <span class="stat-label">Default scan budget</span>
-            <strong>1.0 <small>ms</small></strong>
-            <p>Per tick in the High FPS profile.</p>
-          </article>
-
-          <article class="compat-card surface-card reveal" style="--reveal-delay: 160ms">
-            <span class="stat-label">Compatible setup</span>
-            <p>Fabric 1.21.11, client-side.</p>
-            <div class="launcher-grid">
-              <span><i class="launcher-dot launcher-blue"></i>Minecraft</span>
-              <span><i class="launcher-dot launcher-green"></i>Modrinth</span>
-              <span><i class="launcher-dot launcher-purple"></i>Prism</span>
-              <span><i class="launcher-dot launcher-white"></i>Fabric</span>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-medium" id="preview" aria-labelledby="preview-title">
-      <div class="container container-wide">
-        <header class="section-heading reveal">
-          <span class="section-kicker">Interface samples</span>
-          <h2 id="preview-title">See <em>Arcane</em> in action.</h2>
-          <p>Three clear views, each built around a specific job.</p>
-        </header>
-
-        <div class="demo-grid">
-          <article class="demo-card reveal" style="--reveal-delay: 0ms">
-            <div class="demo-window">
-              <header>
-                <span><i></i> Growth Tracker</span>
-                <small>Sample</small>
-              </header>
-              <div class="mini-map" aria-hidden="true">
-                <span></span><span>08</span><span></span><span></span><span></span><span></span>
-                <span></span><span>24</span><span>36</span><span>41</span><span></span><span></span>
-                <span></span><span></span><span>31</span><span class="hot">78</span><span>40</span><span></span>
-                <span></span><span></span><span></span><span>16</span><span></span><span></span>
-                <i></i>
-              </div>
-            </div>
-            <footer>
-              <div>
-                <h3>Growth Tracker</h3>
-                <p>Loaded-chunk growth activity</p>
-              </div>
-              <span>01</span>
-            </footer>
-          </article>
-
-          <article class="demo-card reveal" style="--reveal-delay: 80ms">
-            <div class="demo-window">
-              <header>
-                <span><i class="purple-dot"></i> Chunk Intel</span>
-                <small>Sample</small>
-              </header>
-              <div class="intel-panel">
-                <div class="intel-score"><span>Current chunk</span><strong>78</strong></div>
-                <dl>
-                  <div><dt>Tracked states</dt><dd>24</dd></div>
-                  <div><dt>Stage changes</dt><dd>18</dd></div>
-                  <div><dt>Growth events</dt><dd>15</dd></div>
-                </dl>
-              </div>
-            </div>
-            <footer>
-              <div>
-                <h3>Chunk Intel</h3>
-                <p>The signals behind the lead</p>
-              </div>
-              <span>02</span>
-            </footer>
-          </article>
-
-          <article class="demo-card reveal" style="--reveal-delay: 160ms">
-            <div class="demo-window">
-              <header>
-                <span><i></i> Independent ESP</span>
-                <small>Visual only</small>
-              </header>
-              <div class="esp-panel">
-                <div><span>Storage ESP</span><i class="toggle on"></i></div>
-                <div><span>Item ESP</span><i class="toggle on"></i></div>
-                <div><span>Tunnel ESP</span><i class="toggle"></i></div>
-                <p>Never creates a base lead.</p>
-              </div>
-            </div>
-            <footer>
-              <div>
-                <h3>Independent ESP</h3>
-                <p>Useful visuals, separate logic</p>
-              </div>
-              <span>03</span>
-            </footer>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-large" id="pricing" aria-labelledby="pricing-title">
-      <div class="container container-medium">
-        <header class="section-heading reveal">
-          <span class="section-kicker">Simple access</span>
-          <h2 id="pricing-title">Choose your <em>plan.</em></h2>
-          <p>Every included tool is listed. Premium growth tracking is still in development.</p>
-        </header>
-
-        <div class="plan-grid">
-          <article class="plan-card reveal" style="--reveal-delay: 0ms">
-            <header>
-              <span>Base</span>
-              <small>Current release</small>
-            </header>
-            <div class="plan-price"><sup>$</sup>5</div>
-            <p>The complete Arcane 2.3.6 client available today.</p>
-            <ul>
-              <li><span class="check" aria-hidden="true"></span>Growth-based base finder</li>
-              <li><span class="check" aria-hidden="true"></span>Chunk map, radar, and intel</li>
-              <li><span class="check" aria-hidden="true"></span>Base leads and growth alerts</li>
-              <li><span class="check" aria-hidden="true"></span>Storage, Item, and Tunnel ESP</li>
-              <li><span class="check" aria-hidden="true"></span>Freecam, Freelook, and Auto Totem</li>
-              <li><span class="check" aria-hidden="true"></span>Chat macros and performance profiles</li>
-              <li><span class="check" aria-hidden="true"></span>All client updates</li>
-            </ul>
-            <button class="plan-action plan-action-secondary" type="button" data-download-open>Download 2.3.6</button>
-          </article>
-
-          <article class="plan-card plan-card-featured reveal" style="--reveal-delay: 80ms">
-            <span class="plan-badge">In development</span>
-            <header>
-              <span>Premium</span>
-              <small>Preview tier</small>
-            </header>
-            <div class="plan-price"><sup>$</sup>10</div>
-            <p>The Arcane toolset plus access to the future Premium growth tracker.</p>
-            <ul>
-              <li><span class="check" aria-hidden="true"></span>Growth-based base finder</li>
-              <li><span class="check" aria-hidden="true"></span>Chunk map, radar, and intel</li>
-              <li><span class="check" aria-hidden="true"></span>Base leads and growth alerts</li>
-              <li><span class="check" aria-hidden="true"></span>Storage, Item, and Tunnel ESP</li>
-              <li><span class="check" aria-hidden="true"></span>Freecam, Freelook, and Auto Totem</li>
-              <li><span class="check" aria-hidden="true"></span>Chat macros and performance profiles</li>
-              <li><span class="check" aria-hidden="true"></span>Premium growth tracker when released</li>
-              <li><span class="check" aria-hidden="true"></span>All client updates</li>
-            </ul>
-            <a class="plan-action plan-action-primary" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Join Premium waitlist</a>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-medium" id="community" aria-label="Arcane community">
-      <div class="container container-wide">
-        <a class="discord-callout reveal" href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">
-          <span class="discord-mark" aria-hidden="true">A</span>
-          <span>
-            <strong>Arcane updates, support, and the Premium waitlist.</strong>
-            <small>Open Discord to stay close to the project.</small>
-          </span>
-          <b>Join Discord <i>→</i></b>
-        </a>
-      </div>
-    </section>
-
-    <section class="section section-large" id="faq" aria-labelledby="faq-title">
-      <div class="container container-faq">
-        <header class="section-heading reveal">
-          <span class="section-kicker">Clear answers</span>
-          <h2 id="faq-title">Frequently asked <em>questions.</em></h2>
-        </header>
-
-        <div class="faq-list">
-          <details class="faq-item reveal" open>
-            <summary>What creates a possible base lead?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Activity from selected growth states—including crops, saplings, sugar cane, and cactus—can create a lead. Repeated stage changes and harvest activity strengthen it.</p>
-          </details>
-          <details class="faq-item reveal">
-            <summary>Do storage blocks or light affect the score?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>No. Storage, block entities, machines, placed-block density, interactions, and light have zero base-finding weight. The finder uses tracked growth activity.</p>
-          </details>
-          <details class="faq-item reveal">
-            <summary>What do the ESP tools do?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Storage, Item, and Tunnel ESP are independent visual tools. They can help you inspect an area, but they never create or strengthen a base lead.</p>
-          </details>
-          <details class="faq-item reveal">
-            <summary>Which Minecraft version is supported?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Arcane 2.3.6 targets Minecraft 1.21.11 with Fabric and runs entirely on the client.</p>
-          </details>
-          <details class="faq-item reveal">
-            <summary>How do I open Arcane?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Press Right Shift after launching the game. Keybinds can be changed from the client interface.</p>
-          </details>
-          <details class="faq-item reveal">
-            <summary>What is different about Premium?<span class="faq-plus" aria-hidden="true"></span></summary>
-            <p>Premium is the future growth-tracking tier and is still in development. The current Base client already includes the growth-based base finder, intel views, visual ESP tools, and player utilities listed above.</p>
-          </details>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="container container-wide">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a class="brand" href="#home">
-            <img src="assets/arcane-mark.svg" width="46" height="32" alt="">
-            <span>Arcane Client</span>
-          </a>
-          <p>Growth activity. Better base leads.</p>
-        </div>
-        <div>
-          <h2>Navigation</h2>
-          <a href="#features">Features</a>
-          <a href="#install">Install</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#faq">FAQ</a>
-        </div>
-        <div>
-          <h2>Project</h2>
-          <a href="https://discord.gg/DvfZW4Fk5" target="_blank" rel="noreferrer">Discord</a>
-          <a href="https://github.com/eiiorejierge/Arcane-Client" target="_blank" rel="noreferrer">GitHub</a>
-          <a href="#community">Community</a>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <span>© 2026 Arcane Client</span>
-        <p>Use only where server rules permit. Not affiliated with Mojang or Microsoft.</p>
-      </div>
-    </div>
-  </footer>
-
-
-  <dialog class="download-dialog" id="download-dialog" aria-labelledby="download-title">
-    <div class="download-panel">
-      <button class="download-close" type="button" data-download-close aria-label="Close download window">×</button>
-      <span class="section-kicker">Arcane Client 2.3.6</span>
-      <h2 id="download-title">Enter your download code.</h2>
-      <p>One verified Fabric 1.21.11 build. The download starts as soon as the code is accepted.</p>
-
-      <form class="download-form" novalidate>
-        <label for="download-code">Access code</label>
-        <div class="download-code-row">
-          <input id="download-code" name="download-code" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false" required aria-describedby="download-status">
-          <button type="submit">Unlock download</button>
-        </div>
-        <p class="download-status" id="download-status" aria-live="polite"></p>
+    <dialog
+      id="download-dialog"
+      aria-labelledby="download-heading"
+      aria-describedby="download-description"
+    >
+      <button
+        type="button"
+        class="dialog-close"
+        aria-label="Close download"
+        data-download-close
+      >
+        ×
+      </button>
+      <span class="eyebrow">ARCLoader</span>
+      <h2 id="download-heading">Download ARCLoader</h2>
+      <p id="download-description">
+        Enter your download code to get ARCLoader for Minecraft 1.21.11.
+        Arcane is included and loads on your first launch.
+      </p>
+      <form id="download-form" novalidate>
+        <fieldset class="version-picker">
+          <legend>Minecraft version</legend>
+          <label>
+            <input type="radio" name="minecraft-version" value="1.21.11" checked />
+            <span><strong>1.21.11</strong><small>Java 21+</small></span>
+          </label>
+          <label>
+            <input type="radio" name="minecraft-version" value="26.3" />
+            <span><strong>26.3</strong><small>Java 25+</small></span>
+          </label>
+        </fieldset>
+        <label for="access-code">Download code</label>
+        <input
+          id="access-code"
+          name="code"
+          type="text"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          aria-describedby="download-status"
+          required
+        />
+        <button class="button button-primary" type="submit">
+          Unlock download <span aria-hidden="true">→</span>
+        </button>
       </form>
-
-      <div class="download-build">
-        <span>2.3.6</span>
-        <span>Fabric</span>
-        <span>Minecraft 1.21.11</span>
-      </div>
-    </div>
-  </dialog>
-
-  <script src="script.js"></script>
-</body>
+      <p
+        id="download-status"
+        class="download-status"
+        role="status"
+        aria-live="polite"
+      ></p>
+      <a
+        id="download-file"
+        class="button button-primary"
+        download="ARCLoader.jar"
+        hidden
+        >Download ARCLoader <span aria-hidden="true">↓</span></a
+      >
+      <p class="artifact-note">
+        Install this JAR as a Fabric mod in Modrinth, Prism, or your
+        <code>mods</code> folder. It is the only Arcane JAR you should install;
+        do not add a loose Arcane Client JAR. Arcane works on the first launch,
+        and future signed updates may ask for one restart.
+      </p>
+      <p class="dialog-help">
+        New here? <a href="help.html">How to get a code</a><br />
+        Need access?
+        <a
+          href="https://discord.gg/DvfZW4Fk5"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Join Discord ↗</a
+        >
+      </p>
+    </dialog>
+  </body>
 </html>

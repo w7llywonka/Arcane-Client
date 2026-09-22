@@ -1,0 +1,4 @@
+Minecraft block textures, XP-bar sprites, panoramas and item artwork: Mojang Studios / Microsoft, from locally installed Minecraft Java Edition assets (1.21.11 and 26.2). Used to illustrate the game's setting; this is an independent fan-made client website, not an official Minecraft product.
+
+Pixelify Sans: Google Fonts, SIL Open Font License 1.1. See Pixelify-Sans-OFL.txt.
+Sora: SIL Open Font License 1.1. See Sora-OFL.txt.

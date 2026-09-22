@@ -16,10 +16,10 @@ import java.util.Locale;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.server.integrated.IntegratedServer;
-import net.minecraft.util.WorldSavePath;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.storage.LevelResource;
 
 /** Small, server-and-dimension-scoped persistent waypoint store. */
 @Environment(EnvType.CLIENT)
@@ -27,11 +27,13 @@ public final class WaypointStore {
     private static final int MAX_WAYPOINTS = 128;
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static List<Waypoint> waypoints;
+    private static Scope cachedScope;
+    private static List<Waypoint> cachedCurrent = List.of();
 
     private WaypointStore() {
     }
 
-    public static synchronized Waypoint add(MinecraftClient client, String requestedName, BlockPos pos) {
+    public static synchronized Waypoint add(Minecraft client, String requestedName, BlockPos pos) {
         ensureLoaded();
         Scope scope = scope(client);
         String name = cleanName(requestedName);
@@ -42,23 +44,32 @@ public final class WaypointStore {
             Waypoint oldest = waypoints.stream().min(Comparator.comparingLong(Waypoint::createdMillis)).orElse(waypoints.getFirst());
             waypoints.remove(oldest);
         }
+        invalidateCurrent();
         save();
         return added;
     }
 
-    public static synchronized boolean remove(MinecraftClient client, String requestedName) {
+    public static synchronized boolean remove(Minecraft client, String requestedName) {
         ensureLoaded();
         Scope scope = scope(client);
         String name = cleanName(requestedName);
         boolean removed = waypoints.removeIf(point -> point.sameScope(scope) && point.name.equalsIgnoreCase(name));
-        if (removed) save();
+        if (removed) {
+            invalidateCurrent();
+            save();
+        }
         return removed;
     }
 
-    public static synchronized List<Waypoint> current(MinecraftClient client) {
+    public static synchronized List<Waypoint> current(Minecraft client) {
         ensureLoaded();
         Scope scope = scope(client);
-        return waypoints.stream().filter(point -> point.sameScope(scope)).sorted(Comparator.comparingLong(Waypoint::createdMillis)).toList();
+        if (!scope.equals(cachedScope)) {
+            cachedScope = scope;
+            cachedCurrent = waypoints.stream().filter(point -> point.sameScope(scope))
+                .sorted(Comparator.comparingLong(Waypoint::createdMillis)).toList();
+        }
+        return cachedCurrent;
     }
 
     public static String cleanName(String value) {
@@ -100,24 +111,29 @@ public final class WaypointStore {
         }
     }
 
+    private static void invalidateCurrent() {
+        cachedScope = null;
+        cachedCurrent = List.of();
+    }
+
     private static Path storagePath() {
         return FabricLoader.getInstance().getConfigDir().resolve("arcaneclient-waypoints.json");
     }
 
-    private static Scope scope(MinecraftClient client) {
+    private static Scope scope(Minecraft client) {
         String server;
-        if (client.getCurrentServerEntry() != null) {
-            server = client.getCurrentServerEntry().address.toLowerCase(Locale.ROOT);
+        if (client.getCurrentServer() != null) {
+            server = client.getCurrentServer().ip.toLowerCase(Locale.ROOT);
         } else {
-            IntegratedServer integratedServer = client.getServer();
+            IntegratedServer integratedServer = client.getSingleplayerServer();
             server = integratedServer == null
                 ? "singleplayer:unknown"
                 : singleplayerIdentity(
-                    integratedServer.getSaveProperties().getLevelName(),
-                    integratedServer.getSavePath(WorldSavePath.ROOT)
+                    integratedServer.getWorldData().getLevelName(),
+                    integratedServer.getWorldPath(LevelResource.ROOT)
                 );
         }
-        String dimension = client.world == null ? "unknown" : client.world.getRegistryKey().getValue().toString();
+        String dimension = client.level == null ? "unknown" : client.level.dimension().identifier().toString();
         return new Scope(server, dimension);
     }
 

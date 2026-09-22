@@ -5,6 +5,9 @@ import net.fabricmc.api.Environment;
 
 @Environment(value=EnvType.CLIENT)
 public enum SignalCategory {
+    GROWN_PLANTS(100),
+    GROWTH_ACTIVITY(75),
+    PLANT_HARVEST(25),
     NATURAL_GROWTH(6),
     CULTIVATION(16),
     PLACED_BLOCK(30),

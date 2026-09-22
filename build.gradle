@@ -1,9 +1,10 @@
 plugins {
-	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 	id 'maven-publish'
 }
 
 repositories {
+    mavenCentral()
 	// Add repositories to retrieve artifacts from in here.
 	// You should only use this when depending on other mods because
 	// Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
@@ -35,24 +36,45 @@ fabricApi {
 // Fabric's optional test-only packet synchronizer cannot track that teardown;
 // exercise normal asynchronous networking instead (does not affect shipped JARs).
 loom.runs.clientGameTest.vmArg '-Dfabric.client.gametest.disableNetworkSynchronizer=true'
+loom.runs.clientGameTest.vmArg "-Darcane.gametest.tests=${providers.gradleProperty('arcaneGameTests').getOrElse('all')}"
+// Explicit opt-in fixture: copy an unmodified pack only into the disposable QA instance.
+if (providers.gradleProperty('arcaneQaResourcePack').isPresent()) {
+    def qaPack = file(providers.gradleProperty('arcaneQaResourcePack').get())
+    if (!qaPack.isFile() || !qaPack.name.endsWith('.zip')) throw new GradleException('QA resource pack must be an existing ZIP')
+    loom.runs.clientGameTest.vmArg "-Darcane.qa.resourcePack=${qaPack.name}"
+    tasks.register('stageQaResourcePack', Copy) {
+        dependsOn 'deleteGameTestRunDir'
+        from qaPack
+        into layout.buildDirectory.dir('run/clientGameTest/resourcepacks')
+    }
+    tasks.named('runClientGameTest') { dependsOn 'stageQaResourcePack' }
+}
 
 dependencies {
 	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 	// Fabric API. This is technically optional, but you probably want it anyway.
-	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
 	testRuntimeOnly "org.junit.platform:junit-platform-launcher:1.11.4"
+
+    // Match Minecraft 26.3's LWJGL ABI; bundle only the additional NanoVG module.
+    def vectorVersion = '3.4.3'
+    implementation("org.lwjgl:lwjgl-nanovg:${vectorVersion}") { transitive = false }
+    include("org.lwjgl:lwjgl-nanovg:${vectorVersion}") { transitive = false }
+    ['natives-windows', 'natives-windows-arm64', 'natives-linux', 'natives-linux-arm64', 'natives-macos', 'natives-macos-arm64'].each { platform ->
+        runtimeOnly("org.lwjgl:lwjgl-nanovg:${vectorVersion}:${platform}") { transitive = false }
+        include("org.lwjgl:lwjgl-nanovg:${vectorVersion}:${platform}") { transitive = false }
+    }
 }
 
 processResources {
 	def version = project.version
 	inputs.property "version", version
-	from(["third-party/Sora-OFL.txt", "third-party/BarlowCondensed-OFL.txt"]) {
+	from(["third-party/Sora-OFL.txt", "third-party/Xuong-OFL.txt", "third-party/BarlowCondensed-OFL.txt", "third-party/LWJGL-NanoVG-LICENSE.txt"]) {
 		into "META-INF/licenses/arcaneclient"
 	}
 
@@ -68,9 +90,10 @@ tasks.withType(Test).configureEach {
 }
 
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 21
+	it.options.release = 25
 	it.options.encoding = 'UTF-8'
 	it.options.compilerArgs.add('-Xlint:unchecked')
+	it.options.compilerArgs.addAll(['-Xmaxerrs', '2000'])
 }
 
 base {
@@ -78,13 +101,17 @@ base {
 }
 
 java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+
 	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
 	// if it is present.
 	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
-	sourceCompatibility = JavaVersion.VERSION_21
-	targetCompatibility = JavaVersion.VERSION_21
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
 }
 
 jar {

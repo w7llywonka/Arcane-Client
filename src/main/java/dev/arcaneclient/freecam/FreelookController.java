@@ -3,15 +3,15 @@ package dev.arcaneclient.freecam;
 import dev.arcaneclient.ArcaneClient;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.option.Perspective;
+import net.minecraft.client.CameraType;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 
 /** Third-person orbit camera anchored to the player without rotating the player's head. */
 @Environment(EnvType.CLIENT)
 public final class FreelookController {
     private static boolean active;
-    private static Perspective previousPerspective = Perspective.FIRST_PERSON;
+    private static CameraType previousPerspective = CameraType.FIRST_PERSON;
     private static float cameraYaw;
     private static float cameraPitch;
 
@@ -28,38 +28,38 @@ public final class FreelookController {
     }
 
 
-    public static void toggle(MinecraftClient client) {
+    public static void toggle(Minecraft client) {
         if (isActive()) disable(client); else enable(client);
     }
 
-    public static void enable(MinecraftClient client) {
-        ClientPlayerEntity player = client.player;
-        if (active || player == null || client.world == null) return;
+    public static void enable(Minecraft client) {
+        LocalPlayer player = client.player;
+        if (active || player == null || client.level == null) return;
         FreecamController.disable(client);
-        previousPerspective = client.options.getPerspective();
-        cameraYaw = player.getYaw();
-        cameraPitch = Math.clamp(player.getPitch(), -89.9f, 89.9f);
+        previousPerspective = client.options.getCameraType();
+        cameraYaw = player.getYRot();
+        cameraPitch = Math.clamp(player.getXRot(), -89.9f, 89.9f);
         active = true;
         DetachedCameraInteraction.stopMining(client);
-        client.options.setPerspective(Perspective.THIRD_PERSON_BACK);
+        client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
         client.setCameraEntity(player);
         ArcaneClient.LOGGER.info("Freelook enabled");
     }
 
-    public static void disable(MinecraftClient client) {
+    public static void disable(Minecraft client) {
         if (!active) return;
         active = false;
         DetachedCameraInteraction.stopMining(client);
 
         if (client.player != null) client.setCameraEntity(client.player); else client.setCameraEntity(null);
-        client.options.setPerspective(previousPerspective);
+        client.options.setCameraType(previousPerspective);
         ArcaneClient.LOGGER.info("Freelook disabled");
     }
 
-    public static void tick(MinecraftClient client) {
-        ClientPlayerEntity player = client.player;
+    public static void tick(Minecraft client) {
+        LocalPlayer player = client.player;
         if (!active) return;
-        if (player == null || client.world == null) {
+        if (player == null || client.level == null) {
             disable(client);
             return;
         }
@@ -69,8 +69,8 @@ public final class FreelookController {
         DetachedCameraInteraction.tickMining(
             client,
             player,
-            player.getYaw(),
-            player.getPitch(),
+            player.getYRot(),
+            player.getXRot(),
             true
         );
     }

@@ -2,6 +2,8 @@ package dev.arcaneclient.combat;
 
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
+import dev.arcaneclient.additions.combat.CombatAdditionsController;
+import dev.arcaneclient.additions.combat.ShieldBreakerController;
 import dev.arcaneclient.inventory.InventoryActionScheduler;
 import dev.arcaneclient.utility.AutoFishController;
 import dev.arcaneclient.utility.HotbarRefillController;
@@ -9,13 +11,13 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.EntityHitResult;
 
 /**
  * Coordinates inventory-affecting combat modules and guarantees one explicit
- * weapon precedence: Mace, then Spear, then general Smart Weapon.
+ * weapon precedence: Shield Breaker, Mace, Spear, then general Smart Weapon.
  *
  * <p>Manual attacks must call {@link #prepareForManualAttack} at the head of
  * the vanilla attack method and {@link #restoreAfterManualAttack} at return,
@@ -26,6 +28,7 @@ import net.minecraft.util.hit.EntityHitResult;
 public final class CombatAutomationController {
     private enum PreparedWeapon {
         NONE,
+        SHIELD,
         MACE,
         SPEAR,
         SMART
@@ -46,12 +49,12 @@ public final class CombatAutomationController {
     private CombatAutomationController() {
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         tick(client, entity -> false);
     }
 
     /** Runs passive inventory automation and Trigger Bot once per client tick. */
-    public static void tick(MinecraftClient client, Predicate<Entity> protectedTarget) {
+    public static void tick(Minecraft client, Predicate<Entity> protectedTarget) {
         Objects.requireNonNull(client, "client");
         Objects.requireNonNull(protectedTarget, "protectedTarget");
         ArcaneConfig config = ArcaneClient.config();
@@ -62,12 +65,16 @@ public final class CombatAutomationController {
         AutoFishController.tick(client, autoFishSettings(config));
 
         try {
-            TriggerBotController.tick(
-                client,
-                triggerSettings(config),
-                protectedTarget,
-                target -> prepareForTarget(client, target, config)
-            );
+            // Auto Clicker owns held crosshair attacks; avoid a second automated attack
+            // from Trigger Bot in the same input interval when both are enabled.
+            if (!CombatAdditionsController.controlsAttack(client)) {
+                TriggerBotController.tick(
+                    client,
+                    triggerSettings(config),
+                    protectedTarget,
+                    target -> prepareForTarget(client, target, config)
+                );
+            }
         } finally {
             // Trigger Bot sends its attack packet synchronously inside tick().
             restorePreparedWeapon(client);
@@ -75,33 +82,39 @@ public final class CombatAutomationController {
     }
 
     /** Selects the correct weapon for a crosshair entity before a manual attack packet. */
-    public static void prepareForManualAttack(MinecraftClient client) {
+    public static void prepareForManualAttack(Minecraft client) {
         Objects.requireNonNull(client, "client");
         restorePreparedWeapon(client);
         ArcaneConfig config = ArcaneClient.config();
-        if (config == null || !(client.crosshairTarget instanceof EntityHitResult hit)) return;
+        if (config == null || !(client.hitResult instanceof EntityHitResult hit)) return;
         prepareForTarget(client, hit.getEntity(), config);
     }
 
     /** Restores the player's prior hotbar slot after the manual attack packet was sent. */
-    public static void restoreAfterManualAttack(MinecraftClient client) {
+    public static void restoreAfterManualAttack(Minecraft client) {
         Objects.requireNonNull(client, "client");
         restorePreparedWeapon(client);
     }
 
-    public static void reset(MinecraftClient client) {
+    public static void reset(Minecraft client) {
         if (client != null) restorePreparedWeapon(client);
         preparedWeapon = PreparedWeapon.NONE;
+        ShieldBreakerController.restore(client);
         AutoArmorController.reset();
         HotbarRefillController.reset();
-        AutoFishController.reset(client != null && client.player != null ? client.player.age : 0L);
+        AutoFishController.reset(client != null && client.player != null ? client.player.tickCount : 0L);
         TriggerBotController.reset();
         InventoryActionScheduler.shared().reset();
     }
 
-    private static void prepareForTarget(MinecraftClient client, Entity target, ArcaneConfig config) {
+    private static void prepareForTarget(Minecraft client, Entity target, ArcaneConfig config) {
         restorePreparedWeapon(client);
         CombatController.suspendAutoEat(client);
+        if (ShieldBreakerController.prepare(client, target,
+            config.combatAdditions != null && config.combatAdditions.shieldBreaker)) {
+            preparedWeapon = PreparedWeapon.SHIELD;
+            return;
+        }
         if (MaceSwitchController.prepareForTarget(client, target, maceSettings(config))) {
             preparedWeapon = PreparedWeapon.MACE;
             return;
@@ -115,8 +128,9 @@ public final class CombatAutomationController {
         }
     }
 
-    private static void restorePreparedWeapon(MinecraftClient client) {
+    private static void restorePreparedWeapon(Minecraft client) {
         switch (preparedWeapon) {
+            case SHIELD -> ShieldBreakerController.restore(client);
             case MACE -> MaceSwitchController.restore(client);
             case SPEAR -> SpearSwitchController.restore(client);
             case SMART -> SmartWeaponController.restore(client);

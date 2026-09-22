@@ -24,11 +24,11 @@ import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 
 public final class ArcaneLoader {
-    static final String LOADER_VERSION = "1.2.3+mc1.21.11";
+    static final String LOADER_VERSION = "1.2.7+mc26.3";
     static final String PRIMARY_MANIFEST_URL =
-        "https://www.arcaneclient.shop/updates/loader-release.json";
+        "https://www.arcaneclient.shop/updates/channels/mc-26.3/loader-release.json";
     static final String FALLBACK_MANIFEST_URL =
-        "https://arcane-client-puce.vercel.app/updates/loader-release.json";
+        "https://arcane-client-puce.vercel.app/updates/channels/mc-26.3/loader-release.json";
     private static final String MANIFEST_URL_OVERRIDE = System.getProperty("arcane.manifestUrl");
 
     private final LoaderState state;

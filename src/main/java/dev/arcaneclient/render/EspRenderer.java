@@ -1,7 +1,5 @@
 package dev.arcaneclient.render;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.esp.BlockEntityEspClassifier;
@@ -17,70 +15,59 @@ import java.util.List;
 import java.util.PriorityQueue;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.RenderSetup;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexRendering;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.Entity;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.shape.VoxelShape;
-import net.minecraft.util.shape.VoxelShapes;
-import net.minecraft.world.chunk.WorldChunk;
-import org.joml.Vector3fc;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 @Environment(value=EnvType.CLIENT)
 public final class EspRenderer {
-    private static final VoxelShape BLOCK_BOX = VoxelShapes.cuboid((double)0.03, (double)0.03, (double)0.03, (double)0.97, (double)0.97, (double)0.97);
-    private static final RenderPipeline ESP_LINES = RenderPipelines.register((RenderPipeline)RenderPipeline.builder((RenderPipeline.Snippet[])new RenderPipeline.Snippet[]{RenderPipelines.RENDERTYPE_LINES_SNIPPET}).withLocation(ArcaneClient.id("pipeline/storage_esp")).withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).build());
-    private static final RenderLayer ESP_LINE_TYPE = RenderLayer.of((String)"arcaneclient_storage_esp", (RenderSetup)RenderSetup.builder((RenderPipeline)ESP_LINES).build());
-    private static final RenderPipeline ESP_FILL = RenderPipelines.register((RenderPipeline)RenderPipeline.builder((RenderPipeline.Snippet[])new RenderPipeline.Snippet[]{RenderPipelines.POSITION_COLOR_SNIPPET}).withLocation(ArcaneClient.id("pipeline/storage_esp_fill")).withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST).withDepthWrite(false).withCull(false).build());
-    private static final RenderLayer ESP_FILL_TYPE = RenderLayer.of((String)"arcaneclient_storage_esp_fill", (RenderSetup)RenderSetup.builder((RenderPipeline)ESP_FILL).translucent().build());
+    private static final VoxelShape BLOCK_BOX = Shapes.box((double)0.03, (double)0.03, (double)0.03, (double)0.97, (double)0.97, (double)0.97);
     private static List<Target> targets = List.of();
     private static long lastRefresh = Long.MIN_VALUE;
     private static final StorageDiscoveryTracker DISCOVERIES = new StorageDiscoveryTracker(65_536);
-    private static ClientWorld discoveryWorld;
+    private static ClientLevel discoveryWorld;
 
     private EspRenderer() {
     }
 
     public static void register() {
-        WorldRenderEvents.END_MAIN.register(EspRenderer::render);
+        LevelRenderEvents.COLLECT_SUBMITS.register(EspRenderer::render);
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         if (ArcaneSettingsScreen.isOpen(client)) return;
         ArcaneConfig config = ArcaneClient.config();
-        if (client.world != discoveryWorld) {
-            discoveryWorld = client.world;
+        if (client.level != discoveryWorld) {
+            discoveryWorld = client.level;
             DISCOVERIES.reset();
             lastRefresh = Long.MIN_VALUE;
         }
-        if ((!config.esp && !config.blockEntityDebug) || client.world == null || client.getCameraEntity() == null) {
+        if ((!config.esp && !config.blockEntityDebug) || client.level == null || client.getCameraEntity() == null) {
             targets = List.of();
             return;
         }
         PerformanceProfile profile = config.performanceProfile();
-        long gameTime = client.world.getTime();
+        long gameTime = client.level.getGameTime();
         if (lastRefresh != Long.MIN_VALUE && gameTime >= lastRefresh && gameTime - lastRefresh < profile.snapshotRefreshTicks()) {
             return;
         }
         lastRefresh = gameTime;
         Entity cameraEntity = client.getCameraEntity();
-        int centerX = ChunkSectionPos.getSectionCoord((int)cameraEntity.getBlockX());
-        int centerZ = ChunkSectionPos.getSectionCoord((int)cameraEntity.getBlockZ());
+        int centerX = SectionPos.blockToSectionCoord((int)cameraEntity.getBlockX());
+        int centerZ = SectionPos.blockToSectionCoord((int)cameraEntity.getBlockZ());
         int radius = profile.storageRadiusChunks();
         int targetLimit = profile.storageTargetLimit();
         PriorityQueue<RankedTarget> nearestStorage = new PriorityQueue<>(
@@ -96,16 +83,16 @@ public final class EspRenderer {
         ArrayList<StorageDiscovery> discovered = new ArrayList<>();
         for (int dz = -radius; dz <= radius; ++dz) {
             for (int dx = -radius; dx <= radius; ++dx) {
-                WorldChunk chunk = client.world.getChunkManager().getWorldChunk(centerX + dx, centerZ + dz, false);
+                LevelChunk chunk = client.level.getChunkSource().getChunk(centerX + dx, centerZ + dz, false);
                 if (chunk == null) continue;
                 for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-                    Identifier id = Registries.BLOCK_ENTITY_TYPE.getId(blockEntity.getType());
+                    Identifier id = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType());
                     String path = id == null ? "unknown" : id.getPath();
-                    BlockPos pos = blockEntity.getPos().toImmutable();
+                    BlockPos pos = blockEntity.getBlockPos().immutable();
                     int storageColor = config.esp ? BlockEntityEspClassifier.color(path) : 0;
                     int debugColor = config.blockEntityDebug ? BlockEntityEspClassifier.debugColor(pos.getY()) : 0;
                     boolean storageTarget = storageColor != 0;
-                    boolean debugTarget = debugColor != 0 && !storageTarget;
+                    boolean debugTarget = debugColor != 0;
                     if (!storageTarget && !debugTarget) continue;
                     if (storageTarget && config.storageChatAlerts && BlockEntityEspClassifier.isContainerTarget(path) && DISCOVERIES.markNew(pos.asLong())) {
                         discovered.add(new StorageDiscovery(pos, path));
@@ -117,9 +104,9 @@ public final class EspRenderer {
                         cameraEntity.getZ()
                     );
                     if (storageTarget) {
-                        offerNearest(nearestStorage, new Target(pos, storageColor, true, false), horizontalDistanceSquared, targetLimit);
+                        offerNearest(nearestStorage, new Target(pos, storageColor, true, debugTarget), horizontalDistanceSquared, targetLimit);
                     }
-                    if (debugTarget) {
+                    if (debugTarget && !storageTarget) {
                         offerNearest(nearestDebug, new Target(pos, debugColor, false, true), horizontalDistanceSquared, targetLimit);
                     }
                 }
@@ -149,7 +136,7 @@ public final class EspRenderer {
         }
     }
 
-    private static void publishDiscoveries(MinecraftClient client, List<StorageDiscovery> discovered) {
+    private static void publishDiscoveries(Minecraft client, List<StorageDiscovery> discovered) {
         if (client.player == null || discovered.isEmpty()) {
             return;
         }
@@ -170,10 +157,9 @@ public final class EspRenderer {
             ? "Storage found: " + types + " at " + nearest.getX() + ", " + nearest.getY() + ", " + nearest.getZ()
             : "Storage found: " + discovered.size() + " block entities (" + types + "), nearest at "
                 + nearest.getX() + ", " + nearest.getY() + ", " + nearest.getZ();
-        client.player.sendMessage(
-            Text.literal("[Arcane] ").formatted(Formatting.DARK_PURPLE)
-                .append(Text.literal(message).formatted(Formatting.GREEN)),
-            false
+        client.player.sendSystemMessage(
+            Component.literal("[Arcane] ").withStyle(ChatFormatting.DARK_PURPLE)
+                .append(Component.literal(message).withStyle(ChatFormatting.GREEN))
         );
     }
 
@@ -181,61 +167,38 @@ public final class EspRenderer {
         return path.replace('_', ' ');
     }
 
-    private static void render(WorldRenderContext context) {
-        MinecraftClient client = MinecraftClient.getInstance();
+    private static void render(LevelRenderContext context) {
+        renderedDebugTracerCount = 0;
+        Minecraft client = Minecraft.getInstance();
         ArcaneConfig config = ArcaneClient.config();
-        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client) || (!config.esp && !config.blockEntityDebug) || client.world == null || targets.isEmpty()) {
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client) || (!config.esp && !config.blockEntityDebug) || client.level == null || targets.isEmpty()) {
             return;
         }
-        MatrixStack matrices = context.matrices();
         Entity cameraEntity = client.getCameraEntity();
-        if (matrices == null || cameraEntity == null) {
+        if (context.poseStack() == null || cameraEntity == null) {
             return;
         }
-        Vec3d camera = context.worldState().cameraRenderState.pos;
-        VertexConsumer lines = context.consumers().getBuffer(ESP_LINE_TYPE);
+        Vec3 camera = Render263.camera(context);
         PerformanceProfile profile = config.performanceProfile();
-        Vector3fc forward = client.gameRenderer.getCamera().getHorizontalPlane();
+        Render263.Batch batch = Render263.batch(context);
         for (Target target : targets) {
             BlockPos pos = target.pos();
-            double x = (double)pos.getX() + 0.5 - camera.x;
-            double y = (double)pos.getY() + 0.5 - camera.y;
-            double z = (double)pos.getZ() + 0.5 - camera.z;
-            VertexRendering.drawOutline((MatrixStack)matrices, (VertexConsumer)lines, (VoxelShape)BLOCK_BOX, (double)((double)pos.getX() - camera.x), (double)((double)pos.getY() - camera.y), (double)((double)pos.getZ() - camera.z), (int)target.color(), (float)2.0f);
-            if (!target.storageTarget() || !config.storageTracers) continue;
-            TracerLines.draw(matrices.peek(), lines, (double)forward.x() * 0.25, (double)forward.y() * 0.25, (double)forward.z() * 0.25, x, y, z, target.color(), 1.25f);
+            batch.outline(BLOCK_BOX, pos.getX(), pos.getY(), pos.getZ(), target.color(), 2.0f, true);
+            if (!((target.storageTarget() && config.esp && config.storageTracers)
+                || (target.debugTarget() && config.blockEntityDebug && config.blockEntityDebugTracers))) continue;
+            batch.line(camera.x, camera.y, camera.z,
+                pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, target.color(), 1.25f, true);
+            if (target.debugTarget() && config.blockEntityDebug && config.blockEntityDebugTracers) renderedDebugTracerCount++;
         }
         if (profile.filledStorageBoxes()) {
-            // Requesting another custom layer flushes the shared line buffer. Finish every
-            // line first, then acquire and populate the fill buffer in a separate pass.
-            VertexConsumer fills = context.consumers().getBuffer(ESP_FILL_TYPE);
             for (Target target : targets) {
                 BlockPos pos = target.pos();
-                EspRenderer.drawFilledBox(matrices.peek(), fills, (double)pos.getX() - camera.x, (double)pos.getY() - camera.y, (double)pos.getZ() - camera.z, 0x30000000 | target.color() & 0xFFFFFF);
+                batch.filledBox(pos.getX() + 0.05, pos.getY() + 0.05, pos.getZ() + 0.05,
+                    pos.getX() + 0.95, pos.getY() + 0.95, pos.getZ() + 0.95,
+                    0x30000000 | target.color() & 0xFFFFFF, true);
             }
         }
-    }
-
-    private static void drawFilledBox(MatrixStack.Entry pose, VertexConsumer fills, double originX, double originY, double originZ, int color) {
-        float x0 = (float)originX + 0.05f;
-        float y0 = (float)originY + 0.05f;
-        float z0 = (float)originZ + 0.05f;
-        float x1 = (float)originX + 0.95f;
-        float y1 = (float)originY + 0.95f;
-        float z1 = (float)originZ + 0.95f;
-        EspRenderer.quad(pose, fills, color, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1);
-        EspRenderer.quad(pose, fills, color, x0, y1, z1, x1, y1, z1, x1, y1, z0, x0, y1, z0);
-        EspRenderer.quad(pose, fills, color, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1);
-        EspRenderer.quad(pose, fills, color, x1, y0, z0, x0, y0, z0, x0, y1, z0, x1, y1, z0);
-        EspRenderer.quad(pose, fills, color, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0);
-        EspRenderer.quad(pose, fills, color, x1, y0, z1, x1, y0, z0, x1, y1, z0, x1, y1, z1);
-    }
-
-    private static void quad(MatrixStack.Entry pose, VertexConsumer fills, int color, float x0, float y0, float z0, float x1, float y1, float z1, float x2, float y2, float z2, float x3, float y3, float z3) {
-        fills.vertex(pose, x0, y0, z0).color(color);
-        fills.vertex(pose, x1, y1, z1).color(color);
-        fills.vertex(pose, x2, y2, z2).color(color);
-        fills.vertex(pose, x3, y3, z3).color(color);
+        batch.submit();
     }
 
     public static int targetCount() {
@@ -245,6 +208,9 @@ public final class EspRenderer {
     public static int debugTargetCount() {
         return (int)targets.stream().filter(Target::debugTarget).count();
     }
+
+    private static int renderedDebugTracerCount;
+    public static int renderedDebugTracerCount() { return renderedDebugTracerCount; }
 
     @Environment(value=EnvType.CLIENT)
     private record Target(BlockPos pos, int color, boolean storageTarget, boolean debugTarget) {

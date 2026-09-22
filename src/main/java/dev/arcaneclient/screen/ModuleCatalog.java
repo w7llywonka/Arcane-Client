@@ -20,8 +20,8 @@ import java.util.HashSet;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 
 /** Builds and validates Arcane's visible catalog of independently useful modules. */
 @Environment(EnvType.CLIENT)
@@ -36,16 +36,98 @@ public final class ModuleCatalog {
     private ModuleCatalog() {
     }
 
-    public static List<GuiCategory> build(ArcaneConfig config, MinecraftClient client) {
+    public static List<GuiCategory> build(ArcaneConfig config, Minecraft client) {
         ArcaneKeybinds keybinds = ArcaneClient.keybinds();
+        List<GuiModule> combatModules = mutable(combined(combat(config, keybinds, client),
+            dev.arcaneclient.additions.combat.CombatAdditionsController.modules(config, client)));
+        List<GuiModule> movementModules = mutable(movement(config, keybinds, client));
+        List<GuiModule> espModules = mutable(combined(esp(config, keybinds, client),
+            dev.arcaneclient.additions.intel.IntelAdditions.espModules(config, client)));
+        List<GuiModule> renderModules = mutable(combined(render(config, keybinds, client),
+            dev.arcaneclient.additions.visual.VisualAdditions.modules(config, client),
+            dev.arcaneclient.additions.intel.IntelAdditions.renderModules(config, client),
+            dev.arcaneclient.additions.viewmodel.ViewmodelEditor.modules(config, client),
+            dev.arcaneclient.additions.mining.MiningOverlay.modules(config, client),
+            dev.arcaneclient.additions.effects.Effects.modules(config, client)));
+        List<GuiModule> utilityModules = mutable(combined(utility(config, keybinds),
+            dev.arcaneclient.additions.nuker.Nuker.modules(config, client),
+            dev.arcaneclient.additions.utility.UtilityAdditions.modules(config, client),
+            dev.arcaneclient.additions.intel.IntelAdditions.utilityModules(config, client),
+            dev.arcaneclient.additions.social.AutoTpa.modules(config, client),
+            dev.arcaneclient.additions.dispenser.DispenserHelper.modules(config, client)));
+        List<GuiModule> clientModules = mutable(combined(clientTools(config, keybinds, client),
+            dev.arcaneclient.additions.media.MediaHud.modules(config, client),
+            dev.arcaneclient.additions.preview.PreviewAdditions.modules(config, client),
+            dev.arcaneclient.additions.configlibrary.ConfigLibrary.modules(config, client),
+            dev.arcaneclient.additions.presence.ArcanePresence.modules(config, client)));
+        List<GuiModule> baseModules = mutable(combined(baseFinding(config, keybinds),
+            dev.arcaneclient.additions.susfinder.SusChunkFinderModules.modules(config, client)));
+
+        // Put discovery, privacy, session and flight tools where users naturally look for them.
+        moveNamed(espModules, baseModules, "Chunk Tiles", "Tunnel ESP", "Amethyst ESP", "Access Trail ESP");
+        moveNamed(renderModules, baseModules, "Base Radar", "Region Map");
+        moveNamed(renderModules, clientModules, "Clean Capture", "Skin Protect");
+        moveNamed(utilityModules, movementModules, "Elytra Swap");
+        moveNamed(clientModules, utilityModules, "Relog");
+        moveNamed(renderModules, espModules, "Hitboxes");
+        removeNamed(clientModules, "Config Library"); // The persistent Configs button already opens it.
+        config.uiFavorites.remove("Config Library");
+        if (config.uiFavorites.remove("Coordinate Clipboard")) config.uiFavorites.add("Copy Coordinates");
+
+        groupNamed(config, combatModules, "Targeting", "Aim and attack helpers.",
+            "Aim Assist", "Auto Clicker", "Trigger Bot");
+        groupNamed(config, combatModules, "Weapon Assist", "Automatic weapon choices for specific combat situations.",
+            "Smart Weapon", "Spear Switch", "Mace Switch", "Shield Breaker");
+        groupNamed(config, combatModules, "Combat Feedback", "Local combat sound, swing and cooldown presentation.",
+            "Hit Sound", "Swing Speed", "Combat HUD");
+        groupNamed(config, combatModules, "Anchor Assist", "Safe, deliberate respawn-anchor actions.",
+            "Anchor Macro", "Double Anchor");
+
+        groupNamed(config, movementModules, "Auto Movement", "Simple movement holds and automatic movement inputs.",
+            "Auto Sprint", "Auto Walk", "Auto Jump", "Auto Sneak");
+        groupNamed(config, movementModules, "Elytra", "Flight boosting, camera and equipment controls.",
+            "Elytra Assist", "Elytra Perspective");
+
+        groupNamed(config, espModules, "Entity ESP", "Entity outlines, tracers and hitbox rendering in one place.",
+            "Player ESP", "Mob ESP", "Projectile ESP", "Crystal ESP", "Entity Tracers", "Hitboxes");
+        groupNamed(config, espModules, "Nametags", "Player, dropped-item and spawner labels.",
+            "Nametags", "Spawner Nametags");
+
+        groupNamed(config, renderModules, "Camera Tools", "Camera, zoom, FOV and hand-view controls.",
+            "Freelook", "Zoom", "Custom FOV", "Viewmodel Editor");
+        groupNamed(config, renderModules, "Navigation", "Waypoints, breadcrumbs and chunk boundaries.",
+            "Waypoints", "Breadcrumbs", "Chunk Borders");
+        groupNamed(config, renderModules, "World Effects", "Local motion, impact and particle presentation.",
+            "Jump Circles", "Hit Particles", "Motion Blur", "Totem Animation", "Particle Control");
+        groupNamed(config, renderModules, "Styling", "Crosshair, outlines, glint and local accessories.",
+            "Custom Crosshair", "Block Outline", "Custom Glint", "Custom Accessories", "Armor Trim Hider");
+        groupNamed(config, renderModules, "HUD Indicators", "Compact input and active-feature indicators.",
+            "Keystrokes", "Active Modules");
+
+        groupNamed(config, utilityModules, "Session", "Respawn, reconnect, idle and death-session helpers.",
+            "Auto Respawn", "Death Tracker", "Anti AFK");
+        groupNamed(config, utilityModules, "Totem Inventory", "Small, deliberate totem inventory automations.",
+            "Hover Totem", "Auto Inventory Totem");
+        groupNamed(config, utilityModules, "Social", "Chat shortcuts and trusted teleport requests.",
+            "Chat Macros", "Auto TPA");
+        groupNamed(config, utilityModules, "Alerts", "Spawner, staff-list and weather notifications.",
+            "Spawner Protect", "Staff List", "Weather Notifier");
+
+        groupNamed(config, clientModules, "HUD Widgets", "Optional status, inventory and media panels.",
+            "Status HUD", "Inventory HUD", "Spotify HUD");
+        groupNamed(config, clientModules, "Preview Lab", "Clearly labeled local-only presentation previews.",
+            "Fake Pay", "Fake Roles", "Fake Stats");
+        groupNamed(config, clientModules, "Privacy & Capture", "Redaction, clean recording and local skin privacy.",
+            "Streamer Mode", "Clean Capture", "Skin Protect");
+
         List<GuiCategory> categories = List.of(
-            new GuiCategory("COMBAT", combat(config, keybinds, client)),
-            new GuiCategory("MOVEMENT", movement(config, keybinds, client)),
-            new GuiCategory("ESP", esp(config, keybinds, client)),
-            new GuiCategory("RENDER", render(config, keybinds, client)),
-            new GuiCategory("UTILITY", utility(config, keybinds)),
-            new GuiCategory("CLIENT", clientTools(config, keybinds, client)),
-            new GuiCategory("BASE FINDING", baseFinding(config, keybinds))
+            new GuiCategory("COMBAT", List.copyOf(combatModules)),
+            new GuiCategory("MOVEMENT", List.copyOf(movementModules)),
+            new GuiCategory("ESP", List.copyOf(espModules)),
+            new GuiCategory("RENDER", List.copyOf(renderModules)),
+            new GuiCategory("UTILITY", List.copyOf(utilityModules)),
+            new GuiCategory("CLIENT", List.copyOf(clientModules)),
+            new GuiCategory("BASE FINDING", List.copyOf(baseModules))
         );
         ArrayList<String> actualNames = new ArrayList<>(countModules(categories));
         for (GuiCategory category : categories) {
@@ -61,6 +143,72 @@ public final class ModuleCatalog {
         return REQUIRED_CORE_MODULE_NAMES;
     }
 
+    @SafeVarargs
+    private static List<GuiModule> combined(List<GuiModule>... groups) {
+        ArrayList<GuiModule> result = new ArrayList<>();
+        for (List<GuiModule> group : groups) result.addAll(group);
+        return List.copyOf(result);
+    }
+
+    private static List<GuiModule> mutable(List<GuiModule> modules) {
+        return new ArrayList<>(modules);
+    }
+
+    private static void moveNamed(List<GuiModule> source, List<GuiModule> destination, String... names) {
+        for (String name : names) {
+            GuiModule module = findNamed(source, name);
+            source.remove(module);
+            destination.add(module);
+        }
+    }
+
+    private static void removeNamed(List<GuiModule> modules, String name) {
+        modules.remove(findNamed(modules, name));
+    }
+
+    private static GuiModule findNamed(List<GuiModule> modules, String name) {
+        return modules.stream().filter(module -> module.name().equals(name)).findFirst()
+            .orElseThrow(() -> new IllegalStateException("Missing module during catalog cleanup: " + name));
+    }
+
+    private static void groupNamed(
+        ArcaneConfig config,
+        List<GuiModule> modules,
+        String groupName,
+        String description,
+        String... childNames
+    ) {
+        List<GuiModule> children = new ArrayList<>(childNames.length);
+        int insertion = modules.size();
+        boolean favorite = false;
+        for (String childName : childNames) {
+            GuiModule child = findNamed(modules, childName);
+            children.add(child);
+            insertion = Math.min(insertion, modules.indexOf(child));
+            favorite |= config.uiFavorites.remove(childName);
+        }
+        List<GuiModule> groupedChildren = List.copyOf(children);
+        GuiModule.Builder group = GuiModule.group(groupName, description,
+            () -> groupedChildren.stream().anyMatch(GuiModule::enabled),
+            () -> {
+                long count = groupedChildren.stream().filter(GuiModule::enabled).count();
+                return count == 0 ? "" : count + " ON";
+            });
+        for (GuiModule child : groupedChildren) {
+            if (child.toggleable()) {
+                group.with(new GuiSetting.Toggle(child.name(), child.description(), child::enabled, enabled -> {
+                    if (enabled != child.enabled()) child.toggle();
+                }));
+            } else {
+                group.with(new GuiSetting.Section(child.name()));
+            }
+            for (GuiSetting setting : child.settings()) group.with(setting);
+        }
+        modules.removeAll(groupedChildren);
+        modules.add(insertion, group.build());
+        if (favorite) config.uiFavorites.add(groupName);
+    }
+
     static int countModules(List<GuiCategory> categories) {
         int count = 0;
         for (GuiCategory category : categories) count += category.modules().size();
@@ -70,24 +218,14 @@ public final class ModuleCatalog {
     private static List<GuiModule> baseFinding(ArcaneConfig config, ArcaneKeybinds keybinds) {
         GuiModule chunkFinder = GuiModule.toggle(
             "Chunk Finder",
-            "Uses the combined 1.6/1.8 evidence engine with deep weighting and neighboring-chunk confirmation; storage and amethyst never contribute.",
+            "Counts grown plant blocks in loaded chunks. No containers, saplings, sounds or waiting for growth ticks.",
             () -> config.enabled,
             value -> config.enabled = value
         )
-            .with(new GuiSetting.Slider("Sensitivity", config::sensitivity, config::setSensitivity, 0, 100, "%"))
+            .with(new GuiSetting.Slider("Grown blocks required", () -> config.grownBlocksRequired, value -> config.grownBlocksRequired = value, 1, 256, " blocks"))
             .with(new GuiSetting.Slider("Scan radius", () -> config.scanRadius, value -> config.scanRadius = value, 2, 24, " ch"))
             .with(new GuiSetting.Slider("Scan speed", () -> config.chunksPerTick, value -> config.chunksPerTick = value, 1, 16, "/t"))
             .with(new GuiSetting.Slider("Rescan delay", () -> config.rescanSeconds, value -> config.rescanSeconds = value, 10, 300, "s"))
-            .with(new GuiSetting.Toggle("Growth changes", () -> config.growthChronicle, value -> config.growthChronicle = value))
-            .with(new GuiSetting.Toggle("Harvest activity", () -> config.harvestRhythm, value -> config.harvestRhythm = value))
-            .with(new GuiSetting.Toggle("Farm geometry", () -> config.farmGeometry, value -> config.farmGeometry = value))
-            .with(new GuiSetting.Toggle("Player blocks", () -> config.playerBlockSignals, value -> config.playerBlockSignals = value))
-            .with(new GuiSetting.Toggle("Machine evidence", () -> config.machineSignals, value -> config.machineSignals = value))
-            .with(new GuiSetting.Toggle("Automation", () -> config.automationCadence, value -> config.automationCadence = value))
-            .with(new GuiSetting.Toggle("Managed entities", () -> config.managedHabitats, value -> config.managedHabitats = value))
-            .with(new GuiSetting.Toggle("Packet activity", () -> config.packetSignals, value -> config.packetSignals = value))
-            .with(new GuiSetting.Toggle("Supporting light", () -> config.evidenceConstellation, value -> config.evidenceConstellation = value))
-            .with(new GuiSetting.Toggle("Deep focus", () -> config.deepFocus, value -> config.deepFocus = value))
             .with(new GuiSetting.Toggle("Neighbor correlation", () -> config.clusterInference, value -> config.clusterInference = value))
             .with(new GuiSetting.Info("Flagged chunks", () -> Integer.toString(ArcaneClient.engine().flaggedCount())))
             .with(new GuiSetting.Info("Base leads", () -> Integer.toString(ArcaneClient.engine().activityClusterCount())))
@@ -110,7 +248,7 @@ public final class ModuleCatalog {
         return List.of(chunkFinder, chunkIntel, evidencePoints);
     }
 
-    private static List<GuiModule> esp(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
+    private static List<GuiModule> esp(ArcaneConfig config, ArcaneKeybinds keybinds, Minecraft client) {
         GuiModule storage = GuiModule.toggle(
             "Storage ESP", "Draws loaded containers through walls with no vertical cutoff.", () -> config.esp, value -> config.esp = value
         )
@@ -127,13 +265,25 @@ public final class ModuleCatalog {
             () -> config.blockEntityDebug,
             value -> config.blockEntityDebug = value
         )
+            .with(new GuiSetting.Toggle("Tracers", () -> config.blockEntityDebugTracers, value -> config.blockEntityDebugTracers = value))
             .with(new GuiSetting.Info("Depth filter", () -> "Y < 0"))
             .with(new GuiSetting.Info("Visible", () -> Integer.toString(EspRenderer.debugTargetCount())))
             .build();
 
         GuiModule.Builder itemBuilder = GuiModule.toggle(
-            "Item ESP", "Highlights selected dropped-loot categories.", () -> config.itemEsp, value -> config.itemEsp = value
-        ).with(new GuiSetting.Toggle("Tracers", () -> config.itemTracers, value -> config.itemTracers = value));
+            "Item ESP", "Highlights any selected dropped item, or every dropped item. Only items received from the server can be shown.", () -> config.itemEsp, value -> config.itemEsp = value
+        )
+            .with(new GuiSetting.Cycle("Choose items", () -> Integer.toString(config.itemEspItems.size()), () -> client.gui.setScreen(new ItemEspPickerScreen(client.gui.screen(), config))))
+            .with(new GuiSetting.Cycle("Add held item", () -> "Add", () -> {
+                if (client.player != null && !client.player.getMainHandItem().isEmpty()) {
+                    config.itemEspItems.add(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(client.player.getMainHandItem().getItem()).toString());
+                }
+            }))
+            .with(new GuiSetting.Toggle("All dropped items", () -> config.itemEspAll, value -> config.itemEspAll = value))
+            .with(new GuiSetting.Toggle("Preset groups", () -> config.itemEspUsePresets, value -> config.itemEspUsePresets = value))
+            .with(new GuiSetting.Swatch("Item color", () -> config.itemEspCustomColor, value -> config.itemEspCustomColor = value))
+            .with(new GuiSetting.Slider("Range", () -> config.itemEspRange, value -> config.itemEspRange = value, 16, 256, "m"))
+            .with(new GuiSetting.Toggle("Tracers", () -> config.itemTracers, value -> config.itemTracers = value));
         for (ItemEspCategory category : ItemEspCategory.values()) {
             itemBuilder.with(new GuiSetting.ToggleSwatch(
                 category.label(),
@@ -219,9 +369,11 @@ public final class ModuleCatalog {
             .with(new GuiSetting.Swatch("Color", () -> config.searchEspColor, color -> config.searchEspColor = color))
             .with(new GuiSetting.Info("Indexed targets", () -> Integer.toString(WorldIntelRenderer.searchTargetCount())))
             .with(new GuiSetting.Info("Queued chunks", () -> Integer.toString(WorldIntelRenderer.queuedChunkCount()))).build();
-        GuiModule nametags = GuiModule.toggle("Nametags", "Shows player labels and dropped-item names with stack counts. Streamer Mode redacts player names.", () -> config.nametags, value -> config.nametags = value)
+        GuiModule.Builder nametagBuilder = GuiModule.toggle("Nametags", "Player labels, equipment and dropped-item names. Choose only the details you need; Streamer Mode redacts names.", () -> config.nametags, value -> config.nametags = value)
             .with(new GuiSetting.Slider("Range", () -> config.nametagRange, value -> config.nametagRange = value, 16, 192, "m"))
-            .with(new GuiSetting.Swatch("Color", () -> config.nametagColor, color -> config.nametagColor = color)).build();
+            .with(new GuiSetting.Swatch("Color", () -> config.nametagColor, color -> config.nametagColor = color));
+        for (GuiSetting setting : dev.arcaneclient.additions.cosmetics.NametagSettings.settings(config)) nametagBuilder.with(setting);
+        GuiModule nametags = nametagBuilder.build();
         GuiModule logoutSpots = GuiModule.toggle("Logout Spots", "Keeps temporary markers where tracked players disappear from a loaded world.", () -> config.logoutSpots, value -> config.logoutSpots = value)
             .with(new GuiSetting.Slider("Lifetime", () -> config.logoutSpotMinutes, value -> config.logoutSpotMinutes = value, 1, 120, "m"))
             .with(new GuiSetting.Swatch("Color", () -> config.logoutSpotColor, color -> config.logoutSpotColor = color)).build();
@@ -232,7 +384,7 @@ public final class ModuleCatalog {
         return List.of(storage, debug, item, tunnel, amethyst, accessTrails, tiles, player, mobs, projectiles, crystals, tracers, holes, search, nametags, logoutSpots, portalEsp);
     }
 
-    private static List<GuiModule> combat(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
+    private static List<GuiModule> combat(ArcaneConfig config, ArcaneKeybinds keybinds, Minecraft client) {
         GuiModule autoTotem = GuiModule.toggle("Auto Totem", "Refills the off-hand from inventory after a totem pop.", () -> config.autoTotem, value -> config.autoTotem = value)
             .with(new GuiSetting.Info("Totems", () -> client.player == null ? "0" : Integer.toString(CombatController.totemCount(client.player))))
             .with(new GuiSetting.Bind("Bind", keybinds.autoTotem())).build();
@@ -269,7 +421,7 @@ public final class ModuleCatalog {
         return List.of(autoTotem, autoEat, autoArmor, smartWeapon, triggerBot, refill, spear, mace, safety, hitSound, swing, combatHud);
     }
 
-    private static List<GuiModule> movement(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
+    private static List<GuiModule> movement(ArcaneConfig config, ArcaneKeybinds keybinds, Minecraft client) {
         GuiModule sprint = GuiModule.toggle("Auto Sprint", "Sprints while moving forward when hunger and movement state allow it.", () -> config.autoSprint, value -> config.autoSprint = value).build();
         GuiModule walk = GuiModule.toggle("Auto Walk", "Holds forward only during gameplay and releases it for screens, disable, or world leave.", () -> config.autoWalk, value -> config.autoWalk = value)
             .with(new GuiSetting.Bind("Bind", keybinds.autoWalk())).build();
@@ -292,7 +444,7 @@ public final class ModuleCatalog {
         return List.of(sprint, walk, jump, sneak, inventoryMove, safeWalk, parkour, swim, elytra, perspective, cruise);
     }
 
-    private static List<GuiModule> render(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
+    private static List<GuiModule> render(ArcaneConfig config, ArcaneKeybinds keybinds, Minecraft client) {
         GuiModule radar = GuiModule.toggle("Base Radar", "Shows the scored-chunk grid around the player.", () -> config.hud, value -> config.hud = value).build();
         GuiModule freecam = GuiModule.toggle("Freecam", "Detaches the camera for local flight while interaction stays anchored to the real player.", FreecamController::isActive, value -> {
             if (value != FreecamController.isActive()) {
@@ -334,15 +486,15 @@ public final class ModuleCatalog {
         return List.of(radar, freecam, freelook, fullbright, hurtCam, zoom, clean, noRender, waypoints, breadcrumbs, crosshair, chunkBorders);
     }
 
-    private static void closeCameraMenu(MinecraftClient client) {
-        if (client.currentScreen instanceof ArcaneSettingsScreen) client.setScreen(null);
+    private static void closeCameraMenu(Minecraft client) {
+        if (client.gui.screen() instanceof ArcaneSettingsScreen) client.gui.setScreen(null);
     }
 
     private static List<GuiModule> utility(ArcaneConfig config, ArcaneKeybinds keybinds) {
         GuiModule autoTool = GuiModule.toggle("Auto Tool", "Selects the best hotbar tool before mining, then restores your slot.", () -> config.autoTool, value -> config.autoTool = value)
             .with(new GuiSetting.Toggle("Protect 1 durability", () -> config.autoToolPreserveDurability, value -> config.autoToolPreserveDurability = value)).build();
         GuiModule.Builder macros = GuiModule.toggle("Chat Macros", "Sends four saved messages, each on its own key.", () -> config.chatMacros, value -> config.chatMacros = value);
-        List<KeyBinding> macroKeys = keybinds.chatMacros();
+        List<KeyMapping> macroKeys = keybinds.chatMacros();
         for (int slot = 0; slot < macroKeys.size(); slot++) macros.with(new GuiSetting.Message(Integer.toString(slot + 1), slot, macroKeys.get(slot)));
         GuiModule autoRespawn = GuiModule.toggle("Auto Respawn", "Returns to play immediately after death without clicking the death screen.", () -> config.autoRespawn, value -> config.autoRespawn = value).build();
         GuiModule antiAfk = GuiModule.toggle("Anti AFK", "Performs one harmless hand swing after the configured idle interval.", () -> config.antiAfk, value -> config.antiAfk = value)
@@ -351,27 +503,36 @@ public final class ModuleCatalog {
             .with(new GuiSetting.Slider("Stop at", () -> config.durabilityGuardRemaining, value -> config.durabilityGuardRemaining = value, 1, 25, " uses")).build();
         GuiModule deathTracker = GuiModule.toggle("Death Tracker", "Records the latest death in the current server session and optionally points back to it.", () -> config.deathCoordinates, value -> config.deathCoordinates = value)
             .with(new GuiSetting.Toggle("Status HUD beacon", () -> config.hudDeathBeacon, value -> config.hudDeathBeacon = value)).build();
-        GuiModule coordinateClipboard = GuiModule.toggle("Coordinate Clipboard", "Copies exact block coordinates with a bind and obeys Streamer Mode.", () -> config.coordinateClipboard, value -> config.coordinateClipboard = value)
+        GuiModule coordinateClipboard = GuiModule.toggle("Copy Coordinates", "Copies exact block coordinates with a bind and obeys Streamer Mode.", () -> config.coordinateClipboard, value -> config.coordinateClipboard = value)
             .with(new GuiSetting.Bind("Copy bind", keybinds.coordinateClipboard())).build();
         GuiModule autoFish = GuiModule.toggle("Auto Fish", "Recasts only after the local fishing-bobber bite signal and explicit opt-in.", () -> config.autoFish, value -> config.autoFish = value).build();
         return List.of(autoTool, macros.build(), autoRespawn, antiAfk, durabilityGuard, deathTracker, coordinateClipboard, autoFish);
     }
 
-    private static List<GuiModule> clientTools(ArcaneConfig config, ArcaneKeybinds keybinds, MinecraftClient client) {
+    private static List<GuiModule> clientTools(ArcaneConfig config, ArcaneKeybinds keybinds, Minecraft client) {
         GuiModule performance = GuiModule.value("Performance", "Applies fixed scan and render work-budget presets.", () -> config.performanceProfile().label())
             .with(new GuiSetting.Cycle("Profile", () -> config.performanceProfile().label(), () -> {
                 config.cyclePerformanceProfile();
                 ArcaneClient.engine().settingsChanged(client);
             }))
-            .with(new GuiSetting.Info("Frame rate", () -> client.getCurrentFps() + " FPS")).build();
+            .with(new GuiSetting.Info("Frame rate", () -> client.getFps() + " FPS")).build();
 
-        GuiModule interfaceModule = GuiModule.value("Interface", "Preset themes or exact custom RGB colors.", () -> config.customUiColors ? "CUSTOM" : ClickGuiTheme.fromConfig(config.uiTheme).label())
+        GuiModule interfaceModule = GuiModule.value("Interface", "Glass, colors and layout. Shift-click a module to favorite it.", () -> config.customUiColors ? "CUSTOM" : ClickGuiTheme.fromConfig(config.uiTheme).label())
             .with(new GuiSetting.Cycle("Theme", () -> ClickGuiTheme.fromConfig(config.uiTheme).label(), () -> config.uiTheme = (config.uiTheme + 1) % ClickGuiTheme.count()))
+            .with(new GuiSetting.Slider("Glass opacity", () -> config.uiOpacityPercent, value -> config.uiOpacityPercent = value, 45, 100, "%"))
+            .with(new GuiSetting.Toggle("World blur", () -> config.uiBlur, value -> config.uiBlur = value))
+            .with(new GuiSetting.Toggle("Smooth renderer", () -> config.uiVectorRendering, value -> config.uiVectorRendering = value))
+            .with(new GuiSetting.Cycle("Font", () -> config.uiFont == 0 ? "Condensed" : "Sora", () -> config.uiFont = 1 - config.uiFont))
+            .with(new GuiSetting.Toggle("Reduced motion", () -> config.uiReducedMotion, value -> config.uiReducedMotion = value))
+            .with(new GuiSetting.Toggle("One settings section", () -> config.uiSingleSettings, value -> config.uiSingleSettings = value))
             .with(new GuiSetting.Slider("GUI scale", () -> config.uiScalePercent, value -> config.uiScalePercent = value, 75, 125, "%"))
             .with(new GuiSetting.Slider("Density", () -> config.uiDensityPercent, value -> config.uiDensityPercent = value, 75, 150, "%"))
-            .with(new GuiSetting.Slider("Opacity", () -> config.uiOpacityPercent, value -> config.uiOpacityPercent = value, 45, 100, "%"))
+            .with(new GuiSetting.Cycle("Reset layout", () -> "Reset", () -> {
+                if (client.gui.screen() instanceof ArcaneSettingsScreen screen) screen.resetPanelLayout();
+            }))
             .with(new GuiSetting.Slider("Corner radius", () -> config.uiCornerRadius, value -> config.uiCornerRadius = value, 0, 12, "px"))
             .with(new GuiSetting.Slider("Animation", () -> config.uiAnimationPercent, value -> config.uiAnimationPercent = value, 0, 150, "%"))
+            .with(new GuiSetting.Slider("Background dim", () -> config.uiBackgroundDimPercent, value -> config.uiBackgroundDimPercent = value, 0, 80, "%"))
             .with(new GuiSetting.Slider("Status panels scale", () -> config.hudScalePercent, value -> config.hudScalePercent = value, 70, 140, "%"))
             .with(new GuiSetting.Cycle("Status panels anchor", () -> hudAnchorLabel(config.hudAnchor), () -> config.hudAnchor = (config.hudAnchor + 1) % 4))
             .with(new GuiSetting.Toggle("Custom RGB", () -> config.customUiColors, value -> config.customUiColors = value))

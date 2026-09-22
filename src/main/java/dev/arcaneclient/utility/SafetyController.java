@@ -5,10 +5,10 @@ import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.combat.CombatController;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
 
 /** One combined, edge-triggered warning policy. It never closes the active connection. */
 @Environment(EnvType.CLIENT)
@@ -22,10 +22,10 @@ public final class SafetyController {
         latchedReason = SafetyRules.Reason.NONE;
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         ArcaneConfig config = ArcaneClient.config();
-        ClientPlayerEntity player = client.player;
-        if (config == null || player == null || client.world == null || !config.safetyDisconnect) {
+        LocalPlayer player = client.player;
+        if (config == null || player == null || client.level == null || !config.safetyDisconnect) {
             reset();
             return;
         }
@@ -34,9 +34,9 @@ public final class SafetyController {
         int weakestArmor = weakestArmorPercent(player);
         int elytraDurability = elytraDurabilityPercent(player);
         int rockets = ElytraAssistController.rocketCount(player);
-        boolean playerNearby = client.world.getPlayers().stream()
+        boolean playerNearby = client.level.players().stream()
             .filter(other -> other != player && !other.isSpectator())
-            .anyMatch(other -> SafetyRules.nearby(other.squaredDistanceTo(player), config.nearbyPlayerRange));
+            .anyMatch(other -> SafetyRules.nearby(other.distanceToSqr(player), config.nearbyPlayerRange));
 
         SafetyRules.Reason reason = SafetyRules.firstTriggered(
             config.safetyRuleHealth,
@@ -47,7 +47,7 @@ public final class SafetyController {
             SafetyRules.lowHealth(player.getHealth(), config.lowHealthHearts),
             SafetyRules.lowTotems(totems, config.safetyTotemMinimum),
             SafetyRules.lowArmor(weakestArmor, config.armorAlertPercent),
-            player.isGliding() && SafetyRules.flightUnsafe(
+            player.isFallFlying() && SafetyRules.flightUnsafe(
                 elytraDurability,
                 rockets,
                 config.flightSafetyDurability,
@@ -66,22 +66,22 @@ public final class SafetyController {
         }
     }
 
-    private static int weakestArmorPercent(ClientPlayerEntity player) {
+    private static int weakestArmorPercent(LocalPlayer player) {
         int weakest = 100;
         for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
-            ItemStack stack = player.getEquippedStack(slot);
+            ItemStack stack = player.getItemBySlot(slot);
             if (stack.isEmpty()) return 0;
-            if (stack.isDamageable()) weakest = Math.min(weakest, durabilityPercent(stack));
+            if (stack.isDamageableItem()) weakest = Math.min(weakest, durabilityPercent(stack));
         }
         return weakest;
     }
 
-    private static int elytraDurabilityPercent(ClientPlayerEntity player) {
-        ItemStack chest = player.getEquippedStack(EquipmentSlot.CHEST);
-        return chest.isDamageable() ? durabilityPercent(chest) : 100;
+    private static int elytraDurabilityPercent(LocalPlayer player) {
+        ItemStack chest = player.getItemBySlot(EquipmentSlot.CHEST);
+        return chest.isDamageableItem() ? durabilityPercent(chest) : 100;
     }
 
     private static int durabilityPercent(ItemStack stack) {
-        return (stack.getMaxDamage() - stack.getDamage()) * 100 / Math.max(1, stack.getMaxDamage());
+        return (stack.getMaxDamage() - stack.getDamageValue()) * 100 / Math.max(1, stack.getMaxDamage());
     }
 }

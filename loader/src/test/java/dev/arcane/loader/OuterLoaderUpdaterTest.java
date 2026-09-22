@@ -31,11 +31,11 @@ final class OuterLoaderUpdaterTest {
             (source, destination, maximum) -> downloads.incrementAndGet(),
             (plan, release) -> schedules.incrementAndGet());
         ReleaseManifest same = new ReleaseManifest(2, "arcane-loader",
-            "1.2.2+mc1.21.11", "1.21.11", "https://example.com/loader.jar",
+            "1.2.2+mc26.3", "26.3", "https://example.com/loader.jar",
             "a".repeat(64), "A".repeat(86) + "==", 999);
 
         LoaderUpdateResult result = updater.checkAndStage(same,
-            "1.2.2+mc1.21.11", running);
+            "1.2.2+mc26.3", running);
 
         assertEquals(LoaderUpdateResult.Status.CURRENT, result.status());
         assertEquals(0, downloads.get());
@@ -53,9 +53,9 @@ final class OuterLoaderUpdaterTest {
         byte[] original = "old-loader".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         Files.write(running, original);
         Path releaseFile = directory.resolve("remote-loader.jar");
-        TestArtifacts.writeOuterLoader(releaseFile, "1.2.3+mc1.21.11");
+        TestArtifacts.writeOuterLoader(releaseFile, "1.2.3+mc26.3");
         var pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-        ReleaseManifest release = TestArtifacts.release(releaseFile, "1.2.3+mc1.21.11", pair);
+        ReleaseManifest release = TestArtifacts.release(releaseFile, "1.2.3+mc26.3", pair);
         AtomicReference<UpdatePlan> scheduled = new AtomicReference<>();
         OuterLoaderUpdater updater = new OuterLoaderUpdater(
             LoaderState.at(directory.resolve("state")), pair.getPublic(),
@@ -64,7 +64,7 @@ final class OuterLoaderUpdaterTest {
             (plan, ignored) -> scheduled.set(plan));
 
         LoaderUpdateResult result = updater.checkAndStage(release,
-            "1.2.2+mc1.21.11", running);
+            "1.2.2+mc26.3", running);
 
         assertEquals(LoaderUpdateResult.Status.STAGED, result.status());
         assertTrue(Files.isRegularFile(result.path()));

@@ -6,20 +6,20 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.AttackRangeComponent;
-import net.minecraft.component.type.PiercingWeaponComponent;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.passive.PassiveEntity;
-import net.minecraft.entity.passive.TameableEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.AttackRange;
+import net.minecraft.world.item.component.PiercingWeapon;
+import net.minecraft.world.phys.EntityHitResult;
 
 /** Crosshair-only attack automation with vanilla cooldown and 1.21.11 spear semantics. */
 @Environment(EnvType.CLIENT)
@@ -35,7 +35,7 @@ public final class TriggerBotController {
     private TriggerBotController() {
     }
 
-    public static boolean tick(MinecraftClient client, Settings settings) {
+    public static boolean tick(Minecraft client, Settings settings) {
         return tick(client, settings, entity -> false, entity -> { });
     }
 
@@ -44,19 +44,19 @@ public final class TriggerBotController {
      * @param prepareWeapon synchronously applies Mace/Spear/Smart Weapon precedence
      */
     public static boolean tick(
-        MinecraftClient client,
+        Minecraft client,
         Settings settings,
         Predicate<Entity> protectedTarget,
         Consumer<Entity> prepareWeapon
     ) {
         Objects.requireNonNull(protectedTarget, "protectedTarget");
         Objects.requireNonNull(prepareWeapon, "prepareWeapon");
-        ClientPlayerEntity player = client.player;
-        if (!settings.enabled() || player == null || client.world == null || client.interactionManager == null) return false;
+        LocalPlayer player = client.player;
+        if (!settings.enabled() || player == null || client.level == null || client.gameMode == null) return false;
         if (DetachedCameraInteraction.isActive()) return false;
-        if (!(client.crosshairTarget instanceof EntityHitResult hit)) return false;
+        if (!(client.hitResult instanceof EntityHitResult hit)) return false;
         Entity target = hit.getEntity();
-        long tick = player.age;
+        long tick = player.tickCount;
         int elapsed = lastAttackTick <= Long.MIN_VALUE / 4
             ? Integer.MAX_VALUE
             : (int) Math.min(Integer.MAX_VALUE, Math.max(0L, tick - lastAttackTick));
@@ -66,29 +66,29 @@ public final class TriggerBotController {
             target.isAttackable(),
             target == player,
             protectedTarget.test(target),
-            target instanceof PlayerEntity targetPlayer && targetPlayer.isCreative(),
-            target instanceof TameableEntity tameable && tameable.isTamed(),
-            player.canSee(target),
+            target instanceof Player targetPlayer && targetPlayer.isCreative(),
+            target instanceof TamableAnimal tameable && tameable.isTame(),
+            player.hasLineOfSight(target),
             player.isUsingItem(),
-            client.currentScreen != null,
+            client.gui.screen() != null,
             player.isSpectator(),
-            player.getAttackCooldownProgress(0.0f),
+            player.getAttackStrengthScale(0.0f),
             elapsed
         );
         if (!TriggerBotPolicy.shouldAttack(context, settings.policy())) return false;
 
         prepareWeapon.accept(target);
-        ItemStack weapon = player.getMainHandStack();
-        if (player.isBelowMinimumAttackCharge(weapon, 0)) return false;
-        PiercingWeaponComponent piercing = weapon.get(DataComponentTypes.PIERCING_WEAPON);
-        if (piercing != null && !client.interactionManager.isFlyingLocked()) {
-            client.interactionManager.attackWithPiercingWeapon(piercing);
+        ItemStack weapon = player.getMainHandItem();
+        if (player.cannotAttackWithItem(weapon, 0)) return false;
+        PiercingWeapon piercing = weapon.get(DataComponents.PIERCING_WEAPON);
+        if (piercing != null && !client.gameMode.isSpectator()) {
+            client.gameMode.piercingAttack(weapon.getAttackAnimation(), piercing);
         } else {
-            AttackRangeComponent range = weapon.get(DataComponentTypes.ATTACK_RANGE);
-            if (range != null && !range.isWithinRange(player, hit.getPos())) return false;
-            client.interactionManager.attackEntity(player, target);
+            AttackRange range = weapon.get(DataComponents.ATTACK_RANGE);
+            if (range != null && !range.isInRange(player, hit.getLocation())) return false;
+            client.gameMode.attack(player, target);
+            player.swing(InteractionHand.MAIN_HAND, weapon.getAttackAnimation(), false);
         }
-        player.swingHand(Hand.MAIN_HAND);
         lastAttackTick = tick;
         return true;
     }
@@ -98,9 +98,9 @@ public final class TriggerBotController {
     }
 
     private static TriggerBotPolicy.TargetKind targetKind(Entity target) {
-        if (target instanceof PlayerEntity) return TriggerBotPolicy.TargetKind.PLAYER;
-        if (target instanceof HostileEntity) return TriggerBotPolicy.TargetKind.HOSTILE;
-        if (target instanceof PassiveEntity) return TriggerBotPolicy.TargetKind.PASSIVE;
+        if (target instanceof Player) return TriggerBotPolicy.TargetKind.PLAYER;
+        if (target instanceof Monster) return TriggerBotPolicy.TargetKind.HOSTILE;
+        if (target instanceof AgeableMob) return TriggerBotPolicy.TargetKind.PASSIVE;
         if (target instanceof LivingEntity) return TriggerBotPolicy.TargetKind.OTHER;
         return TriggerBotPolicy.TargetKind.OTHER;
     }

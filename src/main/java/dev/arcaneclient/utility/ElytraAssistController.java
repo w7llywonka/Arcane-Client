@@ -7,14 +7,14 @@ import dev.arcaneclient.inventory.InventoryActionScheduler;
 import dev.arcaneclient.inventory.InventoryAutomationSupport;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 /** Automatically spends hotbar or off-hand rockets to maintain efficient Elytra flight. */
 @Environment(EnvType.CLIENT)
@@ -25,30 +25,30 @@ public final class ElytraAssistController {
     private ElytraAssistController() {
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         ArcaneConfig config = ArcaneClient.config();
-        ClientPlayerEntity player = client.player;
+        LocalPlayer player = client.player;
         if (boostCooldown > 0) boostCooldown--;
-        if (config == null || player == null || client.world == null || client.interactionManager == null) {
+        if (config == null || player == null || client.level == null || client.gameMode == null) {
             reset();
             return;
         }
 
-        boolean inputBlocked = client.currentScreen != null
+        boolean inputBlocked = client.gui.screen() != null
             || player.isUsingItem()
-            || client.options.useKey.isPressed()
+            || client.options.keyUse.isDown()
             || FreecamController.isActive();
-        double speedBlocksPerSecond = player.getVelocity().length() * 20.0;
+        double speedBlocksPerSecond = player.getDeltaMovement().length() * 20.0;
         if (!ElytraAssistLogic.shouldBoost(
             config.elytraAssist,
-            player.isGliding(),
+            player.isFallFlying(),
             inputBlocked,
             boostCooldown,
             speedBlocksPerSecond,
             config.elytraAssistSmartConservation,
             config.elytraAssistBoostBelow
         )) {
-            if (!config.elytraAssist || !player.isGliding()) {
+            if (!config.elytraAssist || !player.isFallFlying()) {
                 boostCooldown = 0;
                 missingRocketsLatched = false;
                 releaseHotbarLease(InventoryActionScheduler.shared());
@@ -56,15 +56,15 @@ public final class ElytraAssistController {
             return;
         }
 
-        Hand hand = Hand.OFF_HAND;
+        InteractionHand hand = InteractionHand.OFF_HAND;
         int rocketSlot = -1;
-        if (!player.getOffHandStack().isOf(Items.FIREWORK_ROCKET)) {
-            hand = Hand.MAIN_HAND;
+        if (!player.getOffhandItem().is(Items.FIREWORK_ROCKET)) {
+            hand = InteractionHand.MAIN_HAND;
             rocketSlot = findRocketSlot(player);
         }
-        if (hand == Hand.MAIN_HAND && rocketSlot < 0) {
+        if (hand == InteractionHand.MAIN_HAND && rocketSlot < 0) {
             if (!missingRocketsLatched) {
-                player.sendMessage(Text.literal("Elytra Assist: no rockets in hotbar"), true);
+                player.sendOverlayMessage(Component.literal("Elytra Assist: no rockets in hotbar"));
                 missingRocketsLatched = true;
             }
             boostCooldown = 20;
@@ -75,12 +75,12 @@ public final class ElytraAssistController {
         long tick = InventoryAutomationSupport.tick(player);
         if (!acquireHotbarLease(InventoryActionScheduler.shared(), tick)) return;
         int previousSlot = player.getInventory().getSelectedSlot();
-        boolean changedSlot = hand == Hand.MAIN_HAND && rocketSlot != previousSlot;
+        boolean changedSlot = hand == InteractionHand.MAIN_HAND && rocketSlot != previousSlot;
         try {
             if (changedSlot) setSelectedSlot(client, player, rocketSlot);
-            ActionResult result = client.interactionManager.interactItem(player, hand);
-            if (result.isAccepted()) {
-                player.swingHand(hand);
+            InteractionResult result = client.gameMode.useItem(player, hand);
+            if (result.consumesAction()) {
+                player.swing(hand, player.getItemInHand(hand).getInteractAnimation(), false);
                 boostCooldown = config.elytraAssistDelayTicks;
             } else {
                 boostCooldown = 5;
@@ -100,32 +100,32 @@ public final class ElytraAssistController {
         return boostCooldown;
     }
 
-    public static int rocketCount(ClientPlayerEntity player) {
-        int count = player.getOffHandStack().isOf(Items.FIREWORK_ROCKET)
-            ? player.getOffHandStack().getCount()
+    public static int rocketCount(LocalPlayer player) {
+        int count = player.getOffhandItem().is(Items.FIREWORK_ROCKET)
+            ? player.getOffhandItem().getCount()
             : 0;
         for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
-            if (stack.isOf(Items.FIREWORK_ROCKET)) count += stack.getCount();
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.is(Items.FIREWORK_ROCKET)) count += stack.getCount();
         }
         return count;
     }
 
-    private static int findRocketSlot(ClientPlayerEntity player) {
+    private static int findRocketSlot(LocalPlayer player) {
         int selectedSlot = player.getInventory().getSelectedSlot();
-        if (player.getInventory().getStack(selectedSlot).isOf(Items.FIREWORK_ROCKET)) {
+        if (player.getInventory().getItem(selectedSlot).is(Items.FIREWORK_ROCKET)) {
             return selectedSlot;
         }
         for (int slot = 0; slot < 9; slot++) {
-            if (player.getInventory().getStack(slot).isOf(Items.FIREWORK_ROCKET)) return slot;
+            if (player.getInventory().getItem(slot).is(Items.FIREWORK_ROCKET)) return slot;
         }
         return -1;
     }
 
-    private static void setSelectedSlot(MinecraftClient client, ClientPlayerEntity player, int slot) {
+    private static void setSelectedSlot(Minecraft client, LocalPlayer player, int slot) {
         player.getInventory().setSelectedSlot(slot);
-        if (client.getNetworkHandler() != null) {
-            client.getNetworkHandler().sendPacket(new UpdateSelectedSlotC2SPacket(slot));
+        if (client.getConnection() != null) {
+            client.getConnection().send(new ServerboundSetCarriedItemPacket(slot));
         }
     }
 

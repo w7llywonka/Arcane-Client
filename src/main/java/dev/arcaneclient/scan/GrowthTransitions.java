@@ -1,11 +1,12 @@
 package dev.arcaneclient.scan;
 
 import dev.arcaneclient.model.SignalCategory;
+import java.util.Iterator;
 import java.util.Map;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.block.BlockState;
-import net.minecraft.state.property.Property;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 
 @Environment(EnvType.CLIENT)
 public final class GrowthTransitions {
@@ -13,33 +14,31 @@ public final class GrowthTransitions {
     }
 
     public static GrowthEvent analyze(BlockState before, BlockState after) {
+        if (before.hasBlockEntity() || after.hasBlockEntity()) return null;
+        String beforeId = ActivityClassifier.blockPath(before);
+        String afterId = ActivityClassifier.blockPath(after);
+        if ((!growingBlock(beforeId) && !growingBlock(afterId)) || isObfuscationMask(beforeId)) return null;
         return analyze(
-            ActivityClassifier.blockPath(before), properties(before),
-            ActivityClassifier.blockPath(after), properties(after)
+            beforeId, properties(before), afterId, properties(after)
         );
     }
 
     static GrowthEvent analyze(String beforeId, Map<String, Object> before, String afterId, Map<String, Object> after) {
-        if (ScannerStorageFilter.isStoragePath(beforeId) || ScannerStorageFilter.isStoragePath(afterId)) {
+        if (excluded(beforeId) || excluded(afterId)) {
             return null;
         }
         int oldAmethyst = amethystRank(beforeId);
         int newAmethyst = amethystRank(afterId);
         if (oldAmethyst >= 0 || newAmethyst >= 0) {
-            // Shard stages remain available to Amethyst ESP, but amethyst is not
-            // activity evidence for Chunk Finder.
+            if (oldAmethyst >= 0 && newAmethyst == oldAmethyst + 1
+                && java.util.Objects.equals(before.get("facing"), after.get("facing"))) {
+                return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 24, "amethyst bud advanced", Family.AMETHYST);
+            }
+            // Initial appearances and skipped stages can be reveals, not observed growth.
             return null;
         }
 
-        Family revealedFamily = revealedGrowthFamily(afterId, after);
-        if (isObfuscationMask(beforeId) && revealedFamily != null) {
-            return new GrowthEvent(
-                SignalCategory.NATURAL_GROWTH,
-                34,
-                "masked growth state revealed: " + afterId,
-                revealedFamily
-            );
-        }
+        if (isObfuscationMask(beforeId)) return null;
 
         Integer oldAge = integer(before, "age");
         Integer newAge = integer(after, "age");
@@ -52,13 +51,13 @@ public final class GrowthTransitions {
             }
         }
 
-        if (isKelp(afterId) && !isKelp(beforeId)) {
+        if (afterId.equals("kelp") && empty(beforeId)) {
             return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 30, "kelp column grew", Family.KELP);
         }
-        if (isKelp(beforeId) && !isKelp(afterId)) {
+        if (isKelp(beforeId) && empty(afterId)) {
             return new GrowthEvent(SignalCategory.LIVE_ACTIVITY, 115, "kelp column harvested", Family.KELP);
         }
-        if (isKelp(beforeId) && isKelp(afterId) && oldAge != null && newAge != null && !oldAge.equals(newAge)) {
+        if (beforeId.equals("kelp") && afterId.equals("kelp_plant")) {
             return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 22, "kelp growth tick", Family.KELP);
         }
 
@@ -73,35 +72,51 @@ public final class GrowthTransitions {
             }
         }
 
-        if ((beforeId.equals("beehive") || beforeId.equals("bee_nest")) && afterId.equals(beforeId)) {
-            Integer oldHoney = integer(before, "honey_level");
-            Integer newHoney = integer(after, "honey_level");
-            if (oldHoney != null && newHoney != null) {
-                if (oldHoney >= 5 && newHoney == 0) {
-                    return new GrowthEvent(SignalCategory.LIVE_ACTIVITY, 155, "honey harvested", Family.HONEY);
-                }
-                if (newHoney > oldHoney) {
-                    return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 18, "hive honey increased", Family.HONEY);
-                }
-            }
-        }
-
-        if (oldAge != null && newAge != null && beforeId.equals(afterId) && !oldAge.equals(newAge)) {
-            if (newAge < oldAge) {
-                return new GrowthEvent(SignalCategory.LIVE_ACTIVITY, 125, "crop harvested or reset: " + beforeId, Family.CROP);
-            }
+        if (isCrop(beforeId) && oldAge != null && newAge != null && beforeId.equals(afterId) && newAge > oldAge) {
             return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 18, "crop growth tick: " + beforeId, Family.CROP);
         }
-        if (oldAge != null && oldAge > 0 && (afterId.equals("air") || afterId.equals("water"))) {
+        if (isCrop(beforeId) && oldAge != null && oldAge > 0 && empty(afterId)) {
             return new GrowthEvent(SignalCategory.LIVE_ACTIVITY, 140, "mature plant removed: " + beforeId, Family.CROP);
         }
-        if (isVerticalCrop(afterId) && !afterId.equals(beforeId) && (beforeId.equals("air") || beforeId.equals("water"))) {
+        if (isVerticalCrop(afterId) && empty(beforeId)) {
             return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 24, afterId + " grew vertically", Family.VERTICAL_PLANT);
         }
-        if (isVerticalCrop(beforeId) && !beforeId.equals(afterId)) {
+        if (isVerticalCrop(beforeId) && empty(afterId)) {
             return new GrowthEvent(SignalCategory.LIVE_ACTIVITY, 105, beforeId + " harvested", Family.VERTICAL_PLANT);
         }
+        if (beforeId.equals(afterId) && beforeId.equals("vine")) {
+            boolean spread = false;
+            for (String face : java.util.List.of("north", "south", "east", "west", "up")) {
+                if (Boolean.TRUE.equals(before.get(face)) && !Boolean.TRUE.equals(after.get(face))) return null;
+                spread |= Boolean.FALSE.equals(before.get(face)) && Boolean.TRUE.equals(after.get(face));
+            }
+            if (spread) return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 24, "vine spread", Family.CAVE_VINE);
+        }
+        if ((beforeId.equals("cave_vines") || beforeId.equals("weeping_vines") || beforeId.equals("twisting_vines"))
+            && afterId.equals(beforeId + "_plant"))
+            return new GrowthEvent(SignalCategory.NATURAL_GROWTH, 24, "vine stem extended", Family.CAVE_VINE);
         return null;
+    }
+
+    private static boolean empty(String id) {
+        return id.equals("air") || id.equals("cave_air") || id.equals("water");
+    }
+
+    private static boolean growingBlock(String id) {
+        return isCrop(id) || isVerticalCrop(id) || isKelp(id) || id.equals("sweet_berry_bush") || amethystRank(id) >= 0;
+    }
+
+    private static boolean excluded(String id) {
+        return ScannerStorageFilter.isStoragePath(id) || id.endsWith("_sapling") || id.equals("mangrove_propagule")
+            || id.equals("beehive") || id.equals("bee_nest");
+    }
+
+    private static boolean isCrop(String id) {
+        return switch (id) {
+            case "wheat", "carrots", "potatoes", "beetroots", "nether_wart", "cocoa", "melon_stem",
+                 "pumpkin_stem", "torchflower_crop", "pitcher_crop", "cactus", "sugar_cane" -> true;
+            default -> false;
+        };
     }
 
     public static int amethystRank(String id) {
@@ -119,7 +134,7 @@ public final class GrowthTransitions {
     }
 
     private static boolean isVerticalCrop(String id) {
-        return id.equals("bamboo") || id.equals("bamboo_sapling") || id.equals("cactus") || id.equals("sugar_cane")
+        return id.equals("bamboo") || id.equals("vine") || id.startsWith("cave_vines") || id.equals("cactus") || id.equals("sugar_cane")
             || id.startsWith("weeping_vines") || id.startsWith("twisting_vines");
     }
 
@@ -130,18 +145,12 @@ public final class GrowthTransitions {
         };
     }
 
-    private static Family revealedGrowthFamily(String id, Map<String, Object> properties) {
-        if (id.equals("sweet_berry_bush")) return Family.BERRY;
-        if (isKelp(id)) return Family.KELP;
-        if (id.startsWith("cave_vines")) return Family.CAVE_VINE;
-        if (isVerticalCrop(id)) return Family.VERTICAL_PLANT;
-        return integer(properties, "age") != null ? Family.CROP : null;
-    }
-
     private static Map<String, Object> properties(BlockState state) {
         java.util.HashMap<String, Object> values = new java.util.HashMap<>();
-        for (Map.Entry<Property<?>, Comparable<?>> entry : state.getEntries().entrySet()) {
-            values.put(entry.getKey().getName(), entry.getValue());
+        Iterator<Property.Value<?>> entries = state.getValues().iterator();
+        while (entries.hasNext()) {
+            Property.Value<?> entry = entries.next();
+            values.put(entry.property().getName(), entry.value());
         }
         return values;
     }

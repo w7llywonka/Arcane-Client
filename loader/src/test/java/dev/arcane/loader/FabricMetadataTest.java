@@ -20,14 +20,14 @@ final class FabricMetadataTest {
 
             assertEquals("arcaneloader", metadata.get("id"));
             assertEquals("ARCLoader", metadata.get("name"));
-            assertEquals(">=2.9.2", objectMap(metadata.get("depends")).get("arcaneclient"));
+            assertEquals(">=2.9.4", objectMap(metadata.get("depends")).get("arcaneclient"));
 
             Object jarsValue = metadata.get("jars");
             assertTrue(jarsValue instanceof List<?>, "jars must be a list");
             List<?> jars = (List<?>) jarsValue;
             assertEquals(1, jars.size());
             assertEquals(
-                "META-INF/jars/arcane-client-2.9.2+mc1.21.11.jar",
+                "META-INF/jars/arcane-client-2.9.4+mc26.3.jar",
                 objectMap(jars.getFirst()).get("file")
             );
         }

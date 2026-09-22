@@ -9,16 +9,16 @@ import java.util.ArrayList;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.event.client.player.ClientPreAttackCallback;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.FoodComponent;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.EntityHitResult;
 
 /** Runtime behavior for Arcane's combat and survival modules. */
 @Environment(EnvType.CLIENT)
@@ -34,17 +34,17 @@ public final class CombatController {
     public static void register() {
         ClientPreAttackCallback.EVENT.register((client, player, clickCount) -> {
             ArcaneConfig config = ArcaneClient.config();
-            if (config != null && config.hitSound && !FreecamController.isActive() && client.crosshairTarget instanceof EntityHitResult) {
+            if (config != null && config.hitSound && !FreecamController.isActive() && client.hitResult instanceof EntityHitResult) {
                 play(client, 1.45f);
             }
             return false;
         });
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         ArcaneConfig config = ArcaneClient.config();
-        ClientPlayerEntity player = client.player;
-        if (player == null || client.world == null) {
+        LocalPlayer player = client.player;
+        if (player == null || client.level == null) {
             stopAutoEat(client, null);
             return;
         }
@@ -53,20 +53,20 @@ public final class CombatController {
         tickAutoEat(client, player, config);
     }
 
-    private static void tickAutoSprint(MinecraftClient client, ClientPlayerEntity player, ArcaneConfig config) {
-        if (!config.autoSprint || client.currentScreen != null) return;
-        boolean shouldSprint = client.options.forwardKey.isPressed()
-            && !client.options.sneakKey.isPressed()
+    private static void tickAutoSprint(Minecraft client, LocalPlayer player, ArcaneConfig config) {
+        if (!config.autoSprint || client.gui.screen() != null) return;
+        boolean shouldSprint = client.options.keyUp.isDown()
+            && !client.options.keyShift.isDown()
             && !player.isUsingItem()
             && !player.horizontalCollision
-            && player.getHungerManager().getFoodLevel() > 6;
+            && player.getFoodData().getFoodLevel() > 6;
         if (shouldSprint) player.setSprinting(true);
     }
 
-    private static void tickAutoEat(MinecraftClient client, ClientPlayerEntity player, ArcaneConfig config) {
-        boolean needsFood = player.getHungerManager().getFoodLevel() <= config.autoEatHunger
-            && player.getHungerManager().getFoodLevel() < 20;
-        if (!config.autoEat || !needsFood || client.currentScreen != null || player.isSpectator()) {
+    private static void tickAutoEat(Minecraft client, LocalPlayer player, ArcaneConfig config) {
+        boolean needsFood = player.getFoodData().getFoodLevel() <= config.autoEatHunger
+            && player.getFoodData().getFoodLevel() < 20;
+        if (!config.autoEat || !needsFood || client.gui.screen() != null || player.isSpectator()) {
             stopAutoEat(client, player);
             return;
         }
@@ -88,7 +88,7 @@ public final class CombatController {
             autoEatSlot = foodSlot;
             autoEating = true;
         } else if (player.getInventory().getSelectedSlot() != autoEatSlot
-            || !isSafeAutoFood(player.getInventory().getStack(autoEatSlot))
+            || !isSafeAutoFood(player.getInventory().getItem(autoEatSlot))
             || !InventoryActionScheduler.shared().tryAcquire(
             InventoryActionScheduler.Owner.AUTO_EAT,
             InventoryActionScheduler.Channel.HOTBAR_SELECTION,
@@ -98,15 +98,15 @@ public final class CombatController {
             stopAutoEat(client, player);
             return;
         }
-        client.options.useKey.setPressed(true);
+        client.options.keyUse.setDown(true);
     }
 
-    private static void stopAutoEat(MinecraftClient client, ClientPlayerEntity player) {
+    private static void stopAutoEat(Minecraft client, LocalPlayer player) {
         if (!autoEating) {
             InventoryActionScheduler.shared().releaseAll(InventoryActionScheduler.Owner.AUTO_EAT);
             return;
         }
-        client.options.useKey.setPressed(false);
+        client.options.keyUse.setDown(false);
         if (player != null && previousSlot >= 0 && previousSlot < 9
             && player.getInventory().getSelectedSlot() == autoEatSlot) {
             InventoryAutomationSupport.selectHotbar(
@@ -123,64 +123,64 @@ public final class CombatController {
         autoEating = false;
     }
 
-    private static int findFood(ClientPlayerEntity player) {
+    private static int findFood(LocalPlayer player) {
         ArrayList<AutoEatPolicy.Candidate> candidates = new ArrayList<>();
         for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
-            FoodComponent food = stack.get(DataComponentTypes.FOOD);
+            ItemStack stack = player.getInventory().getItem(slot);
+            FoodProperties food = stack.get(DataComponents.FOOD);
             if (food == null) continue;
             candidates.add(new AutoEatPolicy.Candidate(slot, food.nutrition(), food.saturation(), isSafeAutoFood(stack)));
         }
-        return AutoEatPolicy.choose(player.getHungerManager().getFoodLevel(), candidates);
+        return AutoEatPolicy.choose(player.getFoodData().getFoodLevel(), candidates);
     }
 
     private static boolean isSafeAutoFood(ItemStack stack) {
-        return stack.contains(DataComponentTypes.FOOD)
-            && !stack.isOf(Items.ROTTEN_FLESH)
-            && !stack.isOf(Items.SPIDER_EYE)
-            && !stack.isOf(Items.POISONOUS_POTATO)
-            && !stack.isOf(Items.PUFFERFISH)
-            && !stack.isOf(Items.CHICKEN)
-            && !stack.isOf(Items.SUSPICIOUS_STEW)
-            && !stack.isOf(Items.CHORUS_FRUIT)
-            && !stack.isOf(Items.GOLDEN_APPLE)
-            && !stack.isOf(Items.ENCHANTED_GOLDEN_APPLE);
+        return stack.has(DataComponents.FOOD)
+            && !stack.is(Items.ROTTEN_FLESH)
+            && !stack.is(Items.SPIDER_EYE)
+            && !stack.is(Items.POISONOUS_POTATO)
+            && !stack.is(Items.PUFFERFISH)
+            && !stack.is(Items.CHICKEN)
+            && !stack.is(Items.SUSPICIOUS_STEW)
+            && !stack.is(Items.CHORUS_FRUIT)
+            && !stack.is(Items.GOLDEN_APPLE)
+            && !stack.is(Items.ENCHANTED_GOLDEN_APPLE);
     }
 
-    public static void reset(MinecraftClient client) {
+    public static void reset(Minecraft client) {
         stopAutoEat(client, client == null ? null : client.player);
         alertCooldown = 0;
     }
 
-    static void suspendAutoEat(MinecraftClient client) {
+    static void suspendAutoEat(Minecraft client) {
         stopAutoEat(client, client == null ? null : client.player);
     }
 
-    public static int totemCount(ClientPlayerEntity player) {
+    public static int totemCount(LocalPlayer player) {
         int count = 0;
         // Main inventory/hotbar occupy indices 0..35. PlayerInventory also exposes
         // armor and off-hand slots, so iterating size() and then adding off-hand
         // again would double-count the equipped totem.
         for (int slot = 0; slot < 36; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
-            if (stack.isOf(Items.TOTEM_OF_UNDYING)) count += stack.getCount();
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.is(Items.TOTEM_OF_UNDYING)) count += stack.getCount();
         }
-        if (player.getOffHandStack().isOf(Items.TOTEM_OF_UNDYING)) count += player.getOffHandStack().getCount();
+        if (player.getOffhandItem().is(Items.TOTEM_OF_UNDYING)) count += player.getOffhandItem().getCount();
         return count;
     }
 
-    public static boolean notify(MinecraftClient client, String message, float pitch) {
+    public static boolean notify(Minecraft client, String message, float pitch) {
         if (alertCooldown > 0 || client.player == null) return false;
-        client.player.sendMessage(Text.literal(message), true);
+        client.player.sendOverlayMessage(Component.literal(message));
         play(client, pitch);
         alertCooldown = 20;
         return true;
     }
 
-    private static void play(MinecraftClient client, float pitch) {
+    private static void play(Minecraft client, float pitch) {
         ArcaneConfig config = ArcaneClient.config();
         if (config == null || !config.soundNotifications || config.notificationVolume <= 0) return;
         float volume = config.notificationVolume / 100.0f;
-        client.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, pitch, volume));
+        client.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP, pitch, volume));
     }
 }

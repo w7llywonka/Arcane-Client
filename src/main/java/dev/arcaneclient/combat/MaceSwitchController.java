@@ -6,12 +6,12 @@ import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.MaceItem;
-import net.minecraft.item.Items;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.MaceItem;
 
 /** Selects a mace for a real falling smash with a target below the player. */
 @Environment(EnvType.CLIENT)
@@ -35,10 +35,10 @@ public final class MaceSwitchController {
     private MaceSwitchController() {
     }
 
-    public static boolean prepareForTarget(MinecraftClient client, Entity target, Settings settings) {
-        ClientPlayerEntity player = client.player;
-        if (!settings.enabled() || player == null || target == null || client.currentScreen != null) return false;
-        if (!MaceItem.shouldDealAdditionalDamage(player)) return false;
+    public static boolean prepareForTarget(Minecraft client, Entity target, Settings settings) {
+        LocalPlayer player = client.player;
+        if (!settings.enabled() || player == null || target == null || client.gui.screen() != null) return false;
+        if (!MaceItem.canSmashAttack(player)) return false;
         MaceSwitchPolicy.Settings policySettings = new MaceSwitchPolicy.Settings(
             settings.minimumFallDistance(),
             settings.maximumVerticalVelocity(),
@@ -48,18 +48,18 @@ public final class MaceSwitchController {
         double targetDrop = player.getY() - target.getBoundingBox().maxY;
         MaceSwitchPolicy.Context context = new MaceSwitchPolicy.Context(
             player.fallDistance,
-            player.getVelocity().y,
+            player.getDeltaMovement().y,
             targetDrop,
-            player.isGliding(),
-            player.isTouchingWater(),
-            player.isClimbing()
+            player.isFallFlying(),
+            player.isInWater(),
+            player.onClimbable()
         );
         if (!MaceSwitchPolicy.shouldSwitch(context, policySettings)) return false;
 
         List<MaceSwitchPolicy.Candidate> candidates = new ArrayList<>();
         for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
-            if (stack.isOf(Items.MACE)) {
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.is(Items.MACE)) {
                 candidates.add(new MaceSwitchPolicy.Candidate(slot, CombatItemScoring.durabilityPercent(stack)));
             }
         }
@@ -78,8 +78,8 @@ public final class MaceSwitchController {
         return true;
     }
 
-    public static void restore(MinecraftClient client) {
-        ClientPlayerEntity player = client.player;
+    public static void restore(Minecraft client) {
+        LocalPlayer player = client.player;
         long tick = InventoryAutomationSupport.tick(player);
         if (player != null && restoreSlot >= 0 && restoreSlot < 9 && selectedSlot >= 0
             && player.getInventory().getSelectedSlot() == selectedSlot

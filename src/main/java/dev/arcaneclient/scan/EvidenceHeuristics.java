@@ -97,7 +97,7 @@ public final class EvidenceHeuristics {
     }
 
     public static int growthChronicle(int transitions, int uniquePositions, long spanTicks) {
-        if (transitions < 4 || uniquePositions < 2 || spanTicks < 20L || spanTicks > 2400L) return 0;
+        if (transitions < 8 || uniquePositions < 3 || spanTicks < 200L || spanTicks > 2400L) return 0;
         return Math.min(120, 25 + transitions * 5 + uniquePositions * 4);
     }
 }

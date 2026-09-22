@@ -22,6 +22,7 @@ public final class GuiModule {
     private final @Nullable BooleanSupplier value;
     private final @Nullable Consumer<Boolean> setter;
     private final @Nullable Supplier<String> valueLabel;
+    private final boolean group;
     private final List<GuiSetting> settings;
 
     private boolean expanded;
@@ -32,6 +33,7 @@ public final class GuiModule {
         @Nullable BooleanSupplier value,
         @Nullable Consumer<Boolean> setter,
         @Nullable Supplier<String> valueLabel,
+        boolean group,
         List<GuiSetting> settings
     ) {
         this.name = name;
@@ -39,21 +41,27 @@ public final class GuiModule {
         this.value = value;
         this.setter = setter;
         this.valueLabel = valueLabel;
+        this.group = group;
         this.settings = settings;
 
         StringBuilder search = new StringBuilder(name).append(' ').append(description);
         for (GuiSetting setting : settings) {
-            search.append(' ').append(setting.label());
+            search.append(' ').append(setting.searchText());
         }
         this.searchText = search.toString().toLowerCase(Locale.ROOT);
     }
 
     public static Builder toggle(String name, String description, BooleanSupplier value, Consumer<Boolean> setter) {
-        return new Builder(name, description, value, setter, null);
+        return new Builder(name, description, value, setter, null, false);
     }
 
     public static Builder value(String name, String description, Supplier<String> valueLabel) {
-        return new Builder(name, description, null, null, valueLabel);
+        return new Builder(name, description, null, null, valueLabel, false);
+    }
+
+    /** A non-toggleable folder whose active state reflects the features grouped inside it. */
+    public static Builder group(String name, String description, BooleanSupplier active, Supplier<String> valueLabel) {
+        return new Builder(name, description, active, null, valueLabel, true);
     }
 
     public String name() {
@@ -74,6 +82,10 @@ public final class GuiModule {
 
     public boolean toggleable() {
         return this.value != null && this.setter != null;
+    }
+
+    public boolean group() {
+        return this.group;
     }
 
     public boolean enabled() {
@@ -109,6 +121,7 @@ public final class GuiModule {
         private final @Nullable BooleanSupplier value;
         private final @Nullable Consumer<Boolean> setter;
         private final @Nullable Supplier<String> valueLabel;
+        private final boolean group;
         private final List<GuiSetting> settings = new ArrayList<>();
 
         private Builder(
@@ -116,13 +129,15 @@ public final class GuiModule {
             String description,
             @Nullable BooleanSupplier value,
             @Nullable Consumer<Boolean> setter,
-            @Nullable Supplier<String> valueLabel
+            @Nullable Supplier<String> valueLabel,
+            boolean group
         ) {
             this.name = name;
             this.description = description;
             this.value = value;
             this.setter = setter;
             this.valueLabel = valueLabel;
+            this.group = group;
         }
 
         public Builder with(GuiSetting setting) {
@@ -131,7 +146,8 @@ public final class GuiModule {
         }
 
         public GuiModule build() {
-            return new GuiModule(this.name, this.description, this.value, this.setter, this.valueLabel, List.copyOf(this.settings));
+            return new GuiModule(this.name, this.description, this.value, this.setter, this.valueLabel, this.group,
+                List.copyOf(this.settings));
         }
     }
 }

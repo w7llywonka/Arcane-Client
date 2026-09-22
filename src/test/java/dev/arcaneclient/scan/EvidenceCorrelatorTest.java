@@ -51,8 +51,9 @@ final class EvidenceCorrelatorTest {
     void passiveGrowthNeedsTimeAndRepeatedPositions() {
         EvidenceCorrelator correlator = new EvidenceCorrelator();
         List<ScanEvidence> output = List.of();
-        for (int index = 0; index < 4; ++index) {
-            output = correlator.record(new BlockPosition(index % 2, 64, 0), index * 10L, GROWTH, false);
+        for (int index = 0; index < 8; ++index) {
+            output = correlator.record(new BlockPosition(index % 3, 64, 0), index * 30L, GROWTH, false);
+            if (index < 7) assertTrue(output.isEmpty());
         }
         assertFalse(output.isEmpty());
         assertEquals(EvidenceFamily.GROWTH, output.getFirst().family());
@@ -67,5 +68,15 @@ final class EvidenceCorrelatorTest {
         assertEquals(EvidenceCorrelator.MAX_TRACKED_CHUNKS, correlator.trackedChunks());
         correlator.reset();
         assertEquals(0, correlator.trackedChunks());
+    }
+
+    @Test
+    void burstAndSinglePositionCannotBecomeGrowthProof() {
+        EvidenceCorrelator burst = new EvidenceCorrelator();
+        EvidenceCorrelator onePosition = new EvidenceCorrelator();
+        for (int index = 0; index < 32; index++) {
+            assertTrue(burst.record(new BlockPosition(index % 8, 60, index / 8), 0, GROWTH, false).isEmpty());
+            assertTrue(onePosition.record(new BlockPosition(1, 60, 1), index * 30L, GROWTH, false).isEmpty());
+        }
     }
 }

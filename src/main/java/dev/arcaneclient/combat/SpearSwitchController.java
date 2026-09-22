@@ -6,12 +6,12 @@ import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.AttackRangeComponent;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.ItemStack;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.AttackRange;
 
 /** Selects a 1.21.11 spear only when the target is outside its zero-damage minimum reach. */
 @Environment(EnvType.CLIENT)
@@ -34,26 +34,26 @@ public final class SpearSwitchController {
     private SpearSwitchController() {
     }
 
-    public static boolean prepareForTarget(MinecraftClient client, Entity target, Settings settings) {
-        ClientPlayerEntity player = client.player;
-        if (!settings.enabled() || player == null || target == null || client.currentScreen != null) return false;
+    public static boolean prepareForTarget(Minecraft client, Entity target, Settings settings) {
+        LocalPlayer player = client.player;
+        if (!settings.enabled() || player == null || target == null || client.gui.screen() != null) return false;
         SpearSwitchPolicy.Settings policySettings = new SpearSwitchPolicy.Settings(
             settings.minimumTargetDistance(),
             settings.maximumTargetDistance(),
             settings.minimumDurabilityPercent()
         );
-        double distance = CombatItemScoring.distanceToBox(player.getEyePos(), target.getBoundingBox());
+        double distance = CombatItemScoring.distanceToBox(player.getEyePosition(), target.getBoundingBox());
         List<SpearSwitchPolicy.Candidate> candidates = new ArrayList<>();
         for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
+            ItemStack stack = player.getInventory().getItem(slot);
             int rank = CombatItemScoring.spearRank(stack);
             if (rank <= 0) continue;
-            AttackRangeComponent range = stack.get(DataComponentTypes.ATTACK_RANGE);
+            AttackRange range = stack.get(DataComponents.ATTACK_RANGE);
             if (range == null) continue;
             if (!SpearSwitchPolicy.isUsefulDistance(
                 distance,
-                range.getEffectiveMinRange(player),
-                range.getEffectiveMaxRange(player),
+                range.effectiveMinRange(player),
+                range.effectiveMaxRange(player),
                 policySettings
             )) continue;
             candidates.add(new SpearSwitchPolicy.Candidate(slot, rank, CombatItemScoring.durabilityPercent(stack)));
@@ -75,12 +75,12 @@ public final class SpearSwitchController {
         return true;
     }
 
-    public static void restore(MinecraftClient client) {
+    public static void restore(Minecraft client) {
         restore(client, restoreSlot);
     }
 
-    private static void restore(MinecraftClient client, int slot) {
-        ClientPlayerEntity player = client.player;
+    private static void restore(Minecraft client, int slot) {
+        LocalPlayer player = client.player;
         long tick = InventoryAutomationSupport.tick(player);
         if (player != null && slot >= 0 && slot < 9 && selectedSlot >= 0
             && player.getInventory().getSelectedSlot() == selectedSlot

@@ -19,11 +19,11 @@ final class GrowthTransitionsTest {
     }
 
     @Test
-    void amethystStagesRemainDisplayMetadataOnly() {
-        assertNull(GrowthTransitions.analyze(
+    void amethystMustAdvanceAnObservedStageWithoutBeingRevealed() {
+        assertEquals(GrowthTransitions.Family.AMETHYST, GrowthTransitions.analyze(
             "small_amethyst_bud", Map.of(),
             "medium_amethyst_bud", Map.of()
-        ));
+        ).family());
         assertNull(GrowthTransitions.analyze(
             "air", Map.of(), "small_amethyst_bud", Map.of()
         ));
@@ -67,7 +67,7 @@ final class GrowthTransitionsTest {
     }
 
     @Test
-    void recognizesGrowthRevealedFromAnObfuscatedDeepPalette() {
+    void obfuscationRevealsAreNotGrowth() {
         GrowthTransitions.GrowthEvent crop = GrowthTransitions.analyze(
             "deepslate", Map.of("axis", "y"),
             "wheat", Map.of("age", 4)
@@ -77,10 +77,8 @@ final class GrowthTransitionsTest {
             "sweet_berry_bush", Map.of("age", 2)
         );
 
-        assertEquals(GrowthTransitions.Family.CROP, crop.family());
-        assertEquals(GrowthTransitions.Family.BERRY, berry.family());
-        assertEquals(SignalCategory.NATURAL_GROWTH, crop.category());
-        assertTrue(crop.strength() >= 30);
+        assertNull(crop);
+        assertNull(berry);
         assertNull(GrowthTransitions.analyze("deepslate", Map.of(), "redstone_wire", Map.of()));
     }
 
@@ -94,5 +92,30 @@ final class GrowthTransitionsTest {
             "chest", Map.of("age", 5),
             "chest", Map.of("age", 0)
         ));
+    }
+
+    @Test
+    void excludesEverySaplingAndUnrelatedAgeProperty() {
+        for (String id : java.util.List.of("oak_sapling", "spruce_sapling", "bamboo_sapling",
+            "mangrove_propagule", "bee_nest", "chest", "ender_chest", "spawner", "fire", "frosted_ice")) {
+            assertNull(GrowthTransitions.analyze(id, Map.of("age", 0), id, Map.of("age", 1)), id);
+        }
+    }
+
+    @Test
+    void detectsBerriesVinesCropsAndKelpWithoutCountingUnchangedPlants() {
+        assertEquals(GrowthTransitions.Family.BERRY, GrowthTransitions.analyze(
+            "sweet_berry_bush", Map.of("age", 1), "sweet_berry_bush", Map.of("age", 2)).family());
+        assertEquals(GrowthTransitions.Family.CAVE_VINE, GrowthTransitions.analyze(
+            "cave_vines", Map.of("berries", false), "cave_vines", Map.of("berries", true)).family());
+        assertEquals(GrowthTransitions.Family.CAVE_VINE, GrowthTransitions.analyze(
+            "vine", Map.of("north", true, "east", false), "vine", Map.of("north", true, "east", true)).family());
+        assertEquals(GrowthTransitions.Family.KELP, GrowthTransitions.analyze(
+            "kelp", Map.of("age", 10), "kelp_plant", Map.of()).family());
+        assertEquals(GrowthTransitions.Family.CROP, GrowthTransitions.analyze(
+            "wheat", Map.of("age", 2), "wheat", Map.of("age", 3)).family());
+        assertNull(GrowthTransitions.analyze("vine", Map.of("north", true), "vine", Map.of("north", true)));
+        assertNull(GrowthTransitions.analyze("small_amethyst_bud", Map.of("facing", "up"),
+            "medium_amethyst_bud", Map.of("facing", "down")));
     }
 }

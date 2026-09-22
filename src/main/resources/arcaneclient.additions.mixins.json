@@ -1,0 +1,30 @@
+{
+  "required": true,
+  "package": "dev.arcaneclient.mixin.additions",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "CombatClientInvoker",
+    "CombatInputMixin",
+    "HandledScreenAccessor",
+    "SpawnerBreakProgressMixin",
+    "VisualFovMixin",
+    "ArmorTrimHiderMixin",
+    "CustomGlintMixin",
+    "SkinPrivacyMixin",
+    "MotionBlurRendererMixin",
+    "PreviewRoleMixin",
+    "DispenserNetworkMixin",
+    "DispenserInteractionMixin",
+    "ViewmodelHeldItemMixin",
+    "ViewmodelLancingMixin",
+    "MiningInteractionManagerAccessor",
+    "PresenceBadgeMixin",
+    "TotemAnimationMixin",
+    "TotemOverlayMixin",
+    "ParticleControlMixin",
+    "FireworkParticleMarkerMixin",
+    "SusFinderNetworkMixin",
+    "CustomCapeFeatureRendererMixin"
+  ],
+  "injectors": { "defaultRequire": 1 }
+}

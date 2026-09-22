@@ -1,0 +1,108 @@
+package dev.arcaneclient.additions.visual;
+
+/** Client-only visual options. Every module is opt-in. */
+public final class VisualAdditionsConfig {
+    public boolean jumpCircles;
+    public int jumpCircleColor = 0xFFAC7AFF;
+    public int jumpCircleLifetime = 24;
+    public int jumpCircleRadius = 150;
+    public boolean hitParticles;
+    public int hitParticleColor = 0xFFFF89BD;
+    public int hitParticleCount = 10;
+    public int hitParticleLifetime = 20;
+    public boolean blockOutline;
+    public int blockOutlineColor = 0xFFBE97FF;
+    public int blockOutlineWidth = 2;
+    public boolean hitboxes;
+    public int hitboxColor = 0xFF80DFFF;
+    public int hitboxRange = 32;
+    public boolean customFov;
+    public int fov = 100;
+    public boolean armorTrimHider;
+    public boolean customGlint;
+    public int glintColor = 0xFFBB83FF;
+    public boolean motionBlur;
+    public int motionBlurStrength = 35;
+    public boolean customAccessories;
+    public int accessoryStyle;
+    public int accessoryColor = 0xFFFFD26F;
+    public int accessorySize = 100;
+    public boolean headAccessory = true;
+    public boolean accessoryCape;
+    public int capeStyle;
+    public boolean capePhysics = true;
+    public int capeColor = 0xFF402765;
+    public int capeAccentColor = 0xFFDFC1FF;
+    public boolean accessoryTrail;
+    public int trailStyle;
+    public int trailLength = 24;
+    public int trailColor = 0xFFBA91FF;
+    public boolean accessoryAura;
+    public int auraStyle;
+    public int auraRadius = 85;
+    public int auraColor = 0xFFD7B7FF;
+
+    // 26.3 renderer controls. The defaults favor a stable, low-submission ESP path.
+    public boolean espRenderer = true;
+    public boolean espOit = true;
+    public boolean espBatching = true;
+    public boolean espDepthLayers = true;
+    public boolean espAdaptive = true;
+    public boolean espDistanceDetail = true;
+    public boolean espStableFade = true;
+    public boolean espClustering = true;
+    public boolean espCompatibilityMode;
+    public int espHiddenAlpha = 42;
+    public int espVisibleAlpha = 255;
+    public int espFillAlpha = 32;
+    public int espDetailDistance = 96;
+    public int espClusterDistance = 160;
+    public boolean rendererDiagnostics;
+    public boolean inputLatencyHud;
+    public boolean mapHeadingHud;
+    public boolean colorGrade;
+    public int colorGradePreset;
+    public int colorGradeStrength = 12;
+    public int sdlInputProfile;
+    public boolean advancedChordBinds;
+    public int chordModifier;
+    public boolean signItemPreview = true;
+    public boolean cushionCamera;
+
+    public void sanitize() {
+        jumpCircleColor |= 0xFF000000;
+        hitParticleColor |= 0xFF000000;
+        blockOutlineColor |= 0xFF000000;
+        hitboxColor |= 0xFF000000;
+        glintColor |= 0xFF000000;
+        accessoryColor |= 0xFF000000;
+        capeColor |= 0xFF000000;
+        capeAccentColor |= 0xFF000000;
+        trailColor |= 0xFF000000;
+        auraColor |= 0xFF000000;
+        jumpCircleLifetime = Math.clamp(jumpCircleLifetime, 10, 60);
+        jumpCircleRadius = Math.clamp(jumpCircleRadius, 50, 300);
+        hitParticleCount = Math.clamp(hitParticleCount, 1, 24);
+        hitParticleLifetime = Math.clamp(hitParticleLifetime, 5, 40);
+        blockOutlineWidth = Math.clamp(blockOutlineWidth, 1, 5);
+        hitboxRange = Math.clamp(hitboxRange, 8, 64);
+        fov = Math.clamp(fov, 30, 140);
+        motionBlurStrength = Math.clamp(motionBlurStrength, 0, 100);
+        accessoryStyle = Math.clamp(accessoryStyle, 0, 2);
+        accessorySize = Math.clamp(accessorySize, 50, 150);
+        capeStyle = Math.clamp(capeStyle, 0, 2);
+        trailStyle = Math.clamp(trailStyle, 0, 2);
+        trailLength = Math.clamp(trailLength, 6, 60);
+        auraStyle = Math.clamp(auraStyle, 0, 2);
+        auraRadius = Math.clamp(auraRadius, 40, 180);
+        espHiddenAlpha = Math.clamp(espHiddenAlpha, 0, 160);
+        espVisibleAlpha = Math.clamp(espVisibleAlpha, 32, 255);
+        espFillAlpha = Math.clamp(espFillAlpha, 0, 160);
+        espDetailDistance = Math.clamp(espDetailDistance, 24, 256);
+        espClusterDistance = Math.clamp(espClusterDistance, 48, 384);
+        colorGradePreset = Math.clamp(colorGradePreset, 0, 4);
+        colorGradeStrength = Math.clamp(colorGradeStrength, 0, 40);
+        sdlInputProfile = Math.clamp(sdlInputProfile, 0, 1);
+        chordModifier = Math.clamp(chordModifier, 0, 2);
+    }
+}

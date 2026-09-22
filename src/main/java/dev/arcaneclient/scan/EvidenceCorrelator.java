@@ -115,7 +115,7 @@ public final class EvidenceCorrelator {
                     ++this.harvestBursts;
                     this.lastHarvestSignal = tick;
                     output.add(ScanEvidence.liveSignal(
-                        SignalCategory.LIVE_ACTIVITY, position, "coordinated harvest rhythm",
+                        SignalCategory.PLANT_HARVEST, position, "coordinated plant harvest",
                         strength, tick, 12000, EvidenceFamily.HARVEST
                     ));
                 }
@@ -128,7 +128,7 @@ public final class EvidenceCorrelator {
             if (strength > 0 && elapsed(tick, this.lastGrowthSignal) >= 200L) {
                 this.lastGrowthSignal = tick;
                 output.add(ScanEvidence.liveSignal(
-                    SignalCategory.NATURAL_GROWTH, position, "repeated growth chronicle",
+                    SignalCategory.GROWTH_ACTIVITY, position, "repeated plant growth",
                     strength, tick, 12000, EvidenceFamily.GROWTH
                 ));
             }

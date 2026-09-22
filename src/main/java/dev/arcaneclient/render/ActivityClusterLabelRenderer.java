@@ -8,14 +8,12 @@ import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.Heightmap;
-import org.joml.Quaternionfc;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.Vec3;
 
 @Environment(value=EnvType.CLIENT)
 public final class ActivityClusterLabelRenderer {
@@ -27,7 +25,7 @@ public final class ActivityClusterLabelRenderer {
     }
 
     public static void register() {
-        WorldRenderEvents.END_MAIN.register(ActivityClusterLabelRenderer::render);
+        LevelRenderEvents.COLLECT_SUBMITS.register(ActivityClusterLabelRenderer::render);
     }
 
     public static void reset() {
@@ -35,9 +33,9 @@ public final class ActivityClusterLabelRenderer {
         targets = List.of();
     }
 
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
-        if (!ArcaneClient.config().overlay || client.world == null) {
+        if (!ArcaneClient.config().overlay || client.level == null) {
             reset();
             return;
         }
@@ -48,10 +46,10 @@ public final class ActivityClusterLabelRenderer {
         source = current;
         ArrayList<Target> rebuilt = new ArrayList<Target>(current.size());
         for (TraceEngine.ActivityClusterCandidate candidate : current) {
-            if (client.world.getChunkManager().getWorldChunk(candidate.chunkX(), candidate.chunkZ(), false) == null) continue;
+            if (client.level.getChunkSource().getChunk(candidate.chunkX(), candidate.chunkZ(), false) == null) continue;
             int x = candidate.chunkX() * 16 + 8;
             int z = candidate.chunkZ() * 16 + 8;
-            int y = Math.max(72, client.world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z) + 8);
+            int y = Math.max(72, client.level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) + 8);
             rebuilt.add(new Target(
                 (double)x + 0.5, y, (double)z + 0.5,
                 candidate.confidence(), candidate.members(), candidate.families()
@@ -60,29 +58,18 @@ public final class ActivityClusterLabelRenderer {
         targets = List.copyOf(rebuilt);
     }
 
-    private static void render(WorldRenderContext context) {
-        if (!ArcaneClient.config().overlay || targets.isEmpty() || context.matrices() == null) {
+    private static void render(LevelRenderContext context) {
+        if (!ArcaneClient.config().overlay || targets.isEmpty() || context.poseStack() == null) {
             return;
         }
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client)) return;
-        Vec3d camera = context.worldState().cameraRenderState.pos;
-        TextRenderer font = ArcaneFont.renderer(client);
+        Font font = ArcaneFont.renderer(client);
         for (Target target : targets) {
-            MatrixStack matrices = context.matrices();
-            matrices.push();
-            matrices.translate(target.x() - camera.x, target.y() - camera.y, target.z() - camera.z);
-            matrices.multiply((Quaternionfc)context.worldState().cameraRenderState.orientation);
-            matrices.scale(-0.025f, -0.025f, 0.025f);
             String score = "CONF " + target.confidence() + "% · " + target.members() + " CH · " + target.families() + " FAM";
-            ActivityClusterLabelRenderer.drawCentered(font, LABEL, 0.0f, matrices, context, -1);
-            ActivityClusterLabelRenderer.drawCentered(font, score, 10.0f, matrices, context, -3092272);
-            matrices.pop();
+            Render263.text(context, font, LABEL, new Vec3(target.x(), target.y(), target.z()), 0.025f, -1, true);
+            Render263.text(context, font, score, new Vec3(target.x(), target.y() - 0.25, target.z()), 0.025f, -3092272, true);
         }
-    }
-
-    private static void drawCentered(TextRenderer font, String text, float y, MatrixStack matrices, WorldRenderContext context, int color) {
-        font.draw(text, (float)(-font.getWidth(text)) / 2.0f, y, color, false, matrices.peek().getPositionMatrix(), context.consumers(), TextRenderer.TextLayerType.SEE_THROUGH, -1342177280, 0xF000F0);
     }
 
     @Environment(value=EnvType.CLIENT)

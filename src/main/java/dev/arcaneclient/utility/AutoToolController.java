@@ -6,12 +6,12 @@ import dev.arcaneclient.inventory.InventoryActionScheduler;
 import dev.arcaneclient.inventory.InventoryAutomationSupport;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 
 /** Chooses the best hotbar tool before mining and safely restores the player's slot afterward. */
 @Environment(EnvType.CLIENT)
@@ -22,19 +22,19 @@ public final class AutoToolController {
     private AutoToolController() {
     }
 
-    public static void prepareForCrosshair(MinecraftClient client, boolean breaking) {
+    public static void prepareForCrosshair(Minecraft client, boolean breaking) {
         ArcaneConfig config = ArcaneClient.config();
-        ClientPlayerEntity player = client.player;
-        if (config == null || !config.autoTool || !breaking || player == null || client.world == null || client.currentScreen != null) {
+        LocalPlayer player = client.player;
+        if (config == null || !config.autoTool || !breaking || player == null || client.level == null || client.gui.screen() != null) {
             restore(client);
             return;
         }
-        if (!(client.crosshairTarget instanceof BlockHitResult hit)
+        if (!(client.hitResult instanceof BlockHitResult hit)
             || hit.getType() != HitResult.Type.BLOCK) {
             restore(client);
             return;
         }
-        BlockState state = client.world.getBlockState(hit.getBlockPos());
+        BlockState state = client.level.getBlockState(hit.getBlockPos());
         if (state.isAir()) {
             restore(client);
             return;
@@ -43,8 +43,8 @@ public final class AutoToolController {
     }
 
     public static void selectForState(
-        MinecraftClient client,
-        ClientPlayerEntity player,
+        Minecraft client,
+        LocalPlayer player,
         BlockState state,
         boolean preserveDurability
     ) {
@@ -53,12 +53,12 @@ public final class AutoToolController {
         boolean[] suitable = new boolean[9];
         boolean[] eligible = new boolean[9];
         for (int slot = 0; slot < 9; slot++) {
-            ItemStack stack = player.getInventory().getStack(slot);
-            speeds[slot] = stack.getMiningSpeedMultiplier(state);
-            suitable[slot] = stack.isSuitableFor(state);
+            ItemStack stack = player.getInventory().getItem(slot);
+            speeds[slot] = stack.getDestroySpeed(state);
+            suitable[slot] = stack.isCorrectToolForDrops(state);
             eligible[slot] = !preserveDurability
-                || !stack.isDamageable()
-                || stack.getMaxDamage() - stack.getDamage() > 1;
+                || !stack.isDamageableItem()
+                || stack.getMaxDamage() - stack.getDamageValue() > 1;
         }
         int bestSlot = AutoToolSelector.choose(currentSlot, speeds, suitable, eligible);
         if (bestSlot == currentSlot) {
@@ -88,8 +88,8 @@ public final class AutoToolController {
         autoSelectedSlot = bestSlot;
     }
 
-    public static void restore(MinecraftClient client) {
-        ClientPlayerEntity player = client.player;
+    public static void restore(Minecraft client) {
+        LocalPlayer player = client.player;
         if (player != null && restoreSlot >= 0 && restoreSlot < 9
             && player.getInventory().getSelectedSlot() == autoSelectedSlot) {
             InventoryAutomationSupport.selectHotbar(

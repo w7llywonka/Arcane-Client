@@ -32,7 +32,7 @@ final class OuterLoaderUpdater {
 
     LoaderUpdateResult checkAndStage(ReleaseManifest release, String currentVersion,
                                      Path runningLoader) throws Exception {
-        if (!"1.21.11".equals(release.minecraftVersion())) {
+        if (!"26.3".equals(release.minecraftVersion())) {
             throw new IllegalStateException("Release targets Minecraft " + release.minecraftVersion());
         }
         UpdatePlan plan = UpdatePlanner.plan(state.directory(), runningLoader, currentVersion, release);

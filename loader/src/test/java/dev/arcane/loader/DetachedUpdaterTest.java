@@ -26,7 +26,7 @@ final class DetachedUpdaterTest {
         Files.write(target, oldBytes);
         Files.write(staged, newBytes);
         var pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
-        ReleaseManifest signed = TestArtifacts.release(staged, "1.2.3+mc1.21.11", pair);
+        ReleaseManifest signed = TestArtifacts.release(staged, "1.2.3+mc26.3", pair);
 
         DetachedUpdater.replaceAfterExit(-1, staged, target, backup, signed.size(),
             signed.sha256(), signed.signature(), pair.getPublic());

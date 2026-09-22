@@ -1,6 +1,6 @@
 # Arcane Client
 
-Source for the public **Arcane Client 2.9.2** release and **ARCLoader 1.2.3**, for Minecraft 1.21.11.
+Source for the public **Arcane Client 2.9.4+mc26.3** release and **ARCLoader 1.2.7+mc26.3**, for Minecraft 26.3.
 
 Official downloads: [arcaneclient.shop](https://arcaneclient.shop).
 
@@ -13,11 +13,11 @@ Official downloads: [arcaneclient.shop](https://arcaneclient.shop).
 - Public loader source, including signed updates, installation and the after-exit replacement helper.
 - Unit tests and Minecraft client integration tests.
 
-The source of the shipped client is under `src/`; the public loader is under `loader/`. The private DEV loader and Discord administrator service are not part of this release. Existing `legacy/`, `website/` and older documents are historical material, not the current client build inputs. This update does not deploy or refresh the website source.
+The source of the shipped client is under `src/`; the public loader is under `loader/`; and the current website source is under `website/`. Private DEV loader builds, release-signing keys, Discord administrator secrets, and other deployment credentials are not part of this public release.
 
 ## Build from source
 
-Install Java 21. From the repository root:
+Install Java 25. From the repository root:
 
 ```powershell
 .\gradlew.bat build
@@ -28,12 +28,12 @@ On Linux/macOS, use `./gradlew` instead of `.\gradlew.bat`.
 
 Outputs:
 
-- `build/libs/arcane-client-2.9.2+mc1.21.11.jar`
+- `build/libs/arcane-client-2.9.4+mc26.3.jar`
 - `loader/build/libs/ARCLoader.jar`
 
 The loader bundles the client you just compiled. No prebuilt client binary or private signing key is required. Do not install both outputs together: choose the standalone client **or** ARCLoader, alongside Fabric API.
 
-Runtime requirements: Minecraft 1.21.11, Java 21, Fabric Loader 0.19.3+, compatible Fabric API 0.141.6+1.21.11. Right Shift opens the module interface.
+Runtime requirements: Minecraft 26.3, Java 25, Fabric Loader 0.19.5, and Fabric API 0.160.6+26.3. Right Shift opens the module interface.
 
 ## Inspect and verify
 

@@ -1,46 +1,49 @@
 package dev.arcaneclient;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.arcaneclient.ArcaneClient;
+import dev.arcaneclient.mixin.KeyBindingAccessor;
 import java.util.List;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.util.Identifier;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.resources.Identifier;
 
 @Environment(value=EnvType.CLIENT)
 public final class ArcaneKeybinds {
-    private final KeyBinding scanner;
-    private final KeyBinding overlay;
-    private final KeyBinding freecam;
-    private final KeyBinding freelook;
-    private final KeyBinding zoom;
-    private final KeyBinding cleanCapture;
-    private final KeyBinding esp;
-    private final KeyBinding autoTotem;
-    private final KeyBinding tunnelEsp;
-    private final KeyBinding itemEsp;
-    private final KeyBinding settings;
-    private final KeyBinding relog;
-    private final KeyBinding autoWalk;
-    private final KeyBinding autoSneak;
-    private final KeyBinding coordinateClipboard;
-    private final KeyBinding waypoint;
-    private final List<KeyBinding> chatMacros;
+    private final KeyMapping scanner;
+    private final KeyMapping overlay;
+    private final KeyMapping freecam;
+    private final KeyMapping freelook;
+    private final KeyMapping zoom;
+    private final KeyMapping cleanCapture;
+    private final KeyMapping esp;
+    private final KeyMapping autoTotem;
+    private final KeyMapping tunnelEsp;
+    private final KeyMapping itemEsp;
+    private final KeyMapping settings;
+    private final KeyMapping relog;
+    private final KeyMapping autoWalk;
+    private final KeyMapping autoSneak;
+    private final KeyMapping coordinateClipboard;
+    private final KeyMapping waypoint;
+    private final List<KeyMapping> chatMacros;
+    private boolean legacyBindingsChecked;
 
     public ArcaneKeybinds() {
-        KeyBinding.Category category = KeyBinding.Category.create((Identifier)ArcaneClient.id("main"));
-        this.scanner = ArcaneKeybinds.register("key.arcaneclient.toggle", 66, category);
-        this.overlay = ArcaneKeybinds.register("key.arcaneclient.overlay", 78, category);
-        this.freecam = ArcaneKeybinds.register("key.arcaneclient.freecam", 295, category);
-        this.freelook = ArcaneKeybinds.register("key.arcaneclient.freelook", -1, category);
-        this.zoom = ArcaneKeybinds.register("key.arcaneclient.zoom", 67, category);
-        this.cleanCapture = ArcaneKeybinds.register("key.arcaneclient.clean_capture", -1, category);
-        this.esp = ArcaneKeybinds.register("key.arcaneclient.esp", 296, category);
-        this.autoTotem = ArcaneKeybinds.register("key.arcaneclient.auto_totem", 297, category);
-        this.tunnelEsp = ArcaneKeybinds.register("key.arcaneclient.tunnel_esp", 298, category);
-        this.itemEsp = ArcaneKeybinds.register("key.arcaneclient.item_esp", 299, category);
-        this.settings = ArcaneKeybinds.register("key.arcaneclient.settings", 344, category);
+        KeyMapping.Category category = KeyMapping.Category.register((Identifier)ArcaneClient.id("main"));
+        this.scanner = ArcaneKeybinds.register("key.arcaneclient.toggle", InputConstants.KEY_B, category);
+        this.overlay = ArcaneKeybinds.register("key.arcaneclient.overlay", InputConstants.KEY_N, category);
+        this.freecam = ArcaneKeybinds.register("key.arcaneclient.freecam", InputConstants.KEY_F6, category);
+        this.freelook = ArcaneKeybinds.register("key.arcaneclient.freelook", InputConstants.UNKNOWN.getValue(), category);
+        this.zoom = ArcaneKeybinds.register("key.arcaneclient.zoom", InputConstants.KEY_C, category);
+        this.cleanCapture = ArcaneKeybinds.register("key.arcaneclient.clean_capture", InputConstants.UNKNOWN.getValue(), category);
+        this.esp = ArcaneKeybinds.register("key.arcaneclient.esp", InputConstants.KEY_F7, category);
+        this.autoTotem = ArcaneKeybinds.register("key.arcaneclient.auto_totem", InputConstants.KEY_F8, category);
+        this.tunnelEsp = ArcaneKeybinds.register("key.arcaneclient.tunnel_esp", InputConstants.KEY_F9, category);
+        this.itemEsp = ArcaneKeybinds.register("key.arcaneclient.item_esp", InputConstants.KEY_F10, category);
+        this.settings = ArcaneKeybinds.register("key.arcaneclient.settings", InputConstants.KEY_RSHIFT, category);
         this.relog = ArcaneKeybinds.register("key.arcaneclient.relog", -1, category);
         this.autoWalk = ArcaneKeybinds.register("key.arcaneclient.auto_walk", -1, category);
         this.autoSneak = ArcaneKeybinds.register("key.arcaneclient.auto_sneak", -1, category);
@@ -49,75 +52,105 @@ public final class ArcaneKeybinds {
         this.chatMacros = List.of(ArcaneKeybinds.register("key.arcaneclient.chat_macro_1", -1, category), ArcaneKeybinds.register("key.arcaneclient.chat_macro_2", -1, category), ArcaneKeybinds.register("key.arcaneclient.chat_macro_3", -1, category), ArcaneKeybinds.register("key.arcaneclient.chat_macro_4", -1, category));
     }
 
-    public KeyBinding scanner() {
+    public KeyMapping scanner() {
         return this.scanner;
     }
 
-    public KeyBinding overlay() {
+    public KeyMapping overlay() {
         return this.overlay;
     }
 
-    public KeyBinding freecam() {
+    public KeyMapping freecam() {
         return this.freecam;
     }
 
-    public KeyBinding freelook() {
+    public KeyMapping freelook() {
         return this.freelook;
     }
 
-    public KeyBinding zoom() {
+    public KeyMapping zoom() {
         return this.zoom;
     }
 
-    public KeyBinding cleanCapture() {
+    public KeyMapping cleanCapture() {
         return this.cleanCapture;
     }
 
-    public KeyBinding esp() {
+    public KeyMapping esp() {
         return this.esp;
     }
 
-    public KeyBinding autoTotem() {
+    public KeyMapping autoTotem() {
         return this.autoTotem;
     }
 
-    public KeyBinding tunnelEsp() {
+    public KeyMapping tunnelEsp() {
         return this.tunnelEsp;
     }
 
-    public KeyBinding itemEsp() {
+    public KeyMapping itemEsp() {
         return this.itemEsp;
     }
 
-    public KeyBinding settings() {
+    public KeyMapping settings() {
         return this.settings;
     }
 
-    public KeyBinding relog() {
+    public KeyMapping relog() {
         return this.relog;
     }
 
-    public KeyBinding autoWalk() {
+    public KeyMapping autoWalk() {
         return this.autoWalk;
     }
 
-    public KeyBinding autoSneak() {
+    public KeyMapping autoSneak() {
         return this.autoSneak;
     }
 
-    public KeyBinding coordinateClipboard() {
+    public KeyMapping coordinateClipboard() {
         return this.coordinateClipboard;
     }
 
-    public KeyBinding waypoint() {
+    public KeyMapping waypoint() {
         return this.waypoint;
     }
 
-    public List<KeyBinding> chatMacros() {
+    public List<KeyMapping> chatMacros() {
         return this.chatMacros;
     }
 
-    private static KeyBinding register(String name, int key, KeyBinding.Category category) {
-        return KeyBindingHelper.registerKeyBinding((KeyBinding)new KeyBinding(name, key, category));
+    /**
+     * Minecraft 26.3 replaced GLFW key values with SDL scan codes. Early 26.3
+     * Arcane builds saved the old numeric defaults into options.txt. Migrate
+     * those exact per-action defaults once, after Minecraft has loaded options.
+     */
+    public boolean migrateLegacyBindings() {
+        if (this.legacyBindingsChecked) return false;
+        this.legacyBindingsChecked = true;
+
+        boolean changed = false;
+        changed |= migrate(this.scanner, 66, InputConstants.KEY_B);
+        changed |= migrate(this.overlay, 78, InputConstants.KEY_N);
+        changed |= migrate(this.freecam, 295, InputConstants.KEY_F6);
+        changed |= migrate(this.zoom, 67, InputConstants.KEY_C);
+        changed |= migrate(this.esp, 296, InputConstants.KEY_F7);
+        changed |= migrate(this.autoTotem, 297, InputConstants.KEY_F8);
+        changed |= migrate(this.tunnelEsp, 298, InputConstants.KEY_F9);
+        changed |= migrate(this.itemEsp, 299, InputConstants.KEY_F10);
+        changed |= migrate(this.settings, 344, InputConstants.KEY_RSHIFT);
+        if (changed) KeyMapping.resetMapping();
+        return changed;
+    }
+
+    private static boolean migrate(KeyMapping mapping, int legacyValue, int sdlValue) {
+        InputConstants.Key key = ((KeyBindingAccessor)(Object)mapping).arcaneclient$boundKey();
+        if (key.getType() != InputConstants.Type.KEYBOARD || key.getValue() != legacyValue) return false;
+        mapping.setKey(InputConstants.Type.KEYBOARD.getOrCreate(sdlValue));
+        return true;
+    }
+
+    private static KeyMapping register(String name, int key, KeyMapping.Category category) {
+        return KeyMappingHelper.registerKeyMapping((KeyMapping)new KeyMapping(name, key, category));
     }
 }

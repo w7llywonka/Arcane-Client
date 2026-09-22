@@ -17,12 +17,12 @@ final class LoaderArtifactValidatorTest {
     void acceptsOnlyOuterLoaderWithMatchingVersionAndNestedClient() throws Exception {
         var pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
         Path loader = directory.resolve("loader.jar");
-        TestArtifacts.writeOuterLoader(loader, "1.2.3+mc1.21.11");
-        ReleaseManifest release = TestArtifacts.release(loader, "1.2.3+mc1.21.11", pair);
+        TestArtifacts.writeOuterLoader(loader, "1.2.3+mc26.3");
+        ReleaseManifest release = TestArtifacts.release(loader, "1.2.3+mc26.3", pair);
         assertDoesNotThrow(() -> LoaderArtifactValidator.validate(loader, release));
 
         ReleaseManifest wrongVersion = new ReleaseManifest(2, "arcane-loader",
-            "1.2.4+mc1.21.11", "1.21.11", release.downloadUrl(), release.sha256(),
+            "1.2.7+mc26.3", "26.3", release.downloadUrl(), release.sha256(),
             release.signature(), release.size());
         assertThrows(SecurityException.class,
             () -> LoaderArtifactValidator.validate(loader, wrongVersion));

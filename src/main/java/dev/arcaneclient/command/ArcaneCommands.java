@@ -16,13 +16,13 @@ import java.util.List;
 import java.util.function.ToIntFunction;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.ChunkPos;
 
 @Environment(value=EnvType.CLIENT)
 public final class ArcaneCommands {
@@ -44,34 +44,35 @@ public final class ArcaneCommands {
                 .then(command("macros", ArcaneCommands::chatMacros))
                 .then(command("tracers", ArcaneCommands::tracers))
                 .then(command("analysis", ArcaneCommands::analysis))
+                .then(command("amethystcheck", ArcaneCommands::amethystCheck))
                 .then(command("settings", ignored -> settings()))
                 .then(command("profile", ArcaneCommands::profile))
                 .then(command("here", ArcaneCommands::here))
-                .then(ClientCommandManager.literal("waypoint")
+                .then(ClientCommands.literal("waypoint")
                     .then(command("list", ArcaneCommands::waypointList))
-                    .then(ClientCommandManager.literal("add")
-                        .then(ClientCommandManager.argument("name", StringArgumentType.greedyString())
+                    .then(ClientCommands.literal("add")
+                        .then(ClientCommands.argument("name", StringArgumentType.greedyString())
                             .executes(context -> waypointAdd(context, StringArgumentType.getString(context, "name")))))
-                    .then(ClientCommandManager.literal("remove")
-                        .then(ClientCommandManager.argument("name", StringArgumentType.greedyString())
+                    .then(ClientCommands.literal("remove")
+                        .then(ClientCommands.argument("name", StringArgumentType.greedyString())
                             .executes(context -> waypointRemove(context, StringArgumentType.getString(context, "name"))))))
                 .then(command("list", source -> list(source, 8))
-                    .then(ClientCommandManager.argument("count", IntegerArgumentType.integer(1, 20))
+                    .then(ClientCommands.argument("count", IntegerArgumentType.integer(1, 20))
                         .executes(context -> list(context.getSource(), IntegerArgumentType.getInteger(context, "count")))))
-                .then(ClientCommandManager.literal("threshold")
-                    .then(ClientCommandManager.argument("score", IntegerArgumentType.integer(0, 100))
+                .then(ClientCommands.literal("threshold")
+                    .then(ClientCommands.argument("score", IntegerArgumentType.integer(0, 100))
                         .executes(context -> threshold(context.getSource(), IntegerArgumentType.getInteger(context, "score")))))
-                .then(ClientCommandManager.literal("radius")
-                    .then(ClientCommandManager.argument("chunks", IntegerArgumentType.integer(2, 24))
+                .then(ClientCommands.literal("radius")
+                    .then(ClientCommands.argument("chunks", IntegerArgumentType.integer(2, 24))
                         .executes(context -> radius(context.getSource(), IntegerArgumentType.getInteger(context, "chunks")))))
-                .then(ClientCommandManager.literal("speed")
-                    .then(ClientCommandManager.argument("intensity", IntegerArgumentType.integer(1, 16))
+                .then(ClientCommands.literal("speed")
+                    .then(ClientCommands.argument("intensity", IntegerArgumentType.integer(1, 16))
                         .executes(context -> speed(context.getSource(), IntegerArgumentType.getInteger(context, "intensity")))))
                 .then(command("rescan", ArcaneCommands::rescan))
                 .then(command("clear", ArcaneCommands::clear));
 
             LiteralCommandNode<FabricClientCommandSource> arcane = dispatcher.register(root);
-            dispatcher.register(ClientCommandManager.literal("dtrace").redirect(arcane));
+            dispatcher.register(ClientCommands.literal("dtrace").redirect(arcane));
         });
     }
 
@@ -79,8 +80,30 @@ public final class ArcaneCommands {
         String name,
         ToIntFunction<FabricClientCommandSource> action
     ) {
-        return ClientCommandManager.literal(name)
+        return ClientCommands.literal(name)
             .executes(context -> action.applyAsInt(context.getSource()));
+    }
+
+    private static int amethystCheck(FabricClientCommandSource source) {
+        Minecraft client = Minecraft.getInstance();
+        if (client.level == null || client.player == null) return 0;
+        var camera = client.gameRenderer.mainCamera().position();
+        var block = net.minecraft.core.BlockPos.containing(camera);
+        var center = new ChunkPos(
+            net.minecraft.core.SectionPos.blockToSectionCoord(block.getX()),
+            net.minecraft.core.SectionPos.blockToSectionCoord(block.getZ())
+        );
+        var counts = dev.arcaneclient.scan.AmethystDiagnostics.read(client.level, center);
+        feedback(source, "Received blocks near camera (" + counts.chunks() + " loaded chunks, all heights): shell "
+            + counts.shell() + ", budding " + counts.budding() + ", S/M/L/C " + counts.stages());
+        var engine = ArcaneClient.engine();
+        feedback(source, "ESP index (all indexed chunks): " + engine.amethystStageCount(0) + "/"
+            + engine.amethystStageCount(1) + "/" + engine.amethystStageCount(2) + "/" + engine.amethystStageCount(3)
+            + "; queued " + engine.queueSize());
+        if (counts.growthBlocks() == 0) {
+            feedback(source, "No buds or clusters are present in that received area. This cannot distinguish hidden blocks from absent growth.");
+        }
+        return 1;
     }
 
     private static int status(FabricClientCommandSource source) {
@@ -93,7 +116,7 @@ public final class ArcaneCommands {
     private static int enabled(FabricClientCommandSource source, boolean enabled) {
         ArcaneClient.config().enabled = enabled;
         if (enabled) {
-            ArcaneClient.engine().queueNearby(MinecraftClient.getInstance());
+            ArcaneClient.engine().queueNearby(Minecraft.getInstance());
         }
         ArcaneClient.config().save();
         ArcaneCommands.feedback(source, "Scanner " + (enabled ? "enabled" : "disabled"));
@@ -117,7 +140,7 @@ public final class ArcaneCommands {
     }
 
     private static int freecam(FabricClientCommandSource source) {
-        FreecamController.toggle(MinecraftClient.getInstance());
+        FreecamController.toggle(Minecraft.getInstance());
         ArcaneCommands.feedback(source, "Freecam " + (FreecamController.isActive() ? "enabled" : "disabled"));
         return 1;
     }
@@ -141,7 +164,7 @@ public final class ArcaneCommands {
     private static int tunnelEsp(FabricClientCommandSource source) {
         ArcaneConfig config = ArcaneClient.config();
         config.tunnelEsp = !config.tunnelEsp;
-        ArcaneClient.engine().tunnelSettingsChanged(MinecraftClient.getInstance());
+        ArcaneClient.engine().tunnelSettingsChanged(Minecraft.getInstance());
         config.save();
         ArcaneCommands.feedback(source, "Tunnel ESP " + (config.tunnelEsp ? "enabled" : "disabled"));
         return 1;
@@ -185,25 +208,25 @@ public final class ArcaneCommands {
         ArcaneConfig config = ArcaneClient.config();
         config.cyclePerformanceProfile();
         config.save();
-        ArcaneClient.engine().settingsChanged(MinecraftClient.getInstance());
+        ArcaneClient.engine().settingsChanged(Minecraft.getInstance());
         ArcaneCommands.feedback(source, "Performance profile set to " + config.performanceProfile().label());
         return 1;
     }
     private static int settings() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        client.send(() -> client.setScreen((Screen)new ArcaneSettingsScreen(null)));
+        Minecraft client = Minecraft.getInstance();
+        client.schedule(() -> client.gui.setScreen((Screen)new ArcaneSettingsScreen(null)));
         return 1;
     }
 
     private static int here(FabricClientCommandSource source) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client.player == null) {
             return 0;
         }
-        ChunkPos pos = client.player.getChunkPos();
-        TraceEngine.ChunkMarker marker = ArcaneClient.engine().markerAt(pos.x, pos.z);
+        ChunkPos pos = client.player.chunkPosition();
+        TraceEngine.ChunkMarker marker = ArcaneClient.engine().markerAt(pos.x(), pos.z());
         if (marker == null) {
-            ArcaneCommands.feedback(source, "Chunk " + pos.x + ", " + pos.z + ": no evidence yet");
+            ArcaneCommands.feedback(source, "Chunk " + pos.x() + ", " + pos.z() + ": no evidence yet");
         } else {
             ArcaneCommands.feedback(source, ArcaneCommands.describe(marker));
         }
@@ -211,22 +234,22 @@ public final class ArcaneCommands {
     }
 
     private static int waypointAdd(CommandContext<FabricClientCommandSource> context, String name) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client.player == null || client.world == null) return 0;
-        WaypointStore.Waypoint waypoint = WaypointStore.add(client, name, client.player.getBlockPos());
+        Minecraft client = Minecraft.getInstance();
+        if (client.player == null || client.level == null) return 0;
+        WaypointStore.Waypoint waypoint = WaypointStore.add(client, name, client.player.blockPosition());
         ArcaneCommands.feedback(context.getSource(), "Waypoint saved: " + waypoint.name() + " at "
             + waypoint.x() + ", " + waypoint.y() + ", " + waypoint.z());
         return 1;
     }
 
     private static int waypointRemove(CommandContext<FabricClientCommandSource> context, String name) {
-        boolean removed = WaypointStore.remove(MinecraftClient.getInstance(), name);
+        boolean removed = WaypointStore.remove(Minecraft.getInstance(), name);
         ArcaneCommands.feedback(context.getSource(), removed ? "Waypoint removed: " + WaypointStore.cleanName(name) : "No waypoint named " + WaypointStore.cleanName(name));
         return removed ? 1 : 0;
     }
 
     private static int waypointList(FabricClientCommandSource source) {
-        List<WaypointStore.Waypoint> waypoints = WaypointStore.current(MinecraftClient.getInstance());
+        List<WaypointStore.Waypoint> waypoints = WaypointStore.current(Minecraft.getInstance());
         if (waypoints.isEmpty()) {
             ArcaneCommands.feedback(source, "No waypoints in this server and dimension");
             return 1;
@@ -250,16 +273,16 @@ public final class ArcaneCommands {
     }
 
     private static int threshold(FabricClientCommandSource source, int score) {
-        ArcaneClient.config().threshold = score;
+        ArcaneClient.config().setSensitivity(100 - score);
         ArcaneClient.config().save();
-        ArcaneCommands.feedback(source, "Suspicion threshold set to " + score);
+        ArcaneCommands.feedback(source, "Grown blocks required: " + ArcaneClient.config().grownBlocksRequired);
         return 1;
     }
 
     private static int radius(FabricClientCommandSource source, int chunks) {
         ArcaneClient.config().scanRadius = chunks;
         ArcaneClient.config().save();
-        ArcaneClient.engine().queueNearby(MinecraftClient.getInstance());
+        ArcaneClient.engine().queueNearby(Minecraft.getInstance());
         ArcaneCommands.feedback(source, "Scan radius set to " + chunks + " chunks");
         return 1;
     }
@@ -272,7 +295,7 @@ public final class ArcaneCommands {
     }
 
     private static int rescan(FabricClientCommandSource source) {
-        ArcaneClient.engine().queueNearby(MinecraftClient.getInstance());
+        ArcaneClient.engine().queueNearby(Minecraft.getInstance());
         ArcaneCommands.feedback(source, "Nearby loaded chunks queued for a rescan");
         return 1;
     }
@@ -289,7 +312,7 @@ public final class ArcaneCommands {
     }
 
     private static void feedback(FabricClientCommandSource source, String text) {
-        source.sendFeedback((Text)Text.literal((String)text));
+        source.sendFeedback((Component)Component.literal((String)text));
     }
 
     private static String state(boolean enabled) {

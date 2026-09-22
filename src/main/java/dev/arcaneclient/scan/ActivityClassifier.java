@@ -2,21 +2,22 @@ package dev.arcaneclient.scan;
 
 import dev.arcaneclient.model.SignalCategory;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.entity.Entity;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.tag.BiomeTags;
-import net.minecraft.state.property.Properties;
-import net.minecraft.state.property.Property;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.world.biome.BiomeKeys;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.BiomeTags;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Property;
 
 @Environment(value=EnvType.CLIENT)
 public final class ActivityClassifier {
@@ -57,7 +58,7 @@ public final class ActivityClassifier {
         }
         if (facts.signal() != null || facts.crop() || facts.farmland() || facts.importedPlantCandidate()
             || facts.pointedDripstone() || facts.cauldron() || facts.spawner() || facts.amethystStage()
-            || state.getLuminance() > 0) {
+            || state.getLightEmission() > 0) {
             return true;
         }
         return switch (facts.path()) {
@@ -80,10 +81,10 @@ public final class ActivityClassifier {
     }
 
     Signal classifyBlock(BlockState state, String path) {
-        if (ScannerStorageFilter.isStoragePath(path)) {
+        if (state.hasBlockEntity() || ScannerStorageFilter.isStoragePath(path)) {
             return null;
         }
-        if (path.endsWith("_leaves") && state.contains(Properties.PERSISTENT) && ((Boolean)state.get(Properties.PERSISTENT)).booleanValue()) {
+        if (path.endsWith("_leaves") && state.hasProperty(BlockStateProperties.PERSISTENT) && ((Boolean)state.getValue(BlockStateProperties.PERSISTENT)).booleanValue()) {
             return Signal.PERSISTENT_LEAVES;
         }
         if (BREEDING_BLOCKS.contains(path)) {
@@ -98,16 +99,16 @@ public final class ActivityClassifier {
         if (path.contains("copper_golem_statue")) {
             return Signal.COPPER_BASE_BLOCK;
         }
-        if (path.equals("respawn_anchor") && state.contains(Properties.CHARGES) && (Integer)state.get(Properties.CHARGES) > 0) {
+        if (path.equals("respawn_anchor") && state.hasProperty(BlockStateProperties.RESPAWN_ANCHOR_CHARGES) && (Integer)state.getValue(BlockStateProperties.RESPAWN_ANCHOR_CHARGES) > 0) {
             return Signal.CHARGED_ANCHOR;
         }
-        if (path.equals("sculk_shrieker") && state.contains(Properties.CAN_SUMMON) && !((Boolean)state.get(Properties.CAN_SUMMON)).booleanValue()) {
+        if (path.equals("sculk_shrieker") && state.hasProperty(BlockStateProperties.CAN_SUMMON) && !((Boolean)state.getValue(BlockStateProperties.CAN_SUMMON)).booleanValue()) {
             return Signal.DISABLED_SHRIEKER;
         }
         if (REDSTONE.contains(path) || path.endsWith("_copper_bulb")) {
             return Signal.REDSTONE;
         }
-        if (path.equals("deepslate") && state.contains(Properties.AXIS) && state.get(Properties.AXIS) != Direction.Axis.Y) {
+        if (path.equals("deepslate") && state.hasProperty(BlockStateProperties.AXIS) && state.getValue(BlockStateProperties.AXIS) != Direction.Axis.Y) {
             return Signal.HORIZONTAL_DEEPSLATE;
         }
         if (path.startsWith("cobbled_deepslate") || path.startsWith("polished_deepslate") || path.startsWith("deepslate_brick") || path.startsWith("deepslate_tile") || path.equals("chiseled_deepslate")) {
@@ -119,7 +120,7 @@ public final class ActivityClassifier {
         if (path.equals("spawner")) {
             return Signal.MOB_SPAWNER;
         }
-        if ((path.equals("campfire") || path.equals("soul_campfire")) && state.contains(Properties.LIT) && ((Boolean)state.get(Properties.LIT)).booleanValue()) {
+        if ((path.equals("campfire") || path.equals("soul_campfire")) && state.hasProperty(BlockStateProperties.LIT) && ((Boolean)state.getValue(BlockStateProperties.LIT)).booleanValue()) {
             return Signal.LIT_CAMPFIRE;
         }
         if (FUNCTIONAL.contains(path)) {
@@ -179,7 +180,7 @@ public final class ActivityClassifier {
     }
 
     boolean isOpaqueMaskBlock(BlockState state, String path) {
-        return (path.equals("stone") || path.equals("deepslate")) && state.isOpaqueFullCube() && state.getOpacity() >= 15;
+        return (path.equals("stone") || path.equals("deepslate")) && state.isSolidRender() && state.getLightDampening() >= 15;
     }
 
     public boolean isHighBlockEntityType(String path) {
@@ -190,50 +191,50 @@ public final class ActivityClassifier {
         return !ScannerStorageFilter.isStoragePath(path) && FUNCTIONAL_BLOCK_ENTITIES.contains(path);
     }
 
-    public boolean isImportedPlant(ClientWorld level, BlockPos pos, BlockState state) {
+    public boolean isImportedPlant(ClientLevel level, BlockPos pos, BlockState state) {
         return this.isImportedPlant(level, pos, ActivityClassifier.blockPath(state));
     }
 
-    boolean isImportedPlant(ClientWorld level, BlockPos pos, String path) {
+    boolean isImportedPlant(ClientLevel level, BlockPos pos, String path) {
         return switch (path) {
             case "sweet_berry_bush" -> {
-                if (!level.getBiome(pos).isIn(BiomeTags.IS_TAIGA)) {
+                if (!level.getBiome(pos).is(BiomeTags.IS_TAIGA)) {
                     yield true;
                 }
                 yield false;
             }
             case "bamboo", "bamboo_sapling", "cocoa" -> {
-                if (!level.getBiome(pos).isIn(BiomeTags.IS_JUNGLE)) {
+                if (!level.getBiome(pos).is(BiomeTags.IS_JUNGLE)) {
                     yield true;
                 }
                 yield false;
             }
             case "kelp", "kelp_plant" -> {
-                if (!level.getBiome(pos).isIn(BiomeTags.IS_OCEAN)) {
+                if (!level.getBiome(pos).is(BiomeTags.IS_OCEAN)) {
                     yield true;
                 }
                 yield false;
             }
             case "cactus" -> {
-                if (!level.getBiome(pos).matchesKey(BiomeKeys.DESERT) && !level.getBiome(pos).isIn(BiomeTags.IS_BADLANDS)) {
+                if (!level.getBiome(pos).is(Biomes.DESERT) && !level.getBiome(pos).is(BiomeTags.IS_BADLANDS)) {
                     yield true;
                 }
                 yield false;
             }
             case "mangrove_propagule" -> {
-                if (!level.getBiome(pos).matchesKey(BiomeKeys.MANGROVE_SWAMP)) {
+                if (!level.getBiome(pos).is(Biomes.MANGROVE_SWAMP)) {
                     yield true;
                 }
                 yield false;
             }
             case "nether_wart", "crimson_fungus", "warped_fungus", "weeping_vines", "weeping_vines_plant", "twisting_vines", "twisting_vines_plant" -> {
-                if (!level.getBiome(pos).isIn(BiomeTags.IS_NETHER)) {
+                if (!level.getBiome(pos).is(BiomeTags.IS_NETHER)) {
                     yield true;
                 }
                 yield false;
             }
             case "chorus_plant", "chorus_flower" -> {
-                if (!level.getBiome(pos).isIn(BiomeTags.IS_END)) {
+                if (!level.getBiome(pos).is(BiomeTags.IS_END)) {
                     yield true;
                 }
                 yield false;
@@ -250,12 +251,14 @@ public final class ActivityClassifier {
     }
 
     private static int growthBucket(BlockState state) {
-        for (Map.Entry<Property<?>, Comparable<?>> entry : state.getEntries().entrySet()) {
+        Iterator<Property.Value<?>> entries = state.getValues().iterator();
+        while (entries.hasNext()) {
+            Property.Value<?> entry = entries.next();
             Object v;
-            Property<?> property = entry.getKey();
-            if (!property.getName().equals("age") || !((v = entry.getValue()) instanceof Integer)) continue;
+            Property<?> property = entry.property();
+            if (!property.getName().equals("age") || !((v = entry.value()) instanceof Integer)) continue;
             Integer age = (Integer)v;
-            int maximum = property.getValues().stream().filter(Integer.class::isInstance).map(Integer.class::cast).mapToInt(Integer::intValue).max().orElse(0);
+            int maximum = property.getPossibleValues().stream().filter(Integer.class::isInstance).map(Integer.class::cast).mapToInt(Integer::intValue).max().orElse(0);
             return maximum == 0 ? 0 : Math.min(4, age * 4 / maximum);
         }
         return -1;
@@ -266,15 +269,15 @@ public final class ActivityClassifier {
     }
 
     public static String blockPath(BlockState state) {
-        return ActivityClassifier.pathOf(Registries.BLOCK.getId(state.getBlock()));
+        return ActivityClassifier.pathOf(BuiltInRegistries.BLOCK.getKey(state.getBlock()));
     }
 
     public static String blockEntityTypePath(BlockEntity blockEntity) {
-        return ActivityClassifier.pathOf(Registries.BLOCK_ENTITY_TYPE.getId(blockEntity.getType()));
+        return ActivityClassifier.pathOf(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType()));
     }
 
     public static String entityTypePath(Entity entity) {
-        return ActivityClassifier.pathOf(Registries.ENTITY_TYPE.getId(entity.getType()));
+        return ActivityClassifier.pathOf(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()));
     }
 
     private static String pathOf(Object key) {

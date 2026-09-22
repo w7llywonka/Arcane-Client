@@ -18,7 +18,7 @@ final class TestArtifacts {
         ByteArrayOutputStream nestedBytes = new ByteArrayOutputStream();
         try (JarOutputStream nested = new JarOutputStream(nestedBytes)) {
             write(nested, "fabric.mod.json", "{\"schemaVersion\":1,\"id\":\"arcaneclient\","
-                + "\"version\":\"2.9.1+mc1.21.11\"}");
+                + "\"version\":\"2.9.1+mc26.3\"}");
         }
         try (JarOutputStream outer = new JarOutputStream(Files.newOutputStream(destination))) {
             write(outer, "fabric.mod.json", "{\"schemaVersion\":1,\"id\":\"arcaneloader\","
@@ -41,7 +41,7 @@ final class TestArtifacts {
         Signature signer = Signature.getInstance("Ed25519");
         signer.initSign(pair.getPrivate());
         signer.update(Files.readAllBytes(artifact));
-        return new ReleaseManifest(2, "arcane-loader", version, "1.21.11",
+        return new ReleaseManifest(2, "arcane-loader", version, "26.3",
             "https://example.com/Arcane-Loader.jar", ArtifactVerifier.sha256(artifact),
             Base64.getEncoder().encodeToString(signer.sign()), Files.size(artifact));
     }

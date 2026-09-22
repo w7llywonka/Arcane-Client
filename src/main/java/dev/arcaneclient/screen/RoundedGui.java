@@ -1,11 +1,12 @@
 package dev.arcaneclient.screen;
 
 import dev.arcaneclient.ArcaneClient;
+import dev.arcaneclient.screen.vector.VectorUi;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.gl.RenderPipelines;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.util.Identifier;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.resources.Identifier;
 
 /** High-density, linearly filtered rounded GUI surfaces. */
 @Environment(EnvType.CLIENT)
@@ -20,8 +21,12 @@ public final class RoundedGui {
     private RoundedGui() {
     }
 
-    public static void fill(DrawContext graphics, int x, int y, int width, int height, int radius, int color) {
+    public static void fill(GuiGraphicsExtractor graphics, int x, int y, int width, int height, int radius, int color) {
         if (width <= 0 || height <= 0) return;
+        if (VectorUi.recording()) {
+            VectorUi.rect(x, y, width, height, Math.max(0, radius), color);
+            return;
+        }
         int safeRadius = effectiveRadius(width, height, radius);
         if (safeRadius == 0) {
             graphics.fill(x, y, x + width, y + height, color);
@@ -31,7 +36,7 @@ public final class RoundedGui {
     }
 
     public static void outline(
-        DrawContext graphics,
+        GuiGraphicsExtractor graphics,
         int x,
         int y,
         int width,
@@ -55,11 +60,15 @@ public final class RoundedGui {
         );
     }
 
-    public static void outlineOnly(DrawContext graphics, int x, int y, int width, int height, int radius, int color) {
+    public static void outlineOnly(GuiGraphicsExtractor graphics, int x, int y, int width, int height, int radius, int color) {
         if (width <= 0 || height <= 0) return;
+        if (VectorUi.recording()) {
+            VectorUi.outline(x, y, width, height, Math.max(0, radius), 0.65f, color);
+            return;
+        }
         int safeRadius = effectiveRadius(width, height, radius);
         if (safeRadius == 0) {
-            graphics.drawStrokedRectangle(x, y, width, height, color);
+            graphics.outline(x, y, width, height, color);
             return;
         }
         drawNineSlice(graphics, OUTLINE_TEXTURE, x, y, width, height, safeRadius, color);
@@ -70,7 +79,7 @@ public final class RoundedGui {
     }
 
     private static void drawNineSlice(
-        DrawContext graphics,
+        GuiGraphicsExtractor graphics,
         Identifier texture,
         int x,
         int y,
@@ -97,7 +106,7 @@ public final class RoundedGui {
     }
 
     private static void drawSlice(
-        DrawContext graphics,
+        GuiGraphicsExtractor graphics,
         Identifier texture,
         int x,
         int y,
@@ -110,7 +119,7 @@ public final class RoundedGui {
         int color
     ) {
         if (width <= 0 || height <= 0) return;
-        graphics.drawTexture(
+        graphics.blit(
             RenderPipelines.GUI_TEXTURED,
             texture,
             x,

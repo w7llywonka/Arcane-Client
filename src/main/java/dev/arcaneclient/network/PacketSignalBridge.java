@@ -9,35 +9,34 @@ import dev.arcaneclient.scan.EvidenceHeuristics;
 import dev.arcaneclient.scan.GrowthTransitions;
 import dev.arcaneclient.scan.ScannerStorageFilter;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Set;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.entity.BlockEntityType;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.passive.TameableEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.s2c.play.BlockBreakingProgressS2CPacket;
-import net.minecraft.network.packet.s2c.play.BlockEventS2CPacket;
-import net.minecraft.network.packet.s2c.play.ChunkDataS2CPacket;
-import net.minecraft.network.packet.s2c.play.ChunkDeltaUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntityAttachS2CPacket;
-import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
-import net.minecraft.network.packet.s2c.play.LightUpdateS2CPacket;
-import net.minecraft.network.packet.s2c.play.ParticleS2CPacket;
-import net.minecraft.network.packet.s2c.play.PlaySoundS2CPacket;
-import net.minecraft.network.packet.s2c.play.WorldEventS2CPacket;
-import net.minecraft.particle.ParticleType;
-import net.minecraft.registry.Registries;
-import net.minecraft.state.property.Property;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.math.Vec3i;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.core.Vec3i;
+import net.minecraft.core.particles.ParticleType;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+import net.minecraft.network.protocol.game.ClientboundBlockDestructionPacket;
+import net.minecraft.network.protocol.game.ClientboundBlockEventPacket;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
+import net.minecraft.network.protocol.game.ClientboundLevelEventPacket;
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
+import net.minecraft.network.protocol.game.ClientboundLightUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
+import net.minecraft.network.protocol.game.ClientboundSetEntityLinkPacket;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.TamableAnimal;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 
 @Environment(value=EnvType.CLIENT)
 public final class PacketSignalBridge {
@@ -47,119 +46,71 @@ public final class PacketSignalBridge {
     private PacketSignalBridge() {
     }
 
-    public static void onChunkData(ChunkDataS2CPacket packet) {
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || client.world == null) {
-            return;
-        }
-        ScanResult.Builder result = ScanResult.builder();
-        packet.getChunkData().getBlockEntities(packet.getChunkX(), packet.getChunkZ()).accept((pos, type, tag) -> {
-            String id = PacketSignalBridge.path(Registries.BLOCK_ENTITY_TYPE.getId(type));
-            if (ScannerStorageFilter.isStoragePath(id)) return;
-            int strength = PacketSignalBridge.blockEntityStrength(id);
-            if (strength > 0) {
-                result.addStatic(SignalCategory.BLOCK_ENTITY, PacketSignalBridge.at(pos), "raw packet " + id, strength);
-            }
-        });
-        if (ArcaneClient.engine().recordsConcealedLight()) {
-            int litBytes = 0;
-            Iterator iterator = packet.getLightData().getBlockNibbles().iterator();
-            while (iterator.hasNext()) {
-                byte[] data;
-                for (byte value : data = (byte[])iterator.next()) {
-                    if (value == 0) continue;
-                    ++litBytes;
-                }
-            }
-            if (litBytes > 16) {
-                BlockPosition center = new BlockPosition(packet.getChunkX() * 16 + 8, client.world.getBottomY() + 32, packet.getChunkZ() * 16 + 8);
-                result.addStatic(SignalCategory.LIGHT_LEAK, center, "separate block-light payload", Math.min(12, 2 + litBytes / 128));
-            }
-        }
-        ArcaneClient.engine().mergeStatic(packet.getChunkX(), packet.getChunkZ(), result.build());
+    public static void onChunkData(ClientboundLevelChunkWithLightPacket packet) {
+        // ClientChunkEvents queues the loaded chunk. No packet light/entity evidence is scanned.
     }
 
     public static void onBlockUpdate(BlockPos pos, BlockState incoming) {
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || client.world == null) {
+        Minecraft client = PacketSignalBridge.clientOnMainThread();
+        if (client == null || client.level == null) {
             return;
         }
-        BlockState old = client.world.getBlockState(pos);
+        BlockState old = client.level.getBlockState(pos);
         if (old.equals((Object)incoming)) {
             return;
         }
         String oldId = PacketSignalBridge.blockId(old);
         String newId = PacketSignalBridge.blockId(incoming);
-        if (ScannerStorageFilter.isStoragePath(oldId) || ScannerStorageFilter.isStoragePath(newId)) {
+        if (old.hasBlockEntity() || incoming.hasBlockEntity()) {
             return;
         }
         ArcaneClient.engine().recordAmethystState(pos, oldId, newId);
         ArcaneClient.engine().recordCobbledDeepslateState(pos, oldId, newId);
-        String location = PacketSignalBridge.hiddenSuffix(client, pos);
-        if (PacketSignalBridge.isPlayerFingerprint(newId, incoming)) {
-            ArcaneClient.engine().recordLive(pos, SignalCategory.PLACED_BLOCK, 110, "placed fingerprint: " + newId + location);
+        if (dev.arcaneclient.scan.GrownBlocks.matches(old) || dev.arcaneclient.scan.GrownBlocks.matches(incoming)
+            || ArcaneClient.config().tunnelEsp || ArcaneClient.config().accessTrailEsp || ArcaneClient.config().amethystEsp) {
+            ArcaneClient.engine().recordAllowedBlockUpdate(pos, null, false);
         }
-        GrowthTransitions.GrowthEvent growth = GrowthTransitions.analyze(old, incoming);
-        if (growth != null) {
-            ArcaneClient.engine().recordLive(pos, growth.category(), growth.strength(), growth.reason() + location, 12000, 3);
-        }
-        boolean automationChanged = false;
-        for (String property : INTERACTION_PROPERTIES) {
-            Object before = PacketSignalBridge.property(old, property);
-            Object after = PacketSignalBridge.property(incoming, property);
-            if (before == null || after == null || before.equals(after)) continue;
-            automationChanged = true;
-            ArcaneClient.engine().recordLive(pos, SignalCategory.INTERACTION, 90, "state change " + newId + "[" + property + "]" + location, 9600, 4);
-            break;
-        }
-        ArcaneClient.engine().recordAllowedBlockUpdate(pos, growth, automationChanged);
     }
 
-    public static void onSectionBlockUpdate(ChunkDeltaUpdateS2CPacket packet) {
+    public static void onSectionBlockUpdate(ClientboundSectionBlocksUpdatePacket packet) {
         if (PacketSignalBridge.clientOnMainThread() == null) {
             return;
         }
-        packet.visitUpdates((pos, state) -> PacketSignalBridge.onBlockUpdate(pos.toImmutable(), state));
+        packet.runUpdates((pos, state) -> PacketSignalBridge.onBlockUpdate(pos.immutable(), state));
     }
 
     public static void onBlockEntity(BlockPos pos, BlockEntityType<?> type, String source) {
-        if (PacketSignalBridge.clientOnMainThread() == null) {
-            return;
-        }
-        String id = PacketSignalBridge.path(Registries.BLOCK_ENTITY_TYPE.getId(type));
-        if (ScannerStorageFilter.isStoragePath(id)) return;
-        ArcaneClient.engine().recordLive(pos, SignalCategory.BLOCK_ENTITY, PacketSignalBridge.blockEntityStrength(id) + 70, source + ": " + id);
+        // ESP reads the world's block-entity index. No scanner evidence is emitted.
     }
 
-    public static void onBlockEvent(BlockEventS2CPacket packet) {
+    public static void onBlockEvent(ClientboundBlockEventPacket packet) {
         if (PacketSignalBridge.clientOnMainThread() == null) {
             return;
         }
-        String id = PacketSignalBridge.path(Registries.BLOCK.getId(packet.getBlock()));
+        String id = PacketSignalBridge.path(BuiltInRegistries.BLOCK.getKey(packet.getBlock()));
         if (ScannerStorageFilter.isStoragePath(id)) return;
         int strength = id.contains("piston") || id.contains("note_block") ? 140 : 65;
         ArcaneClient.engine().recordLive(packet.getPos(), SignalCategory.INTERACTION, strength, "block event: " + id);
-        ArcaneClient.engine().recordAllowedBlockUpdate(packet.getPos(), null, true);
     }
 
-    public static void onBlockBreaking(BlockBreakingProgressS2CPacket packet) {
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || client.world == null || packet.getProgress() <= 0 || client.player != null && packet.getEntityId() == client.player.getId()) {
+    public static void onBlockBreaking(ClientboundBlockDestructionPacket packet) {
+        Minecraft client = PacketSignalBridge.clientOnMainThread();
+        if (client == null || client.level == null || packet.getProgress() <= 0 || client.player != null && packet.getId() == client.player.getId()) {
             return;
         }
-        Entity actor = client.world.getEntityById(packet.getEntityId());
-        int strength = actor instanceof PlayerEntity ? 200 : 55;
-        String who = actor instanceof PlayerEntity ? "other player" : "entity";
+        Entity actor = client.level.getEntity(packet.getId());
+        int strength = actor instanceof Player ? 200 : 55;
+        String who = actor instanceof Player ? "other player" : "entity";
         ArcaneClient.engine().recordLive(packet.getPos(), SignalCategory.LIVE_ACTIVITY, strength, who + " breaking block" + PacketSignalBridge.hiddenSuffix(client, packet.getPos()), 6000, 2);
     }
 
-    public static void onSound(PlaySoundS2CPacket packet) {
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
+    public static void onSound(ClientboundSoundPacket packet) {
+        Minecraft client = PacketSignalBridge.clientOnMainThread();
         if (client == null) {
             return;
         }
-        BlockPos pos = BlockPos.ofFloored((double)packet.getX(), (double)packet.getY(), (double)packet.getZ());
-        String id = packet.getSound().getKey().map(key -> key.getValue().getPath()).orElse("");
+        BlockPos pos = BlockPos.containing(packet.getX(), packet.getY(), packet.getZ());
+        String id = packet.getSound().unwrapKey().map(key -> key.identifier().getPath()).orElse("");
         if (PacketSignalBridge.nearLocalPlayer(client, pos)) {
             return;
         }
@@ -168,30 +119,30 @@ public final class PacketSignalBridge {
         }
     }
 
-    public static void onParticle(ParticleS2CPacket packet) {
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
+    public static void onParticle(ClientboundLevelParticlesPacket packet) {
+        Minecraft client = PacketSignalBridge.clientOnMainThread();
         if (client == null) {
             return;
         }
-        BlockPos pos = BlockPos.ofFloored((double)packet.getX(), (double)packet.getY(), (double)packet.getZ());
+        BlockPos pos = BlockPos.containing(packet.x(), packet.y(), packet.z());
         if (PacketSignalBridge.nearLocalPlayer(client, pos)) {
             return;
         }
-        ParticleType type = packet.getParameters().getType();
-        String id = PacketSignalBridge.path(Registries.PARTICLE_TYPE.getId(type));
+        ParticleType type = packet.particle().getType();
+        String id = PacketSignalBridge.path(BuiltInRegistries.PARTICLE_TYPE.getKey(type));
         if (id.contains("composter") || id.contains("wax_") || id.contains("campfire") || id.equals("happy_villager") || id.equals("shriek")) {
             ArcaneClient.engine().recordLive(pos, SignalCategory.LIVE_ACTIVITY, 50, "server particle: " + id, 2400, 20);
         }
     }
 
-    public static void onLevelEvent(WorldEventS2CPacket packet) {
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || packet.isGlobal()) {
+    public static void onLevelEvent(ClientboundLevelEventPacket packet) {
+        Minecraft client = PacketSignalBridge.clientOnMainThread();
+        if (client == null || packet.isGlobalEvent()) {
             return;
         }
-        int type = packet.getEventId();
+        int type = packet.getType();
         if (type == 2001) {
-            BlockState broken = Block.getStateFromRawId(packet.getData());
+            BlockState broken = Block.stateById(packet.getData());
             String id = PacketSignalBridge.blockId(broken);
             if (GrowthTransitions.amethystRank(id) >= 0) {
                 ArcaneClient.engine().recordAmethystBreak(packet.getPos(), id);
@@ -208,92 +159,95 @@ public final class PacketSignalBridge {
         }
     }
 
-    public static void onLightUpdate(LightUpdateS2CPacket packet) {
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || client.world == null || !ArcaneClient.engine().recordsConcealedLight()) {
+    public static void onLightUpdate(ClientboundLightUpdatePacket packet) {
+        Minecraft client = PacketSignalBridge.clientOnMainThread();
+        if (client == null || client.level == null || !ArcaneClient.engine().recordsConcealedLight()) {
             return;
         }
         if (client.player == null) {
             return;
         }
-        int observerSectionY = ChunkSectionPos.getSectionCoord((int)client.player.getBlockPos().getY());
-        if (!ArcaneClient.engine().hasScanBaseline(packet.getChunkX(), packet.getChunkZ(), observerSectionY)) {
+        int observerSectionY = SectionPos.blockToSectionCoord((int)client.player.blockPosition().getY());
+        int chunkX = packet.x();
+        int chunkZ = packet.z();
+        if (!ArcaneClient.engine().hasScanBaseline(chunkX, chunkZ, observerSectionY)) {
             return;
         }
-        if (client.player != null && Math.abs(client.player.getChunkPos().x - packet.getChunkX()) <= 1 && Math.abs(client.player.getChunkPos().z - packet.getChunkZ()) <= 1) {
+        if (client.player != null && Math.abs(client.player.chunkPosition().x() - chunkX) <= 1 && Math.abs(client.player.chunkPosition().z() - chunkZ) <= 1) {
             return;
         }
-        int touchedSections = packet.getData().getInitedBlock().cardinality() + packet.getData().getUninitedBlock().cardinality();
+        var lightData = packet.lightData();
+        int touchedSections = lightData.blockYMask().cardinality() + lightData.emptyBlockYMask().cardinality();
         if (touchedSections == 0) {
             return;
         }
         int nonzeroBytes = 0;
-        Iterator iterator = packet.getData().getBlockNibbles().iterator();
+        Iterator<byte[]> iterator = lightData.blockUpdates().iterator();
         while (iterator.hasNext()) {
             byte[] data;
-            for (byte value : data = (byte[])iterator.next()) {
+            for (byte value : data = iterator.next()) {
                 if (value == 0) continue;
                 ++nonzeroBytes;
             }
         }
-        BlockPos position = new BlockPos(packet.getChunkX() * 16 + 8, client.world.getBottomY() + 32, packet.getChunkZ() * 16 + 8);
+        BlockPos position = new BlockPos(chunkX * 16 + 8, client.level.getMinY() + 32, chunkZ * 16 + 8);
         int strength = EvidenceHeuristics.standaloneLightUpdate(touchedSections, nonzeroBytes);
         ArcaneClient.engine().recordLive(position, SignalCategory.LIGHT_LEAK, strength, "standalone block-light section update", 3600, 40);
     }
 
-    public static void onEntitySpawn(EntitySpawnS2CPacket packet) {
+    public static void onEntitySpawn(ClientboundAddEntityPacket packet) {
         if (PacketSignalBridge.clientOnMainThread() == null) {
             return;
         }
-        String id = PacketSignalBridge.path(Registries.ENTITY_TYPE.getId(packet.getEntityType()));
+        String id = PacketSignalBridge.path(BuiltInRegistries.ENTITY_TYPE.getKey(packet.getType()));
         int strength = PacketSignalBridge.entityStrength(id);
         if (strength > 0) {
-            BlockPos pos = BlockPos.ofFloored((double)packet.getX(), (double)packet.getY(), (double)packet.getZ());
+            BlockPos pos = BlockPos.containing((double)packet.getX(), (double)packet.getY(), (double)packet.getZ());
             ArcaneClient.engine().recordLive(pos, SignalCategory.ENTITY, strength, "notable entity: " + id, 9600, 20);
         }
     }
 
     public static void onEntityChanged(int entityId, String reason) {
-        MobEntity mob;
+        Mob mob;
         boolean equipped;
-        TameableEntity tame;
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || client.world == null) {
+        TamableAnimal tame;
+        Minecraft client = PacketSignalBridge.clientOnMainThread();
+        if (client == null || client.level == null) {
             return;
         }
-        Entity entity = client.world.getEntityById(entityId);
+        Entity entity = client.level.getEntity(entityId);
         if (entity == null || entity == client.player) {
             return;
         }
-        boolean playerOwned = entity instanceof TameableEntity && (tame = (TameableEntity)entity).isTamed();
-        boolean bl = equipped = entity instanceof MobEntity && (mob = (MobEntity)entity).hasSaddleEquipped();
+        boolean playerOwned = entity instanceof TamableAnimal && (tame = (TamableAnimal)entity).isTame();
+        boolean bl = equipped = entity instanceof Mob && (mob = (Mob)entity).isSaddled();
         if (playerOwned || equipped || entity.hasCustomName()) {
-            String id = PacketSignalBridge.path(Registries.ENTITY_TYPE.getId(entity.getType()));
-            ArcaneClient.engine().recordLive(entity.getBlockPos(), SignalCategory.ENTITY, 140, reason + ": managed " + id);
+            String id = PacketSignalBridge.path(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()));
+            ArcaneClient.engine().recordLive(entity.blockPosition(), SignalCategory.ENTITY, 140, reason + ": managed " + id);
         }
     }
 
-    public static void onEntityLink(EntityAttachS2CPacket packet) {
-        MinecraftClient client = PacketSignalBridge.clientOnMainThread();
-        if (client == null || client.world == null || packet.getHoldingEntityId() == 0) {
+    public static void onEntityLink(ClientboundSetEntityLinkPacket packet) {
+        Minecraft client = PacketSignalBridge.clientOnMainThread();
+        if (client == null || client.level == null || packet.getDestId() == 0) {
             return;
         }
-        Entity source = client.world.getEntityById(packet.getAttachedEntityId());
+        Entity source = client.level.getEntity(packet.getSourceId());
         if (source != null) {
-            ArcaneClient.engine().recordLive(source.getBlockPos(), SignalCategory.ENTITY, 160, "leashed entity");
+            ArcaneClient.engine().recordLive(source.blockPosition(), SignalCategory.ENTITY, 160, "leashed entity");
         }
     }
 
-    private static MinecraftClient clientOnMainThread() {
-        MinecraftClient client = MinecraftClient.getInstance();
-        return client.isOnThread() ? client : null;
+    private static Minecraft clientOnMainThread() {
+        Minecraft client = Minecraft.getInstance();
+        return client.isSameThread() ? client : null;
     }
 
-    private static boolean nearLocalPlayer(MinecraftClient client, BlockPos pos) {
-        return client.player != null && client.player.getBlockPos().getSquaredDistance((Vec3i)pos) < 64.0;
+    private static boolean nearLocalPlayer(Minecraft client, BlockPos pos) {
+        return client.player != null && client.player.blockPosition().distSqr((Vec3i)pos) < 64.0;
     }
 
-    private static String hiddenSuffix(MinecraftClient client, BlockPos pos) {
+    private static String hiddenSuffix(Minecraft client, BlockPos pos) {
         return client.player != null && (double)pos.getY() < client.player.getY() - 24.0 ? " below masked depth" : "";
     }
 
@@ -302,7 +256,7 @@ public final class PacketSignalBridge {
     }
 
     private static String blockId(BlockState state) {
-        return PacketSignalBridge.path(Registries.BLOCK.getId(state.getBlock()));
+        return PacketSignalBridge.path(BuiltInRegistries.BLOCK.getKey(state.getBlock()));
     }
 
     private static String path(Identifier id) {
@@ -310,9 +264,11 @@ public final class PacketSignalBridge {
     }
 
     private static Object property(BlockState state, String name) {
-        for (Map.Entry entry : state.getEntries().entrySet()) {
-            if (!((Property)entry.getKey()).getName().equals(name)) continue;
-            return entry.getValue();
+        Iterator<Property.Value<?>> values = state.getValues().iterator();
+        while (values.hasNext()) {
+            Property.Value<?> entry = values.next();
+            if (!entry.property().getName().equals(name)) continue;
+            return entry.value();
         }
         return null;
     }

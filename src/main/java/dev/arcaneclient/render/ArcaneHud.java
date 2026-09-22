@@ -4,6 +4,7 @@ import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.ArcaneConfig;
 import dev.arcaneclient.TraceEngine;
 import dev.arcaneclient.combat.CombatController;
+import dev.arcaneclient.input.InputTelemetry;
 import dev.arcaneclient.screen.ArcaneFont;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.screen.ClickGuiColors;
@@ -20,13 +21,13 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.text.OrderedText;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.world.level.ChunkPos;
 
 @Environment(EnvType.CLIENT)
 public final class ArcaneHud {
@@ -66,9 +67,9 @@ public final class ArcaneHud {
     }
 
     /** Refreshes optional telemetry at 4 Hz instead of querying and formatting it every frame. */
-    public static void tick(MinecraftClient client) {
+    public static void tick(Minecraft client) {
         ArcaneConfig config = ArcaneClient.config();
-        if (client.player == null || client.world == null || !config.infoHud) {
+        if (client.player == null || client.level == null || !config.infoHud) {
             cachedInfoLines = List.of();
             infoRefreshIn = 0;
             return;
@@ -82,10 +83,12 @@ public final class ArcaneHud {
         infoRefreshIn = 4;
     }
 
-    private static void render(DrawContext graphics) {
+    private static void render(GuiGraphicsExtractor graphics) {
         ArcaneConfig config = ArcaneClient.config();
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client) || client.player == null || client.world == null) return;
+        Minecraft client = Minecraft.getInstance();
+        if (ArcaneVisibility.overlaysHidden() || ArcaneSettingsScreen.isOpen(client) || client.player == null || client.level == null) return;
+        InputTelemetry.renderedFrame();
+        renderColorGrade(graphics, config);
         if (config.hud) renderRadar(graphics, client, config);
         if (config.chunkAnalysis) renderChunkAnalysis(graphics, client, config);
         if (config.attackMeter) renderCombatHud(graphics, client, config);
@@ -93,10 +96,10 @@ public final class ArcaneHud {
         if (config.customCrosshair) renderCustomCrosshair(graphics, client, config);
     }
 
-    private static void renderRadar(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
-        TextRenderer font = ArcaneFont.renderer(client);
+    private static void renderRadar(GuiGraphicsExtractor graphics, Minecraft client, ArcaneConfig config) {
+        Font font = ArcaneFont.renderer(client);
         TraceEngine engine = ArcaneClient.engine();
-        ChunkPos center = client.player.getChunkPos();
+        ChunkPos center = client.player.chunkPosition();
         Map<Long, TraceEngine.ChunkMarker> markers = nearbyMarkers(engine, center);
         ClickGuiColors theme = ClickGuiColors.resolve(config);
         int cellSize = UiGeometry.radarCellSize(ArcaneFont.width(font, "99"));
@@ -112,52 +115,52 @@ public final class ArcaneHud {
             for (int dx = -RADIUS; dx <= RADIUS; dx++) {
                 int x = gridX + (dx + RADIUS) * cellSize;
                 int y = gridY + (dz + RADIUS) * cellSize;
-                long chunkKey = key(center.x + dx, center.z + dz);
+                long chunkKey = key(center.x() + dx, center.z() + dz);
                 TraceEngine.ChunkMarker marker = markers.get(chunkKey);
                 boolean clustered = cachedClusterChunks.contains(chunkKey);
                 int score = marker == null ? 0 : marker.score();
-                int tile = score == 0 ? 0x5A1C1E24 : qualityColor(score, config.threshold);
+                int tile = score == 0 ? 0x5A1C1E24 : qualityColor(score, dev.arcaneclient.scan.GrowthCountPolicy.FLAG_SCORE);
                 if (dx == 0 && dz == 0 || clustered) {
                     RoundedGui.outline(graphics, x, y, cellSize, cellSize, 4, 1, clustered ? CLUSTER_COLOR : theme.accent(), tile);
                 } else {
                     RoundedGui.fill(graphics, x + 1, y + 1, cellSize - 2, cellSize - 2, 3, tile);
                 }
                 if (score > 0) {
-                    int scoreColor = score >= config.threshold && score < 75 ? 0xFF16171B : theme.text();
+                    int scoreColor = score >= dev.arcaneclient.scan.GrowthCountPolicy.FLAG_SCORE && score < 75 ? 0xFF16171B : theme.text();
                     String scoreText = Integer.toString(Math.min(99, score));
                     int scoreX = x + (cellSize - ArcaneFont.width(font, scoreText)) / 2;
-                    int scoreY = y + (cellSize - font.fontHeight) / 2;
-                    graphics.drawText(font, ArcaneFont.text(scoreText), scoreX, scoreY, scoreColor, false);
+                    int scoreY = y + (cellSize - font.lineHeight) / 2;
+                    graphics.text(font, ArcaneFont.text(scoreText), scoreX, scoreY, scoreColor, false);
                 } else if (dx == 0 && dz == 0) {
                     int plusX = x + (cellSize - ArcaneFont.width(font, "+")) / 2;
-                    int plusY = y + (cellSize - font.fontHeight) / 2;
-                    graphics.drawText(font, ArcaneFont.text("+"), plusX, plusY, theme.accentBright(), false);
+                    int plusY = y + (cellSize - font.lineHeight) / 2;
+                    graphics.text(font, ArcaneFont.text("+"), plusX, plusY, theme.accentBright(), false);
                 }
             }
         }
     }
 
-    private static void renderChunkAnalysis(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
-        TextRenderer font = ArcaneFont.renderer(client);
+    private static void renderChunkAnalysis(GuiGraphicsExtractor graphics, Minecraft client, ArcaneConfig config) {
+        Font font = ArcaneFont.renderer(client);
         TraceEngine engine = ArcaneClient.engine();
-        ChunkPos chunk = client.player.getChunkPos();
-        TraceEngine.ChunkMarker marker = engine.snapshotMarkerAt(chunk.x, chunk.z);
+        ChunkPos chunk = client.player.chunkPosition();
+        TraceEngine.ChunkMarker marker = engine.snapshotMarkerAt(chunk.x(), chunk.z());
         ClickGuiColors theme = ClickGuiColors.resolve(config);
         int panelWidth = 184;
-        int x = graphics.getScaledWindowWidth() - panelWidth - 7;
+        int x = graphics.guiWidth() - panelWidth - 7;
         int y = 7;
         int reasonCount = marker == null ? 0 : Math.min(2, marker.reasons().size());
         int height = marker == null || marker.score() == 0 ? 45 : 58 + reasonCount * 10;
 
         drawGlassPanel(graphics, x, y, panelWidth, height, theme);
         RoundedGui.fill(graphics, x + 8, y + 2, 28, 2, 1, theme.accent());
-        graphics.drawText(font, ArcaneFont.text("CURRENT CHUNK"), x + 9, y + 6, theme.text(), false);
-        String coordinates = config.streamerMode ? "COORDINATES HIDDEN" : chunk.x + ", " + chunk.z;
-        graphics.drawText(font, ArcaneFont.text(coordinates), x + 9, y + 19, theme.accentBright(), false);
+        graphics.text(font, ArcaneFont.text("CURRENT CHUNK"), x + 9, y + 6, theme.text(), false);
+        String coordinates = config.streamerMode ? "COORDINATES HIDDEN" : chunk.x() + ", " + chunk.z();
+        graphics.text(font, ArcaneFont.text(coordinates), x + 9, y + 19, theme.accentBright(), false);
 
         if (marker == null || marker.score() == 0) {
-            OrderedText empty = ArcaneFont.trimmed(font, "No activity evidence", panelWidth - 18);
-            graphics.drawText(font, empty, x + 9, y + 32, theme.muted(), false);
+            FormattedCharSequence empty = ArcaneFont.trimmed(font, "No activity evidence", panelWidth - 18);
+            graphics.text(font, empty, x + 9, y + 32, theme.muted(), false);
             return;
         }
 
@@ -166,96 +169,117 @@ public final class ArcaneHud {
             ? "SCORE  " + marker.score()
             : "BASE " + cluster.confidence() + "% · " + cluster.members() + " CH";
         int scoreX = x + panelWidth - 9 - ArcaneFont.width(font, score);
-        graphics.drawText(font, ArcaneFont.text(score), scoreX, y + 6, cluster != null ? CLUSTER_COLOR : theme.accent(), false);
+        graphics.text(font, ArcaneFont.text(score), scoreX, y + 6, cluster != null ? CLUSTER_COLOR : theme.accent(), false);
 
         var intel = marker.intel();
         String confidence = "CONF " + intel.confidence() + "%  FAM " + intel.independentFamilies()
             + "  SAMPLES " + intel.completeSamples();
         String freshness = "FRESH " + intel.freshness() + "%  COVER " + intel.coveragePercent() + "%";
-        graphics.drawText(font, ArcaneFont.trimmed(font, confidence, panelWidth - 18), x + 9, y + 31, theme.accentBright(), false);
-        graphics.drawText(font, ArcaneFont.trimmed(font, freshness, panelWidth - 18), x + 9, y + 42, theme.muted(), false);
+        graphics.text(font, ArcaneFont.trimmed(font, confidence, panelWidth - 18), x + 9, y + 31, theme.accentBright(), false);
+        graphics.text(font, ArcaneFont.trimmed(font, freshness, panelWidth - 18), x + 9, y + 42, theme.muted(), false);
 
         int lineY = y + 55;
         for (int index = 0; index < reasonCount; index++) {
-            OrderedText reason = ArcaneFont.trimmed(font, "› " + marker.reasons().get(index), panelWidth - 22);
-            graphics.drawText(font, reason, x + 9, lineY, theme.text(), false);
+            FormattedCharSequence reason = ArcaneFont.trimmed(font, "› " + marker.reasons().get(index), panelWidth - 22);
+            graphics.text(font, reason, x + 9, lineY, theme.text(), false);
             lineY += 10;
         }
     }
 
-    private static void renderCombatHud(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
-        TextRenderer font = ArcaneFont.renderer(client);
+    private static void renderCombatHud(GuiGraphicsExtractor graphics, Minecraft client, ArcaneConfig config) {
+        Font font = ArcaneFont.renderer(client);
         ClickGuiColors theme = ClickGuiColors.resolve(config);
         int width = 64;
-        int x = (graphics.getScaledWindowWidth() - width) / 2;
-        int y = graphics.getScaledWindowHeight() / 2 + 13;
-        float cooldown = Math.clamp(client.player.getAttackCooldownProgress(0.0f), 0.0f, 1.0f);
+        int x = (graphics.guiWidth() - width) / 2;
+        int y = graphics.guiHeight() / 2 + 13;
+        float cooldown = Math.clamp(client.player.getAttackStrengthScale(0.0f), 0.0f, 1.0f);
         RoundedGui.fill(graphics, x, y, width, 5, 2, theme.window());
         RoundedGui.fill(graphics, x + 1, y + 1, Math.round((width - 2) * cooldown), 3, 1, cooldown >= 0.95f ? theme.accentBright() : theme.accent());
         if (config.totemCounter) {
             String count = "TOTEMS " + CombatController.totemCount(client.player);
-            graphics.drawText(font, ArcaneFont.text(count), x + (width - ArcaneFont.width(font, count)) / 2, y + 7, theme.text(), false);
+            graphics.text(font, ArcaneFont.text(count), x + (width - ArcaneFont.width(font, count)) / 2, y + 7, theme.text(), false);
         }
     }
 
-    private static void renderInfoHud(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
-        TextRenderer font = ArcaneFont.renderer(client);
+    private static void renderInfoHud(GuiGraphicsExtractor graphics, Minecraft client, ArcaneConfig config) {
+        Font font = ArcaneFont.renderer(client);
         ClickGuiColors theme = ClickGuiColors.resolve(config);
         List<String> lines = cachedInfoLines;
         if (lines.isEmpty() || cachedInfoStreamerMode != config.streamerMode) return;
 
         int panelWidth = 80;
         for (String line : lines) panelWidth = Math.max(panelWidth, ArcaneFont.width(font, line) + 16);
-        int lineHeight = font.fontHeight + 3;
+        int lineHeight = font.lineHeight + 3;
         int panelHeight = lines.size() * lineHeight + 9;
         int x = 7;
-        int y = graphics.getScaledWindowHeight() - panelHeight - 7;
+        int y = graphics.guiHeight() - panelHeight - 7;
         drawGlassPanel(graphics, x, y, panelWidth, panelHeight, theme);
         RoundedGui.fill(graphics, x + 8, y + 2, 28, 2, 1, theme.accent());
         int textY = y + 6;
         for (String line : lines) {
-            graphics.drawText(font, ArcaneFont.text(line), x + 8, textY, theme.text(), false);
+            graphics.text(font, ArcaneFont.text(line), x + 8, textY, theme.text(), false);
             textY += lineHeight;
         }
     }
 
-    private static List<String> buildInfoLines(MinecraftClient client, ArcaneConfig config) {
+    private static List<String> buildInfoLines(Minecraft client, ArcaneConfig config) {
         List<String> lines = new ArrayList<>(6);
-        if (config.infoFps) lines.add("FPS  " + client.getCurrentFps());
+        if (config.infoFps) lines.add("FPS  " + client.getFps());
         if (config.infoCoordinates) {
             lines.add(config.streamerMode
                 ? "XYZ  HIDDEN"
                 : InfoHudFormatter.coordinates(client.player.getX(), client.player.getY(), client.player.getZ()));
         }
         if (config.infoDirection) {
-            lines.add("FACING  " + client.player.getHorizontalFacing().asString().toUpperCase(Locale.ROOT));
+            lines.add("FACING  " + client.player.getDirection().getSerializedName().toUpperCase(Locale.ROOT));
         }
         if (config.infoSpeed) {
-            lines.add(InfoHudFormatter.speed(client.player.getVelocity().x, client.player.getVelocity().z));
+            lines.add(InfoHudFormatter.speed(client.player.getDeltaMovement().x, client.player.getDeltaMovement().z));
         }
         if (config.infoPing) {
-            PlayerListEntry entry = client.getNetworkHandler() == null
+            PlayerInfo entry = client.getConnection() == null
                 ? null
-                : client.getNetworkHandler().getPlayerListEntry(client.player.getUuid());
+                : client.getConnection().getPlayerInfo(client.player.getUUID());
             lines.add("PING  " + (entry == null ? "--" : entry.getLatency() + " ms"));
         }
         if (config.infoBiome) {
-            String biome = client.world.getBiome(client.player.getBlockPos()).getKey()
-                .map(key -> InfoHudFormatter.readableId(key.getValue().getPath()))
+            String biome = client.level.getBiome(client.player.blockPosition()).unwrapKey()
+                .map(key -> InfoHudFormatter.readableId(key.identifier().getPath()))
                 .orElse("UNKNOWN");
             lines.add("BIOME  " + biome);
         }
+        if (config.visualAdditions.mapHeadingHud) {
+            float heading = Math.floorMod(Math.round(client.player.getYRot()), 360);
+            lines.add(String.format(Locale.ROOT, "HEADING  %03.0f°", heading));
+        }
+        if (config.visualAdditions.inputLatencyHud) lines.add("INPUT  " + InputTelemetry.label());
+        if (config.visualAdditions.rendererDiagnostics) lines.add("RENDER  " + Render263.diagnostics());
         return List.copyOf(lines);
     }
 
-    private static void renderCustomCrosshair(DrawContext graphics, MinecraftClient client, ArcaneConfig config) {
-        int centerX = graphics.getScaledWindowWidth() / 2;
-        int centerY = graphics.getScaledWindowHeight() / 2;
+    private static void renderColorGrade(GuiGraphicsExtractor graphics, ArcaneConfig config) {
+        var c = config.visualAdditions;
+        if (!c.colorGrade || c.colorGradeStrength <= 0) return;
+        int alpha = Math.clamp(Math.round(c.colorGradeStrength * 1.45f), 0, 58);
+        int rgb = switch (Math.clamp(c.colorGradePreset, 0, 4)) {
+            case 1 -> 0xFF8A32;
+            case 2 -> 0x4A9DFF;
+            case 3 -> 0x16204A;
+            case 4 -> 0x21071D;
+            default -> 0xFFFFFF;
+        };
+        if (c.colorGradePreset == 0) alpha /= 3;
+        graphics.fill(0, 0, graphics.guiWidth(), graphics.guiHeight(), alpha << 24 | rgb);
+    }
+
+    private static void renderCustomCrosshair(GuiGraphicsExtractor graphics, Minecraft client, ArcaneConfig config) {
+        int centerX = graphics.guiWidth() / 2;
+        int centerY = graphics.guiHeight() / 2;
         int size = config.crosshairSize;
-        double horizontalSpeed = Math.hypot(client.player.getVelocity().x, client.player.getVelocity().z);
-        int dynamicSpread = client.player.isOnGround() ? (int)Math.min(3, Math.round(horizontalSpeed * 10.0)) : 3;
+        double horizontalSpeed = Math.hypot(client.player.getDeltaMovement().x, client.player.getDeltaMovement().z);
+        int dynamicSpread = client.player.onGround() ? (int)Math.min(3, Math.round(horizontalSpeed * 10.0)) : 3;
         int gap = config.crosshairGap + dynamicSpread;
-        float cooldown = client.player.getAttackCooldownProgress(0.0f);
+        float cooldown = client.player.getAttackStrengthScale(0.0f);
         int configured = config.crosshairColor;
         int color = cooldown >= 0.95f
             ? configured
@@ -267,7 +291,7 @@ public final class ArcaneHud {
     }
 
     private static void drawGlassPanel(
-        DrawContext graphics,
+        GuiGraphicsExtractor graphics,
         int x,
         int y,
         int width,
@@ -281,16 +305,16 @@ public final class ArcaneHud {
 
     private static TraceEngine.ActivityClusterCandidate activityClusterAt(TraceEngine engine, ChunkPos chunk) {
         for (TraceEngine.ActivityClusterCandidate candidate : engine.activityClusters()) {
-            if (candidate.contains(chunk.x, chunk.z)) return candidate;
+            if (candidate.contains(chunk.x(), chunk.z())) return candidate;
         }
         return null;
     }
 
     private static Map<Long, TraceEngine.ChunkMarker> nearbyMarkers(TraceEngine engine, ChunkPos center) {
         long tickBucket = engine.currentTick() / 10L;
-        if (tickBucket == cachedTickBucket && center.x == cachedCenterX && center.z == cachedCenterZ) return cachedMarkers;
+        if (tickBucket == cachedTickBucket && center.x() == cachedCenterX && center.z() == cachedCenterZ) return cachedMarkers;
         HashMap<Long, TraceEngine.ChunkMarker> refreshed = new HashMap<>();
-        for (TraceEngine.ChunkMarker marker : engine.nearby(center.x, center.z, RADIUS)) {
+        for (TraceEngine.ChunkMarker marker : engine.nearby(center.x(), center.z(), RADIUS)) {
             refreshed.put(key(marker.chunkX(), marker.chunkZ()), marker);
         }
         HashSet<Long> clusterChunks = new HashSet<>();
@@ -298,7 +322,7 @@ public final class ArcaneHud {
             for (long member : cluster.memberChunks()) {
                 int chunkX = (int)member;
                 int chunkZ = (int)(member >> 32);
-                if (Math.abs(chunkX - center.x) <= RADIUS && Math.abs(chunkZ - center.z) <= RADIUS) {
+                if (Math.abs(chunkX - center.x()) <= RADIUS && Math.abs(chunkZ - center.z()) <= RADIUS) {
                     clusterChunks.add(member);
                 }
             }
@@ -306,8 +330,8 @@ public final class ArcaneHud {
         cachedMarkers = Map.copyOf(refreshed);
         cachedClusterChunks = Set.copyOf(clusterChunks);
         cachedTickBucket = tickBucket;
-        cachedCenterX = center.x;
-        cachedCenterZ = center.z;
+        cachedCenterX = center.x();
+        cachedCenterZ = center.z();
         return cachedMarkers;
     }
 

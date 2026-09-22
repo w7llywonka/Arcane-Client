@@ -19,7 +19,7 @@ final class DetachedUpdateSchedulerTest {
             directory.resolve("state/updates/new.jar"),
             directory.resolve("state/backups/old.jar"), "1.2.2", "1.2.3");
         ReleaseManifest release = new ReleaseManifest(2, "arcane-loader", "1.2.3",
-            "1.21.11", "https://example.com/loader.jar", "a".repeat(64),
+            "26.3", "https://example.com/loader.jar", "a".repeat(64),
             "A".repeat(86) + "==", 1234);
         List<String> command = DetachedUpdateScheduler.command(Path.of("java"),
             directory.resolve("state/helper.jar"), 42, plan, release,

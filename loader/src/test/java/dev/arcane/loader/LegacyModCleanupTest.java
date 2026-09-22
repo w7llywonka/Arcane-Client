@@ -23,9 +23,9 @@ final class LegacyModCleanupTest {
         Path oldLoader = mods.resolve("Arcane-Loader-1.2.1.jar");
         Path oldClient = mods.resolve("arcane-client-2.9.1.jar");
         Path unrelated = mods.resolve("fabric-api.jar");
-        TestArtifacts.writeOuterLoader(selectedLoader, "1.2.2+mc1.21.11");
+        TestArtifacts.writeOuterLoader(selectedLoader, "1.2.2+mc26.3");
         TestArtifacts.writeRootMod(selectedExternalClient, "arcaneclient", "2.9.1");
-        TestArtifacts.writeOuterLoader(oldLoader, "1.2.1+mc1.21.11");
+        TestArtifacts.writeOuterLoader(oldLoader, "1.2.1+mc26.3");
         TestArtifacts.writeRootMod(oldClient, "arcaneclient", "2.9.1");
         TestArtifacts.writeRootMod(unrelated, "fabric-api", "1.0.0");
 
