@@ -1,5 +1,9 @@
 package dev.arcaneclient.gametest;
 
+import static org.lwjgl.sdl.SDLMouse.SDL_BUTTON_LEFT;
+import static org.lwjgl.sdl.SDLMouse.SDL_BUTTON_RIGHT;
+
+import com.mojang.blaze3d.platform.InputConstants;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.model.BlockPosition;
 import dev.arcaneclient.model.EvidenceFamily;
@@ -20,11 +24,12 @@ import net.minecraft.world.level.ChunkPos;
 public final class DevUiClientGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-        singleplayer.getClientWorld().waitForChunksRender();
+        context.waitFor(client -> client.level != null && client.player != null
+            && client.levelRenderer.hasRenderedAllSections(), 5000);
         context.getInput().resizeWindow(1600, 1000);
         context.runOnClient(client -> {
             client.options.guiScale().set(2);
-            client.resizeDisplay();
+            client.resizeGui();
             ArcaneClient.config().uiTheme = 0;
             ArcaneClient.config().uiPanelLayout.clear();
             ArcaneClient.config().uiLayoutCustomized = false;
@@ -36,11 +41,11 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
             ArcaneClient.config().devUiRevision = 1;
             ArcaneClient.config().uiBackgroundDimPercent = 42;
             ArcaneClient.config().uiCornerRadius = 12;
-            client.setScreen(new ArcaneSettingsScreen(null));
+            client.gui.setScreen(new ArcaneSettingsScreen(null));
         });
         context.waitTicks(8);
         context.runOnClient(client -> {
-            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.screen;
+            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.gui.screen();
             List<GuiCategory> categories = field(screen, "categories");
             require(categories.getFirst().name().equals("BASE FINDING"), "Base Finding must be first");
             require(categories.stream().allMatch(GuiCategory::open), "All categories start open");
@@ -53,17 +58,17 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
             require(!ArcaneClient.config().uiThemesOpen && ArcaneClient.config().uiSingleSettings,
                 "Theme editor starts closed and single-section details prevent clutter");
             require(client.level != null, "Overlay test must run over an actual world");
-            require(!screen.shouldPause(), "Overlay must leave the world running");
+            require(!screen.isPauseScreen(), "Overlay must leave the world running");
             GuiCategory first = categories.getFirst();
             UiGeometry.ClickGuiMetrics metrics = field(screen, "metrics");
             GuiModule module = first.visible().getFirst();
             boolean original = module.enabled();
             int x = first.x() + 14;
             int y = first.y() + metrics.headerHeight() + metrics.moduleHeight() / 2;
-            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0)), false);
+            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(SDL_BUTTON_LEFT, 0)), false);
             require(module.enabled() != original, "Left click must toggle");
-            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(0, 0)), false);
-            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(1, 0)), false);
+            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(SDL_BUTTON_LEFT, 0)), false);
+            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(SDL_BUTTON_RIGHT, 0)), false);
             require(module.expanded(), "Right click must expand settings");
             GuiModule other = categories.stream().flatMap(c -> c.modules().stream())
                 .filter(m -> m != module && m.hasSettings()).findFirst().orElseThrow();
@@ -73,15 +78,15 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
             require(other.enabled() == otherEnabled, "Opening details does not toggle the feature");
             screen.toggleModuleSettings(module);
             require(module.expanded() && !other.expanded(), "Only the selected details remain open");
-            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(1, 0)), false);
-            screen.mouseClicked(new MouseButtonEvent(first.x() + metrics.windowWidth() - 13, y, new MouseButtonInfo(0, 0)), false);
+            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(SDL_BUTTON_RIGHT, 0)), false);
+            screen.mouseClicked(new MouseButtonEvent(first.x() + metrics.windowWidth() - 13, y, new MouseButtonInfo(SDL_BUTTON_LEFT, 0)), false);
             require(!module.expanded() && module.enabled() != original, "Clicking the visible switch must toggle, not open settings");
-            screen.mouseClicked(new MouseButtonEvent(first.x() + metrics.windowWidth() - 13, y, new MouseButtonInfo(0, 0)), false);
+            screen.mouseClicked(new MouseButtonEvent(first.x() + metrics.windowWidth() - 13, y, new MouseButtonInfo(SDL_BUTTON_LEFT, 0)), false);
             EditBox search = field(screen, "searchInput");
-            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(0, org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT)), false);
+            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(SDL_BUTTON_LEFT, InputConstants.MOD_SHIFT)), false);
             require(ArcaneClient.config().uiFavorites.contains(module.name()), "Shift-click must favorite a module");
             require(module.enabled() == original, "Favoriting must not toggle the underlying feature");
-            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(0, org.lwjgl.glfw.GLFW.GLFW_MOD_SHIFT)), false);
+            screen.mouseClicked(new MouseButtonEvent(x, y, new MouseButtonInfo(SDL_BUTTON_LEFT, InputConstants.MOD_SHIFT)), false);
             require(!ArcaneClient.config().uiFavorites.contains(module.name()), "A second shift-click must remove the favorite");
             require(module.enabled() == original, "Removing a favorite must not toggle the underlying feature");
             search.setValue("freecam");
@@ -93,7 +98,7 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
         boolean[] originalFullbright = new boolean[1];
         int[] originalModuleCount = new int[1];
         context.runOnClient(client -> {
-            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.screen;
+            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.gui.screen();
             List<GuiCategory> categories = field(screen, "categories");
             originalModuleCount[0] = screen.visibleModuleCount();
             originalFullbright[0] = ArcaneClient.config().fullbright;
@@ -109,7 +114,7 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
         context.waitTicks(4);
         context.takeScreenshot("dev-ui-favorites");
         context.runOnClient(client -> {
-            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.screen;
+            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.gui.screen();
             List<GuiCategory> categories = field(screen, "categories");
             EditBox search = field(screen, "searchInput");
             search.setValue("freecam");
@@ -125,7 +130,7 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
             ArcaneClient.config().fullbright = originalFullbright[0];
         });
         context.runOnClient(client -> {
-            List<GuiCategory> categories = field(client.screen, "categories");
+            List<GuiCategory> categories = field(client.gui.screen(), "categories");
             for (GuiCategory category : categories) category.scrollBy(category.maxScroll());
         });
         context.waitTicks(3);
@@ -133,7 +138,7 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
         context.getInput().resizeWindow(960, 640);
         context.waitTicks(5);
         context.runOnClient(client -> {
-            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.screen;
+            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.gui.screen();
             List<GuiCategory> categories = field(screen, "categories");
             require(categories.getFirst().y() < screen.height / 2, "Base Finding must stay near the top after resize");
             require(categories.stream().allMatch(c -> c.x() >= 0 && c.y() >= 0 && c.y() < screen.height), "Headers remain reachable after resize");
@@ -147,13 +152,13 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
         });
         context.takeScreenshot("dev-ui-compact");
         context.runOnClient(client -> {
-            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.screen;
+            ArcaneSettingsScreen screen = (ArcaneSettingsScreen) client.gui.screen();
             List<GuiCategory> categories = field(screen, "categories");
             GuiCategory moved = categories.getFirst();
             int beforeX = moved.x(), beforeY = moved.y();
-            MouseButtonEvent down = new MouseButtonEvent(beforeX + 12, beforeY + 6, new MouseButtonInfo(0, 0));
+            MouseButtonEvent down = new MouseButtonEvent(beforeX + 12, beforeY + 6, new MouseButtonInfo(SDL_BUTTON_LEFT, 0));
             screen.mouseClicked(down, false);
-            MouseButtonEvent end = new MouseButtonEvent(beforeX + 20, beforeY + 23, new MouseButtonInfo(0, 0));
+            MouseButtonEvent end = new MouseButtonEvent(beforeX + 20, beforeY + 23, new MouseButtonInfo(SDL_BUTTON_LEFT, 0));
             screen.mouseDragged(end, 8, 17);
             screen.mouseReleased(end);
             int x = moved.x(), y = moved.y();
@@ -162,8 +167,8 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
             EditBox search = field(screen, "searchInput");
             screen.setModuleFilters(false, true);
             search.setValue("fullbright");
-            client.resizeDisplay();
-            screen.close();
+            client.resizeGui();
+            screen.onClose();
             var disk = dev.arcaneclient.ArcaneConfig.load();
             require(disk.uiLayoutCustomized, "Customized layout must be written to disk");
             var saved = disk.uiPanelLayout.get(moved.name());
@@ -171,8 +176,8 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
             require(saved.scroll() == scroll, "Filters must not overwrite the saved panel scroll");
             require(disk.uiShowFavoritesOnly && !disk.uiShowEnabledOnly, "Filter selection must be saved on close");
             require(disk.uiFavorites.contains("Fullbright"), "Favorite modules must be saved on close");
-            client.setScreen(new ArcaneSettingsScreen(null));
-            ArcaneSettingsScreen reopenedScreen = (ArcaneSettingsScreen) client.screen;
+            client.gui.setScreen(new ArcaneSettingsScreen(null));
+            ArcaneSettingsScreen reopenedScreen = (ArcaneSettingsScreen) client.gui.screen();
             require(reopenedScreen.visibleModuleCount() == 1, "Favorite filter must be restored on reopen");
             reopenedScreen.setModuleFilters(false, false);
             List<GuiCategory> reopened = field(reopenedScreen, "categories");
@@ -192,12 +197,12 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
             require(resetX != x || resetY != y, "Reset must replace the dragged position with the automatic layout");
             reopenedScreen.setModuleFilters(false, false);
             require(restored.x() == resetX && restored.y() == resetY, "Clearing filters after reset must not revive the old custom position");
-            reopenedScreen.close();
+            reopenedScreen.onClose();
             var resetDisk = dev.arcaneclient.ArcaneConfig.load();
             var resetSaved = resetDisk.uiPanelLayout.get(moved.name());
             require(resetSaved.x() == resetX && resetSaved.y() == resetY, "Reset layout must be saved instead of the pre-filter layout");
         });
-        context.runOnClient(client -> client.setScreen(null));
+        context.runOnClient(client -> client.gui.setScreen(null));
         context.runOnClient(client -> {
             ArcaneClient.config().nametags = true;
             ArcaneClient.config().nametagRange = 16;
@@ -239,7 +244,6 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
                 net.minecraft.world.level.block.Block.UPDATE_CLIENTS | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE);
             ArcaneClient.engine().queueNearby(client);
             ArcaneClient.engine().settingsChanged(client);
-            client.options.hideGui = true;
         });
         context.waitTicks(5);
         context.runOnClient(client -> require(TraceRenderer.renderedTileCount() > 0, "Chunk tile renderer submitted no geometry"));
@@ -247,10 +251,10 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
         int[] ground = new int[5];
         context.runOnClient(client -> {
             ChunkPos chunk = client.player.chunkPosition();
-            ground[0] = chunk.x; ground[1] = chunk.z;
+            ground[0] = chunk.x(); ground[1] = chunk.z();
             ground[2] = chunk.getMinBlockX() + 4; ground[3] = chunk.getMinBlockZ() + 4;
             ground[4] = client.level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, ground[2], ground[3]);
-            require(Math.abs(TraceRenderer.renderedTileSurfaceY(chunk.x, chunk.z, 4, 4) - (ground[4] + 0.04)) < 0.001,
+            require(Math.abs(TraceRenderer.renderedTileSurfaceY(chunk.x(), chunk.z(), 4, 4) - (ground[4] + 0.04)) < 0.001,
                 "Tile must sit directly on the terrain");
         });
         singleplayer.getServer().runCommand("fill " + ground[2] + " " + ground[4] + " " + ground[3]
@@ -270,7 +274,6 @@ public final class DevUiClientGameTest implements FabricClientGameTest {
         context.takeScreenshot("chunk-tiles-grounded-from-air");
         singleplayer.getServer().runCommand("tp ArcaneQA " + (ground[2] + 0.5) + " " + (ground[4] + 5) + " " + (ground[3] + 0.5));
         context.runOnClient(client -> {
-            client.options.hideGui = false;
             ArcaneClient.config().overlay = false;
             ArcaneClient.engine().clearCurrent();
         });

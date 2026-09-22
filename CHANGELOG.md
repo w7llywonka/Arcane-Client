@@ -7,6 +7,7 @@
 - Update the public client, tests, assets, and build configuration for Minecraft 26.3, Java 25, Fabric Loader 0.19.5, and Fabric API 0.160.6+26.3.
 - Add the current renderer, ESP, input, visual, interface, and growth-based scanning work, including the expanded configurable item and block selection tools.
 - Reduce render-thread overhead without lowering visual quality by batching world-intel geometry, caching shape edges and text measurements, eliminating per-target distance allocations, and bounding terrain-cache refresh work per game tick.
+- Preserve custom capes, trails, auras, and Freecam accessories on Minecraft 26.3 by using its dedicated local-player render state and counting deferred geometry after submission.
 - Publish ARCLoader 1.2.7+mc26.3 source with signed outer-loader update support and a reproducible build that embeds the client compiled from this repository instead of a checked-in client JAR.
 - Include the current website source and signed 26.3 public update metadata while excluding private DEV builds, signing keys, bot secrets, caches, and runtime data.
 

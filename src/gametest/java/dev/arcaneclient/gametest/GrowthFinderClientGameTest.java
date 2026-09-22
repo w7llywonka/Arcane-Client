@@ -6,6 +6,7 @@ import dev.arcaneclient.scan.GrownBlocks;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 
 /** Count thresholds, live invalidation and ESP run against real integrated-server packets. */
@@ -13,10 +14,11 @@ import net.minecraft.world.level.ChunkPos;
 public final class GrowthFinderClientGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
         try (var world = context.worldBuilder().create()) {
-            world.getClientWorld().waitForChunksRender();
+            context.waitFor(client -> client.level != null && client.player != null
+                && client.levelRenderer.hasRenderedAllSections(), 5000);
             world.getServer().runCommand("gamerule minecraft:random_tick_speed 0");
             ChunkPos chunk = context.computeOnClient(client -> {
-                client.setScreen(null);
+                client.gui.setScreen(null);
                 var config = ArcaneClient.config();
                 config.enabled = true;
                 config.grownBlocksRequired = 3;
@@ -49,14 +51,14 @@ public final class GrowthFinderClientGameTest implements FabricClientGameTest {
             context.waitFor(client -> EspRenderer.debugTargetCount() >= 5, 5000);
             context.runOnClient(client -> {
                 ArcaneClient.engine().settingsChanged(client);
-                require(ArcaneClient.engine().grownCountAt(chunk.x, chunk.z) == 0, "Containers and immature buds count zero");
+                require(ArcaneClient.engine().grownCountAt(chunk.x(), chunk.z()) == 0, "Containers and immature buds count zero");
                 require(!flagged(chunk), "No grown blocks must stay unflagged");
                 require(EspRenderer.renderedDebugTracerCount() == 0, "Tracers default off");
                 ArcaneClient.config().blockEntityDebugTracers = true;
             });
             context.waitFor(client -> EspRenderer.renderedDebugTracerCount() >= 5, 5000);
             world.getServer().runCommand("setblock " + (x + 3) + " 71 " + (z + 5) + " amethyst_cluster[facing=up]");
-            context.waitFor(client -> ArcaneClient.engine().grownCountAt(chunk.x, chunk.z) == 1, 5000);
+            context.waitFor(client -> ArcaneClient.engine().grownCountAt(chunk.x(), chunk.z()) == 1, 5000);
             context.runOnClient(client -> {
                 ArcaneClient.engine().settingsChanged(client);
                 require(!flagged(chunk), "One block must not pass a three-block minimum");
@@ -79,7 +81,7 @@ public final class GrowthFinderClientGameTest implements FabricClientGameTest {
             world.getServer().runCommand("setblock " + (x + 12) + " 71 " + (z + 8) + " vine[east=true]");
             world.getServer().runCommand("setblock " + (x + 10) + " 70 " + (z + 8) + " farmland[moisture=7]");
             world.getServer().runCommand("setblock " + (x + 10) + " 71 " + (z + 8) + " wheat[age=7]");
-            context.waitFor(client -> ArcaneClient.engine().grownCountAt(chunk.x, chunk.z) == 5, 5000);
+            context.waitFor(client -> ArcaneClient.engine().grownCountAt(chunk.x(), chunk.z()) == 5, 5000);
             context.runOnClient(client -> {
                 ArcaneClient.engine().settingsChanged(client);
                 require(flagged(chunk), "Cluster + berries + kelp stem + vine + mature wheat must meet five-block threshold");
@@ -87,18 +89,18 @@ public final class GrowthFinderClientGameTest implements FabricClientGameTest {
                 ArcaneClient.engine().queueNearby(client);
             });
             context.waitFor(client -> {
-                var marker = ArcaneClient.engine().snapshotMarkerAt(chunk.x, chunk.z);
+                var marker = ArcaneClient.engine().snapshotMarkerAt(chunk.x(), chunk.z());
                 return marker != null && marker.intel().evidencePoints().size() == 5;
             }, 5000);
             context.runOnClient(client -> {
-                var marker = ArcaneClient.engine().snapshotMarkerAt(chunk.x, chunk.z);
+                var marker = ArcaneClient.engine().snapshotMarkerAt(chunk.x(), chunk.z());
                 require(marker.intel().evidencePoints().stream().allMatch(point ->
-                    GrownBlocks.matches(client.world.getBlockState(new net.minecraft.util.math.BlockPos(
+                    GrownBlocks.matches(client.level.getBlockState(new BlockPos(
                         point.position().x(), point.position().y(), point.position().z())))),
                     "Evidence markers must sit on actual grown plants, not chunk centers");
             });
             world.getServer().runCommand("setblock " + (x + 3) + " 71 " + (z + 5) + " air");
-            context.waitFor(client -> ArcaneClient.engine().grownCountAt(chunk.x, chunk.z) == 4, 5000);
+            context.waitFor(client -> ArcaneClient.engine().grownCountAt(chunk.x(), chunk.z()) == 4, 5000);
             context.runOnClient(client -> {
                 ArcaneClient.engine().settingsChanged(client);
                 require(!flagged(chunk), "Removing a plant must remove the flag, not retain the peak count");
@@ -117,7 +119,7 @@ public final class GrowthFinderClientGameTest implements FabricClientGameTest {
                 var counts = dev.arcaneclient.scan.AmethystDiagnostics.read(client.level, chunk);
                 require(counts.stages().equals("2/2/2/2"), "Raw received-block diagnostic must count each stage at both heights");
                 var job = new dev.arcaneclient.scan.ChunkScanner().begin(client.level,
-                    client.level.getChunk(chunk.x, chunk.z), 0, 10, false, true, false, false);
+                    client.level.getChunk(chunk.x(), chunk.z()), 0, 10, false, true, false, false);
                 while (!job.isComplete()) job.step(256);
                 require(job.worldObservations().size() == 8, "ESP scanner must collect all four stages above and below deepslate");
                 require(job.grownCount() == 6, "Only the two full clusters add to the four other grown plants");
@@ -140,7 +142,7 @@ public final class GrowthFinderClientGameTest implements FabricClientGameTest {
         }
     }
     private static boolean flagged(ChunkPos chunk) {
-        return ArcaneClient.engine().markers().stream().anyMatch(marker -> marker.chunkX() == chunk.x && marker.chunkZ() == chunk.z);
+        return ArcaneClient.engine().markers().stream().anyMatch(marker -> marker.chunkX() == chunk.x() && marker.chunkZ() == chunk.z());
     }
     private static void require(boolean value, String message) { if (!value) throw new AssertionError(message); }
 }

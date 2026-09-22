@@ -39,7 +39,6 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
-import org.lwjgl.glfw.GLFW;
 
 @SuppressWarnings("UnstableApiUsage")
 public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
@@ -50,7 +49,8 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         // Keep software-rendered CI cheap while the integrated server generates its spawn chunks.
         context.getInput().resizeWindow(640, 360);
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-            singleplayer.getClientWorld().waitForChunksRender();
+            context.waitFor(client -> client.level != null && client.player != null
+                && client.levelRenderer.hasRenderedAllSections(), 5000);
             context.getInput().resizeWindow(1280, 720);
             context.waitTicks(20);
             prepare(context);
@@ -85,7 +85,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             long started = System.nanoTime();
             for (int dz = -2; dz <= 2; ++dz) {
                 for (int dx = -2; dx <= 2; ++dx) {
-                    LevelChunk chunk = client.level.getChunkSource().getChunk(center.x + dx, center.z + dz, false);
+                    LevelChunk chunk = client.level.getChunkSource().getChunk(center.x() + dx, center.z() + dz, false);
                     if (chunk == null) {
                         continue;
                     }
@@ -115,7 +115,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         ArcaneClient.LOGGER.info("[QA] Starting storage-free Chunk Finder test");
         context.runOnClient(client -> {
             require(client.level != null && client.player != null, "storage exclusion test needs a loaded world");
-            LevelChunk chunk = client.level.getChunk(client.player.chunkPosition().x, client.player.chunkPosition().z);
+            LevelChunk chunk = client.level.getChunk(client.player.chunkPosition().x(), client.player.chunkPosition().z());
             ArrayList<BlockPos> positions = new ArrayList<>();
             for (int y = client.level.getMinY(); y <= client.level.getMaxY() && positions.size() < 5; y++) {
                 for (int z = 1; z < 15 && positions.size() < 5; z++) {
@@ -269,17 +269,17 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         require(!FreecamController.isActive(), "Freecam rapid second press was lost");
 
         context.runOnClient(client -> {
-            ArcaneClient.keybinds().freelook().setBoundKey(
-                InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_F4)
+            ArcaneClient.keybinds().freelook().setKey(
+                InputConstants.Type.KEYBOARD.getOrCreate(InputConstants.KEY_F4)
             );
             KeyMapping.resetMapping();
         });
-        input.pressKey(GLFW.GLFW_KEY_F4);
+        input.pressKey(InputConstants.KEY_F4);
         require(FreelookController.isActive(), "Freelook raw press did not activate immediately");
-        input.pressKey(GLFW.GLFW_KEY_F4);
+        input.pressKey(InputConstants.KEY_F4);
         require(!FreelookController.isActive(), "Freelook rapid second press was lost");
         context.runOnClient(client -> {
-            ArcaneClient.keybinds().freelook().setBoundKey(InputConstants.UNKNOWN);
+            ArcaneClient.keybinds().freelook().setKey(InputConstants.UNKNOWN);
             KeyMapping.resetMapping();
         });
         ArcaneClient.LOGGER.info("[QA] Immediate camera input test passed");
@@ -289,9 +289,8 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         context.runOnClient(client -> {
             require(client.player != null, "singleplayer test did not create a player");
             require(client.level != null, "singleplayer test did not create a client world");
-            client.options.hideGui = false;
             client.options.setCameraType(CameraType.FIRST_PERSON);
-            client.setScreen(null);
+            client.gui.setScreen(null);
             FreecamController.disable(client);
             FreelookController.disable(client);
         });
@@ -379,7 +378,6 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         ArcaneClient.LOGGER.info("[QA] Freecam visual body captured at {} from camera {}", bodyView.playerPos(), bodyView.cameraPos());
 
         context.runOnClient(client -> {
-            client.gameRenderer.pick(1.0f);
             require(!FreecamController.isVisualBody(client.crosshairPickEntity), "Freecam visual body became a crosshair target");
             Entity visualBody = FreecamController.visualBodyEntity();
             require(visualBody != null, "Freecam visual body disappeared before interaction test");
@@ -457,7 +455,6 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
         context.takeScreenshot("arcane-freelook-orbit-hotbar");
 
         context.runOnClient(client -> {
-            client.gameRenderer.pick(1.0f);
             require(client.getCameraEntity() == client.player, "Freelook lost the real player camera before interaction test");
             require(client.crosshairPickEntity != client.player, "Freelook targeted the local player");
         });
@@ -624,14 +621,14 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
 
     private static void testInterface(ClientGameTestContext context) {
         ArcaneClient.LOGGER.info("[QA] Starting Arcane interface visual test");
-        context.runOnClient(client -> client.setScreen(new ArcaneSettingsScreen(null)));
+        context.runOnClient(client -> client.gui.setScreen(new ArcaneSettingsScreen(null)));
         context.waitTicks(4);
         context.runOnClient(client -> require(
-            client.screen instanceof ArcaneSettingsScreen,
+            client.gui.screen() instanceof ArcaneSettingsScreen,
             "Arcane settings screen did not remain open"
         ));
         context.takeScreenshot("arcane-settings-interface");
-        context.runOnClient(client -> client.setScreen(null));
+        context.runOnClient(client -> client.gui.setScreen(null));
         context.waitTicks(2);
         ArcaneClient.LOGGER.info("[QA] Arcane interface visual test passed");
     }
@@ -657,7 +654,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
     private static void faceBody(ClientGameTestContext context) {
         context.runOnClient(client -> {
             Vec3 bodyEye = client.player.getEyePosition();
-            net.minecraft.client.Camera renderedCamera = client.gameRenderer.getMainCamera();
+            net.minecraft.client.Camera renderedCamera = client.gameRenderer.mainCamera();
             Vec3 offset = bodyEye.subtract(renderedCamera.position());
             double horizontal = Math.sqrt(offset.x * offset.x + offset.z * offset.z);
             float yaw = (float) Math.toDegrees(Math.atan2(-offset.x, offset.z));
@@ -666,20 +663,12 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
                 (yaw - FreecamController.cameraYaw()) / 0.15,
                 (pitch - FreecamController.cameraPitch()) / 0.15
             );
-            CameraType perspective = client.options.getCameraType();
-            client.gameRenderer.getMainCamera().setup(
-                client.level,
-                client.player,
-                !perspective.isFirstPerson(),
-                perspective.isMirrored(),
-                1.0f
-            );
         });
     }
 
     private static void assertRenderedCameraFacesBody(ClientGameTestContext context) {
         context.runOnClient(client -> {
-            net.minecraft.client.Camera renderedCamera = client.gameRenderer.getMainCamera();
+            net.minecraft.client.Camera renderedCamera = client.gameRenderer.mainCamera();
             double alignment = renderedBodyAlignment(client);
             ArcaneClient.LOGGER.info(
                 "[QA] Freecam pose yaw {} pitch {}; rendered camera at {} yaw {} pitch {}; body alignment {}",
@@ -695,7 +684,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
     }
 
     private static double renderedBodyAlignment(Minecraft client) {
-        net.minecraft.client.Camera renderedCamera = client.gameRenderer.getMainCamera();
+        net.minecraft.client.Camera renderedCamera = client.gameRenderer.mainCamera();
         Vec3 towardBody = client.player.getEyePosition().subtract(renderedCamera.position()).normalize();
         Vec3 renderedLook = Vec3.directionFromRotation(renderedCamera.xRot(), renderedCamera.yRot()).normalize();
         return renderedLook.dot(towardBody);
@@ -713,8 +702,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
 
     private static void assertHudAvailable(ClientGameTestContext context, String stage) {
         context.runOnClient(client -> {
-            require(!client.options.hideGui, stage + " hid the HUD/hotbar");
-            require(client.screen == null, stage + " left a screen covering the hotbar");
+            require(client.gui.screen() == null, stage + " left a screen covering the hotbar");
             require(client.getCameraEntity() instanceof Player, stage + " made InGameHud.getCameraPlayer return null");
             require(client.getCameraEntity() == client.player, stage + " detached HUD state from the real inventory");
         });
@@ -731,7 +719,7 @@ public final class ArcaneCameraClientGameTest implements FabricClientGameTest {
             require(client.level != null, "world disappeared during camera test");
             Entity camera = client.getCameraEntity();
             require(camera != null, "camera entity disappeared during camera test");
-            net.minecraft.client.Camera renderedCamera = client.gameRenderer.getMainCamera();
+            net.minecraft.client.Camera renderedCamera = client.gameRenderer.mainCamera();
             float controllerYaw = FreecamController.isActive()
                 ? FreecamController.cameraYaw()
                 : FreelookController.isActive() ? FreelookController.cameraYaw() : camera.getYRot();

@@ -20,9 +20,10 @@ public final class NukerClientGameTest implements FabricClientGameTest {
         var previous = context.computeOnClient(client -> ArcaneClient.config().nuker);
         boolean autoTool = context.computeOnClient(client -> ArcaneClient.config().autoTool);
         try (var world = context.worldBuilder().create()) {
-            world.getClientWorld().waitForChunksRender();
+            context.waitFor(client -> client.level != null && client.player != null
+                && client.levelRenderer.hasRenderedAllSections(), 5000);
             BlockPos base = context.computeOnClient(client -> {
-                client.setScreen(null);
+                client.gui.setScreen(null);
                 client.options.pauseOnLostFocus = false;
                 var c = ArcaneClient.config();
                 c.nuker = new NukerConfig(); c.autoTool = true; c.enabled = false;
@@ -77,11 +78,11 @@ public final class NukerClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> require(client.player.getInventory().getSelectedSlot() == 0 && Nuker.currentTarget() == null,
                 "Disable restores original hotbar slot and clears progress"));
             world.getServer().runCommand(set(first, "stone"));
-            context.runOnClient(client -> { ArcaneClient.config().nuker.enabled = true; client.setScreen(new ArcaneSettingsScreen(null)); });
+            context.runOnClient(client -> { ArcaneClient.config().nuker.enabled = true; client.gui.setScreen(new ArcaneSettingsScreen(null)); });
             context.waitTicks(20);
             context.runOnClient(client -> {
                 require(client.level.getBlockState(first).is(Blocks.STONE), "Menu pauses mining");
-                client.setScreen(null); FreecamController.enable(client);
+                client.gui.setScreen(null); FreecamController.enable(client);
             });
             context.waitTicks(15);
             context.runOnClient(client -> {

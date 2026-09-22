@@ -13,7 +13,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.particle.TerrainParticle;
-import net.minecraft.client.renderer.ScreenEffectRenderer;
+import net.minecraft.client.renderer.state.level.LevelRenderState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -33,9 +33,10 @@ public final class EffectsClientGameTest implements FabricClientGameTest {
         EffectsResourcePackFixture.Selection packSelection = null;
         boolean[] previous = new boolean[6];
         try (TestSingleplayerContext world = context.worldBuilder().create()) {
-            world.getClientWorld().waitForChunksRender();
+            context.waitFor(client -> client.level != null && client.player != null
+                && client.levelRenderer.hasRenderedAllSections(), 5000);
             context.runOnClient(client -> {
-                client.setScreen(null);
+                client.gui.setScreen(null);
                 var config = ArcaneClient.config();
                 original[0] = config.effects;
                 originalIntel[0] = config.intelAdditions;
@@ -156,9 +157,10 @@ public final class EffectsClientGameTest implements FabricClientGameTest {
         context.waitFor(client -> client.player != null && client.player.getOffhandItem().isEmpty()
             && !client.player.isDeadOrDying() && (!custom || Effects.totemAnimationActive()), 100);
         context.runOnClient(client -> {
-            ScreenEffectRenderer overlay = field(client.gameRenderer, "overlayRenderer");
-            ItemStack item = field(overlay, "floatingItem");
-            int timer = field(overlay, "floatingItemTimer");
+            LevelRenderState levelState = field(client.levelRenderer, "levelRenderState");
+            var activation = levelState.playerRenderState.itemActivation;
+            ItemStack item = activation == null ? ItemStack.EMPTY : activation.item;
+            int timer = activation == null ? 0 : activation.ticks;
             require(item != null && item.is(Items.TOTEM_OF_UNDYING) && timer > 0, "Real status packet must start the original item timer");
             require(Effects.replacesTotem(item) == custom, "Only an enabled custom animation may replace vanilla");
             require(Effects.totemAnimationActive() == custom, "Custom state must agree with the tested mode " + style);
@@ -169,8 +171,9 @@ public final class EffectsClientGameTest implements FabricClientGameTest {
         if (custom && duration > 44) {
             context.waitTicks(44);
             context.runOnClient(client -> {
-                ScreenEffectRenderer overlay = field(client.gameRenderer, "overlayRenderer");
-                require(field(overlay, "floatingItem") == null, "Vanilla's original animation must expire normally");
+                LevelRenderState levelState = field(client.levelRenderer, "levelRenderState");
+                require(levelState.playerRenderState.itemActivation == null,
+                    "Vanilla's original animation must expire normally");
                 require(Effects.totemAnimationActive(), "A longer custom animation must outlive vanilla's 40-tick timer");
             });
             context.waitTicks(duration + 3 - 44);
@@ -189,7 +192,7 @@ public final class EffectsClientGameTest implements FabricClientGameTest {
             client.particleEngine.clearParticles();
             var position = client.player.position();
             client.level.addDestroyBlockEffect(miningBlock, Blocks.STONE.defaultBlockState());
-            client.level.addBreakingBlockEffect(miningBlock, Direction.UP);
+            client.level.addBreakingBlockEffects(miningBlock, Direction.UP, true);
             client.particleEngine.add(new TerrainParticle(client.level, position.x, position.y, position.z,
                 0, 0, 0, Blocks.STONE.defaultBlockState(), miningBlock));
             require(queuedParticles(client) == 0, "Block density zero must suppress native mining/break debris, not only factory effects");
@@ -221,7 +224,7 @@ public final class EffectsClientGameTest implements FabricClientGameTest {
                 // The actual vanilla firework starter configures each returned spark without a null check.
                 client.level.createFireworks(position.x, position.y + 1, position.z, 0, 0, 0,
                     List.of(new FireworkExplosion(FireworkExplosion.Shape.SMALL_BALL,
-                        IntList.of(0x44AAFF), IntList.of(0x22EEAA), true, true)));
+                        IntList.of(0x44AAFF), IntList.of(0x22EEAA), true, true)), false);
             });
             context.waitTicks(12);
         }
@@ -234,7 +237,7 @@ public final class EffectsClientGameTest implements FabricClientGameTest {
     }
 
     private static int queuedParticles(net.minecraft.client.Minecraft client) {
-        Collection<?> queue = field(client.particleEngine, "newParticles");
+        Collection<?> queue = field(client.particleEngine, "particlesToAdd");
         return queue.size();
     }
 

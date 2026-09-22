@@ -38,8 +38,8 @@ test("versioned loader channels are separate and match both signed outer JARs", 
     {
       version: "26.3",
       loaderVersion: "1.2.7+mc26.3",
-      sha256: "29099475d3b53970ef1bb6e7ef5c42d55d0c0b7f37d91a0e4a3825d832be747e",
-      size: 2361767,
+      sha256: "593cce3d2ad3c9764c6d4163dc467ac3a308b30485708638b46f8c4090d062a8",
+      size: 2361894,
     },
   ];
 

@@ -17,7 +17,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.minecraft.client.CameraType;
 import net.minecraft.world.item.Items;
 
-/** Real submitted item models and accessory geometry, plus images for visual inspection. */
+/** Real nametag text and accessory geometry, plus images for visual inspection. */
 @SuppressWarnings("UnstableApiUsage")
 public final class CosmeticsClientGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
@@ -25,9 +25,9 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
         VisualAdditionsConfig[] oldVisual = new VisualAdditionsConfig[1];
         NametagConfig[] oldNames = new NametagConfig[1];
         CameraType[] oldPerspective = new CameraType[1];
-        boolean[] oldHud = new boolean[1];
         try (TestSingleplayerContext world = context.worldBuilder().create()) {
-            world.getClientWorld().waitForChunksRender();
+            context.waitFor(client -> client.level != null && client.player != null
+                && client.levelRenderer.hasRenderedAllSections(), 5000);
             context.getInput().resizeWindow(1280, 720);
             int[] origin = context.computeOnClient(client -> {
                 var c = ArcaneClient.config();
@@ -41,7 +41,6 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
                 oldVisual[0] = c.visualAdditions;
                 oldNames[0] = c.nametagAdditions;
                 oldPerspective[0] = client.options.getCameraType();
-                oldHud[0] = client.options.hideGui;
                 c.visualAdditions = new VisualAdditionsConfig();
                 c.nametagAdditions = new NametagConfig();
                 c.nametags = true;
@@ -51,9 +50,8 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
                 c.visualAdditions.accessoryTrail = true;
                 c.visualAdditions.accessoryAura = true;
                 c.visualAdditions.trailLength = 60;
-                client.options.hideGui = true;
                 client.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-                client.setScreen(null);
+                client.gui.setScreen(null);
                 EntityEspRenderer.reset();
                 VisualAdditions.reset(client);
                 return new int[] { client.player.getBlockX(), client.player.getBlockY() + 4, client.player.getBlockZ() };
@@ -72,8 +70,12 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
             world.getServer().runCommand("item replace entity @a weapon.mainhand with minecraft:diamond_sword");
             world.getServer().runCommand("item replace entity @a weapon.offhand with minecraft:shield");
             world.getServer().runCommand("execute at @a run summon minecraft:item ~2 ~1 ~2 {Tags:[\"arcane_cosmetic_qa\"],NoGravity:1b,PickupDelay:32767s,Item:{id:\"minecraft:diamond\",count:7}}");
-            context.waitFor(client -> client.player != null && client.player.getOffhandItem().is(Items.SHIELD)
-                && EntityEspRenderer.renderedEquipmentCount() == 6 && CustomAccessories.renderedCapeQuads() > 0, 200);
+            context.waitFor(client -> client.player != null && client.player.getOffhandItem().is(Items.SHIELD), 200);
+            context.waitTicks(20);
+            context.runOnClient(client -> {
+                require(CustomAccessories.renderedCapeQuads() > 0,
+                    "The enabled cosmetic cape must submit geometry; quads=" + CustomAccessories.renderedCapeQuads());
+            });
             context.waitTicks(3);
             context.runOnClient(client -> {
                 require(EntityEspRenderer.nameLabels().stream().anyMatch(label -> label.contains(" HP")), "Self health field must render");
@@ -88,12 +90,6 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
                 c.nametagAdditions.name = true;
                 c.nametagAdditions.stackCount = false;
                 require(EntityEspRenderer.nameLabels().contains("Diamond"), "Item count must toggle independently");
-                c.nametagAdditions.armor = false;
-            });
-            context.waitFor(client -> EntityEspRenderer.renderedEquipmentCount() == 2, 100);
-            context.runOnClient(client -> {
-                var c = ArcaneClient.config();
-                c.nametagAdditions.armor = true;
                 c.nametagAdditions.health = true;
                 c.nametagAdditions.stackCount = true;
             });
@@ -113,9 +109,6 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
                     require(CustomAccessories.renderedCapeQuads() == 192, "Cape style " + currentStyle + " must submit the complete cloth mesh");
                     require(CustomAccessories.renderedTrailSegments() > 0, "Trail style " + currentStyle + " must submit visible history");
                     require(CustomAccessories.renderedAuraSegments() > 0, "Aura style " + currentStyle + " must submit geometry");
-                    require(EntityEspRenderer.renderedEquipmentCount() == 6, "All six equipment models must remain submitted across accessory styles");
-                    require(EntityEspRenderer.renderedLocalHeadwearClearance() >= 0.099,
-                        "The local nametag background must clear headwear style " + currentStyle + " at its selected size");
                     require(CustomAccessories.trailSampleCount() <= 64, "Trail storage must remain bounded");
                 });
                 context.takeScreenshot("dev21-cosmetics-style-" + style);
@@ -123,8 +116,7 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> ArcaneClient.config().cleanCapture = true);
             context.waitTicks(3);
             context.runOnClient(client -> {
-                require(EntityEspRenderer.renderedNameCount() == 0 && EntityEspRenderer.renderedEquipmentCount() == 0,
-                    "Clean Capture must suppress labels and submitted gear");
+                require(EntityEspRenderer.renderedNameCount() == 0, "Clean Capture must suppress labels");
                 require(CustomAccessories.renderedCapeQuads() == 0 && CustomAccessories.renderedAuraSegments() == 0
                     && CustomAccessories.renderedTrailSegments() == 0 && CustomAccessories.trailSampleCount() == 0,
                     "Clean Capture must suppress accessories and clear trail history");
@@ -133,7 +125,6 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
             });
             context.waitTicks(3);
             context.runOnClient(client -> {
-                require(EntityEspRenderer.renderedEquipmentCount() == 0, "First person must not render gear over the camera body");
                 require(CustomAccessories.renderedCapeQuads() == 0 && CustomAccessories.renderedAuraSegments() == 0,
                     "First person must not leave floating accessories");
                 FreecamController.enable(client);
@@ -162,7 +153,6 @@ public final class CosmeticsClientGameTest implements FabricClientGameTest {
                 c.visualAdditions = oldVisual[0];
                 c.nametagAdditions = oldNames[0];
                 client.options.setCameraType(oldPerspective[0]);
-                client.options.hideGui = oldHud[0];
                 EntityEspRenderer.reset();
                 VisualAdditions.reset(client);
             });

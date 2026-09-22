@@ -26,7 +26,8 @@ public final class ChunkScannerClientGameTest implements FabricClientGameTest {
     public void runTest(ClientGameTestContext context) {
         context.getInput().resizeWindow(640, 360);
         try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-            singleplayer.getClientWorld().waitForChunksRender();
+            context.waitFor(client -> client.level != null && client.player != null
+                && client.levelRenderer.hasRenderedAllSections(), 5000);
             context.waitTicks(10);
             ScannerBenchmark benchmark = context.computeOnClient(client -> {
                 require(client.level != null && client.player != null, "scanner benchmark needs a loaded world");
@@ -36,7 +37,7 @@ public final class ChunkScannerClientGameTest implements FabricClientGameTest {
                 List<Sample> samples = new ArrayList<>();
                 for (int dz = -2; dz <= 2; ++dz) {
                     for (int dx = -2; dx <= 2; ++dx) {
-                        LevelChunk chunk = client.level.getChunkSource().getChunk(center.x + dx, center.z + dz, false);
+                        LevelChunk chunk = client.level.getChunkSource().getChunk(center.x() + dx, center.z() + dz, false);
                         if (chunk == null) continue;
                         BlockPos position = new BlockPos(chunk.getPos().getMinBlockX() + 8, sampleY, chunk.getPos().getMinBlockZ() + 8);
                         samples.add(new Sample(chunk, position, client.level.getBlockState(position)));

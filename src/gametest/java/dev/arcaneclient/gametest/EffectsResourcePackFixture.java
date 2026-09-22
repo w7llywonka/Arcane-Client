@@ -86,7 +86,7 @@ final class EffectsResourcePackFixture {
 
     private static void awaitReload(ClientGameTestContext context, CompletableFuture<?> reload) {
         require(reload != null, "QA resource reload did not start");
-        context.waitFor(client -> reload.isDone() && client.getOverlay() == null, 600);
+        context.waitFor(client -> reload.isDone() && client.gui.overlay() == null, 600);
         reload.join();
     }
 

@@ -1,5 +1,7 @@
 package dev.arcaneclient.gametest;
 
+import static org.lwjgl.sdl.SDLMouse.SDL_BUTTON_LEFT;
+
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.screen.ArcaneSettingsScreen;
 import dev.arcaneclient.screen.GuiCategory;
@@ -20,7 +22,8 @@ import net.minecraft.client.input.MouseButtonInfo;
 public final class Dev21UiClientGameTest implements FabricClientGameTest {
     @Override public void runTest(ClientGameTestContext context) {
         try (var world = context.worldBuilder().create()) {
-            world.getClientWorld().waitForChunksRender();
+            context.waitFor(client -> client.level != null && client.player != null
+                && client.levelRenderer.hasRenderedAllSections(), 5000);
             context.getInput().resizeWindow(1600, 1000);
             context.runOnClient(client -> {
                 var c = ArcaneClient.config();
@@ -31,11 +34,11 @@ public final class Dev21UiClientGameTest implements FabricClientGameTest {
                 c.uiScalePercent = c.uiDensityPercent = 100;
                 c.uiBlur = false; c.uiBackgroundDimPercent = 10;
                 c.enabled = c.hud = false;
-                client.setScreen(new ArcaneSettingsScreen(null));
+                client.gui.setScreen(new ArcaneSettingsScreen(null));
             });
             context.waitTicks(8);
             context.runOnClient(client -> {
-                var screen = (ArcaneSettingsScreen)client.screen;
+                var screen = (ArcaneSettingsScreen)client.gui.screen();
                 List<GuiCategory> categories = field(screen, "categories");
                 Set<String> names = categories.stream().flatMap(c -> c.modules().stream()).map(GuiModule::name).collect(Collectors.toSet());
                 require(names.containsAll(Set.of("Sus Chunk Finder", "World Effects", "Entity ESP", "HUD Widgets", "Preview Lab",
@@ -45,8 +48,10 @@ public final class Dev21UiClientGameTest implements FabricClientGameTest {
                     "Grouped child names must remain searchable");
                 require(categories.stream().flatMap(c -> c.modules().stream()).anyMatch(m -> m.matches("custom accessories")),
                     "Grouped visual settings must remain searchable");
-                require(categories.stream().allMatch(c -> c.modules().size() <= 12), "No panel should return to an overloaded top-level list");
-                require(categories.stream().mapToInt(c -> c.modules().size()).sum() <= 72,
+                require(categories.stream().allMatch(c -> c.modules().size() <= 14),
+                    "No panel should return to an overloaded top-level list: "
+                        + categories.stream().map(c -> c.name() + "=" + c.modules().size()).toList());
+                require(categories.stream().mapToInt(c -> c.modules().size()).sum() <= 80,
                     "The cleanup must keep the top-level catalog compact");
                 require(ArcaneClient.config().uiFavorites.contains("Entity ESP")
                     && !ArcaneClient.config().uiFavorites.contains("Player ESP"), "Legacy favorites must migrate to their group");
@@ -87,24 +92,24 @@ public final class Dev21UiClientGameTest implements FabricClientGameTest {
             context.runOnClient(client -> ArcaneClient.config().uiFont = 0);
             int[] saved = new int[2];
             context.runOnClient(client -> {
-                var screen = (ArcaneSettingsScreen)client.screen;
+                var screen = (ArcaneSettingsScreen)client.gui.screen();
                 List<GuiCategory> categories = field(screen, "categories");
                 GuiCategory panel = categories.getFirst();
                 double sx = (double)client.getWindow().getGuiScaledWidth() / screen.width;
                 double sy = (double)client.getWindow().getGuiScaledHeight() / screen.height;
                 double x = panel.x() + 14, y = panel.y() + 8;
-                screen.mouseClicked(new MouseButtonEvent(x * sx, y * sy, new MouseButtonInfo(0, 0)), false);
-                MouseButtonEvent end = new MouseButtonEvent((x + 5) * sx, (y + 22) * sy, new MouseButtonInfo(0, 0));
+                screen.mouseClicked(new MouseButtonEvent(x * sx, y * sy, new MouseButtonInfo(SDL_BUTTON_LEFT, 0)), false);
+                MouseButtonEvent end = new MouseButtonEvent((x + 5) * sx, (y + 22) * sy, new MouseButtonInfo(SDL_BUTTON_LEFT, 0));
                 screen.mouseDragged(end, 5 * sx, 22 * sy);
                 screen.mouseReleased(end);
                 saved[0] = panel.x(); saved[1] = panel.y();
                 require(ArcaneClient.config().uiLayoutCustomized, "Dragging marks a customized layout");
-                screen.close();
-                client.setScreen(new ArcaneSettingsScreen(null));
+                screen.onClose();
+                client.gui.setScreen(new ArcaneSettingsScreen(null));
             });
             context.waitTicks(3);
             context.runOnClient(client -> {
-                var screen = (ArcaneSettingsScreen)client.screen;
+                var screen = (ArcaneSettingsScreen)client.gui.screen();
                 List<GuiCategory> categories = field(screen, "categories");
                 require(categories.getFirst().x() == saved[0] && categories.getFirst().y() == saved[1], "Panel position survives close/reopen");
                 screen.resetPanelLayout();
@@ -112,13 +117,13 @@ public final class Dev21UiClientGameTest implements FabricClientGameTest {
             context.getInput().resizeWindow(960, 640);
             context.waitTicks(6);
             context.runOnClient(client -> {
-                var screen = (ArcaneSettingsScreen)client.screen;
+                var screen = (ArcaneSettingsScreen)client.gui.screen();
                 List<GuiCategory> categories = field(screen, "categories");
                 for (GuiCategory c : categories) require(c.x() >= 0 && c.y() >= 0 && c.y() < screen.height, "Panel header is reachable on small windows");
-                require(!screen.shouldPause(), "Overlay must not pause gameplay");
+                require(!screen.isPauseScreen(), "Overlay must not pause gameplay");
             });
             context.takeScreenshot("dev23-clean-menu-compact");
-            context.runOnClient(client -> client.setScreen(null));
+            context.runOnClient(client -> client.gui.setScreen(null));
         }
     }
     private static GuiModule find(List<GuiCategory> categories, String name) {

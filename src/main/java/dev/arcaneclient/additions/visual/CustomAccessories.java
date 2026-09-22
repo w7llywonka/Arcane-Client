@@ -127,12 +127,22 @@ public final class CustomAccessories {
         if (body == null || body.isRemoved() || body.isInvisibleTo(client.player)) return;
         if (body == client.getCameraEntity() && client.options.getCameraType().isFirstPerson()
             && !FreecamController.isActive()) return;
-        AvatarRenderState state = null;
-        for (EntityRenderState candidate : context.levelState().entityRenderStates) {
-            if (candidate instanceof AvatarRenderState player && player.id == body.getId()) {
-                state = player;
-                break;
+        AvatarRenderState state = body == client.player && context.levelState().playerRenderState.hasPlayer
+            ? context.levelState().playerRenderState.avatarRenderState : null;
+        if (state == null || state.id != body.getId()) {
+            state = null;
+            for (EntityRenderState candidate : context.levelState().entityRenderStates) {
+                if (candidate instanceof AvatarRenderState player && player.id == body.getId()) {
+                    state = player;
+                    break;
+                }
             }
+        }
+        // The detached visual body mirrors the local player, but 26.3 may keep that
+        // client-only entity out of the collected entity-state list. The dedicated
+        // local avatar state is still authoritative for its position and pose.
+        if (state == null && FreecamController.isActive() && context.levelState().playerRenderState.hasPlayer) {
+            state = context.levelState().playerRenderState.avatarRenderState;
         }
         // Don't leave a floating accessory when vanilla hides/culls the body or changes its pose.
         if (state == null || !wearable(state)) return;
@@ -153,9 +163,7 @@ public final class CustomAccessories {
                 (pose, lines) -> trailLines(pose, lines, submittedState, config, camera, partial, time));
         }
         if (config.accessoryAura) {
-            int before = submittedLines;
             aura(context, matrices, state, config, camera, time);
-            renderedAuraSegments = submittedLines - before;
         }
         if (!config.headAccessory) return;
         matrices.pushPose();
@@ -283,7 +291,8 @@ public final class CustomAccessories {
                 state.z - camera.z + offset.z);
             double radius = Math.clamp(c.auraRadius, 40, 180) / 100.0 * state.scale;
             context.submitNodeCollector().submitCustomGeometry(matrices, RenderTypes.lines(), (pose, lines) -> {
-            if (c.auraStyle == 1) {
+                int before = submittedLines;
+                if (c.auraStyle == 1) {
                 ring(pose, lines, radius, 0.035, time * 0.008, alpha(c.auraColor, 175));
                 for (int i = 0; i < 8; i++) {
                     double angle = i * Math.PI / 4 + time * 0.008;
@@ -292,13 +301,13 @@ public final class CustomAccessories {
                     segment(pose, lines, x - tx, 0.045, z - tz, x, 0.18, z, c.auraColor);
                     segment(pose, lines, x, 0.18, z, x + tx, 0.045, z + tz, c.auraColor);
                 }
-            } else if (c.auraStyle == 2) {
+                } else if (c.auraStyle == 2) {
                 for (int i = 0; i < 2; i++) {
                     double phase = (time / 48.0 + i * 0.5) % 1;
                     ring(pose, lines, radius * (0.7 + phase * 0.3), 0.035, 0,
                         alpha(c.auraColor, (int)(165 * Math.sin(phase * Math.PI))));
                 }
-            } else {
+                } else {
                 for (int i = 0; i < 2; i++) {
                     double phase = time * 0.025 + i * Math.PI;
                     double x = Math.cos(phase) * radius, z = Math.sin(phase) * radius;
@@ -315,7 +324,8 @@ public final class CustomAccessories {
                             alpha(c.auraColor, 175 - tail * 12));
                     }
                 }
-            }
+                }
+                renderedAuraSegments = submittedLines - before;
             });
         } finally {
             matrices.popPose();
