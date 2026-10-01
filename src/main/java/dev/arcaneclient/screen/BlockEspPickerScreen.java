@@ -83,7 +83,7 @@ public final class BlockEspPickerScreen extends Screen {
         panelY = (height - panelHeight) / 2;
         int innerWidth = panelWidth - 24;
         int left = panelX + 12;
-        int filterWidth = 94;
+        int filterWidth = 108;
         search = new EditBox(font, left + 7, panelY + 51,
             innerWidth - filterWidth - 20, 12, Component.literal("Search blocks by name or registry ID"));
         search.setBordered(false);
@@ -160,15 +160,15 @@ public final class BlockEspPickerScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         ClickGuiColors colors = theme();
         context.fill(0, 0, width, height, colors.backdrop());
-        RoundedGui.fill(context, panelX, panelY, panelWidth, panelHeight, 7, colors.window());
-        RoundedGui.outlineOnly(context, panelX, panelY, panelWidth, panelHeight, 7, colors.outline());
+        RoundedGui.fill(context, panelX, panelY, panelWidth, panelHeight, 10, colors.window());
+        RoundedGui.outlineOnly(context, panelX, panelY, panelWidth, panelHeight, 10, colors.outline());
         label(context, "Choose blocks", panelX + 12, panelY + 13, colors.text());
         label(context, heading, panelX + panelWidth - 12 - ArcaneFont.width(font, heading),
-            panelY + 13, colors.accentBright());
+            panelY + 13, colors.muted());
         context.text(font, ArcaneFont.trimmed(font, description.get(), panelWidth - 24),
             panelX + 12, panelY + 30, colors.muted(), false);
-        RoundedGui.fill(context, panelX + 12, panelY + 46, panelWidth - 124, 22, 4, colors.nest());
-        RoundedGui.outlineOnly(context, panelX + 12, panelY + 46, panelWidth - 124, 22, 4,
+        RoundedGui.fill(context, panelX + 12, panelY + 46, search.getWidth() + 14, 22, 6, colors.nest());
+        RoundedGui.outlineOnly(context, panelX + 12, panelY + 46, search.getWidth() + 14, 22, 6,
             search.isFocused() ? colors.accentDim() : colors.outlineSoft());
         String count = selectedBlocks.get().size() + " selected  /  " + filtered.size() + " shown";
         label(context, count, panelX + 12, panelY + panelHeight - 45, colors.muted());
@@ -236,11 +236,11 @@ public final class BlockEspPickerScreen extends Screen {
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             ClickGuiColors colors = theme();
-            boolean highlighted = isHovered() || isFocused();
+            boolean highlighted = active && (isHovered() || isFocused());
             int background = selected.getAsBoolean() ? (highlighted ? colors.activeHover() : colors.active())
                 : highlighted ? colors.hover() : colors.nest();
-            RoundedGui.fill(context, getX(), getY(), getWidth(), getHeight(), 4, background);
-            RoundedGui.outlineOnly(context, getX(), getY(), getWidth(), getHeight(), 4,
+            RoundedGui.fill(context, getX(), getY(), getWidth(), getHeight(), 6, background);
+            RoundedGui.outlineOnly(context, getX(), getY(), getWidth(), getHeight(), 6,
                 isFocused() ? colors.accentBright() : colors.outlineSoft());
             String text = label.get();
             setMessage(ArcaneFont.text(text));
@@ -283,8 +283,8 @@ public final class BlockEspPickerScreen extends Screen {
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
             ClickGuiColors colors = theme();
-            RoundedGui.fill(context, getX(), getY(), getWidth(), getHeight(), 4, colors.nest());
-            RoundedGui.outlineOnly(context, getX(), getY(), getWidth(), getHeight(), 4,
+            RoundedGui.fill(context, getX(), getY(), getWidth(), getHeight(), 6, colors.nest());
+            RoundedGui.outlineOnly(context, getX(), getY(), getWidth(), getHeight(), 6,
                 isFocused() ? colors.accentDim() : colors.outlineSoft());
             int first = (int) scroll / ROW_HEIGHT;
             int bottom = getY() + getHeight();
@@ -298,12 +298,12 @@ public final class BlockEspPickerScreen extends Screen {
                 boolean hovering = mouseX >= getX() && mouseX < getX() + rowWidth
                     && mouseY >= Math.max(y, getY()) && mouseY < Math.min(y + ROW_HEIGHT, bottom);
                 if (selected || hovering || isFocused() && index == cursor) {
-                    RoundedGui.fill(context, getX() + 2, y + 1, rowWidth - 3, ROW_HEIGHT - 2, 3,
+                    RoundedGui.fill(context, getX() + 2, y + 1, rowWidth - 3, ROW_HEIGHT - 2, 5,
                         selected ? colors.active() : colors.hover());
                 }
                 if (isFocused() && index == cursor) {
                     RoundedGui.outlineOnly(context, getX() + 2, y + 1, rowWidth - 3, ROW_HEIGHT - 2,
-                        3, colors.accentDim());
+                        5, colors.accentDim());
                 }
                 if (!entry.stack().isEmpty()) {
                     context.item(entry.stack(), getX() + 7, y + 8);

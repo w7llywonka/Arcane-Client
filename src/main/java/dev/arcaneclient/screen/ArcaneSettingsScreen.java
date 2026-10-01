@@ -153,7 +153,7 @@ public final class ArcaneSettingsScreen extends Screen {
         }
 
         int searchWidth = searchWidth();
-        this.searchInput = new EditBox(font(), searchX(searchWidth), 14, searchWidth, 11, Component.literal("Search modules"));
+        this.searchInput = new EditBox(font(), searchX(searchWidth), 17, searchWidth, 11, Component.literal("Search modules"));
         this.searchInput.setBordered(false);
         this.searchInput.setTextShadow(false);
         this.searchInput.setMaxLength(48);
@@ -420,9 +420,11 @@ public final class ArcaneSettingsScreen extends Screen {
         for (GuiCategory category : this.windowOrder) {
             if (!categoryVisible(category)) continue;
             boolean[] categoryMacros = new boolean[MACRO_COUNT];
-            layout(category);
-            clamp(category);
             List<Row> rows = layout(category);
+            int previousX = category.x(), previousY = category.y();
+            clamp(category);
+            // Stationary panels can reuse their rows; a clamp changes the coordinates in the list.
+            if (category.x() != previousX || category.y() != previousY) rows = layout(category);
             drawWindowBody(graphics, category, theme);
             if (windowContains(category, mouseX, mouseY)) this.hoveredModule = null;
             for (Row row : rows) {
@@ -437,6 +439,7 @@ public final class ArcaneSettingsScreen extends Screen {
                     category.x() + windowWidth(),
                     category.y() + category.lastHeight() - bodyPad()
                 );
+                drawSettingsBackgrounds(graphics, rows, theme);
                 for (Row row : rows) {
                     if (row.kind() != RowKind.HEADER && rowVisible(row)) {
                         drawRow(graphics, row, mouseX, mouseY, theme, categoryMacros);
@@ -520,19 +523,31 @@ public final class ArcaneSettingsScreen extends Screen {
     private void drawWindowBody(GuiGraphicsExtractor graphics, GuiCategory category, ClickGuiColors theme) {
         int x = category.x(), y = category.y(), h = category.lastHeight(), radius = windowRadius();
         if (VectorUi.recording()) {
-            VectorUi.shadow(x, y + 1, windowWidth(), h, radius, 5, 0x42000000);
+            VectorUi.shadow(x, y + 2, windowWidth(), h, radius, 7, 0x48000000);
             RoundedGui.fill(graphics, x, y, windowWidth(), h, radius, theme.window());
             VectorUi.pushClip(x, y, windowWidth(), headerHeight());
             VectorUi.gradient(x, y, windowWidth(), headerHeight() + (category.open() ? radius : 0), radius,
-                mixColor(theme.header(), theme.accent(), 0.055f), theme.header());
+                mixColor(theme.header(), theme.text(), 0.025f), theme.header());
             VectorUi.popClip();
         } else {
-            RoundedGui.fill(graphics, x - 2, y + 2, windowWidth() + 4, h + 2, radius + 2, 0x3A000000);
+            RoundedGui.fill(graphics, x + 1, y + 2, windowWidth(), h, radius, 0x30000000);
             RoundedGui.fill(graphics, x, y, windowWidth(), h, radius, theme.window());
-            RoundedGui.fill(graphics, x, y, windowWidth(), headerHeight(), radius, theme.header());
+            UiDraw.enableScissor(graphics, x, y, x + windowWidth(), y + headerHeight());
+            RoundedGui.fill(graphics, x, y, windowWidth(), headerHeight() + (category.open() ? radius : 0), radius, theme.header());
+            UiDraw.disableScissor(graphics);
         }
-        RoundedGui.outlineOnly(graphics, x, y, windowWidth(), h, radius, withAlpha(theme.text(), 20));
-        RoundedGui.fill(graphics, x + 8, y, Math.max(14, windowWidth() / 4), 1, 1, withAlpha(theme.accentBright(), 185));
+        RoundedGui.outlineOnly(graphics, x, y, windowWidth(), h, radius, theme.outline());
+    }
+
+    private void drawSettingsBackgrounds(GuiGraphicsExtractor graphics, List<Row> rows, ClickGuiColors theme) {
+        for (Row row : rows) {
+            GuiModule module = row.module();
+            if (row.kind() != RowKind.MODULE || module == null || !module.expanded() || !module.hasSettings()) continue;
+            int height = NEST_PAD;
+            for (GuiSetting setting : module.settings()) height += settingHeight(setting);
+            RoundedGui.fill(graphics, row.x() + 7, row.y() + row.height(), row.width() - 14, height,
+                Math.min(5, windowRadius()), theme.nest());
+        }
     }
 
     private void drawRow(GuiGraphicsExtractor graphics, Row row, int mouseX, int mouseY, ClickGuiColors theme, boolean[] macroDrawn) {
@@ -551,20 +566,18 @@ public final class ArcaneSettingsScreen extends Screen {
         GuiCategory category = row.category();
         int x = row.x(), y = row.y(), width = row.width();
         if (row.contains(mouseX, mouseY))
-            RoundedGui.fill(graphics, x + 3, y + 3, width - 6, headerHeight() - 6, 5, withAlpha(theme.accent(), 24));
+            RoundedGui.fill(graphics, x + 3, y + 3, width - 6, headerHeight() - 6, 5, withAlpha(theme.text(), 10));
         String title = category.name().equals("ESP") ? "ESP"
             : category.name().substring(0, 1) + category.name().substring(1).toLowerCase(Locale.ROOT);
-        int iconY = y + (headerHeight() - 13) / 2;
-        RoundedGui.fill(graphics, x + 5, iconY, 13, 13, 4, withAlpha(theme.accent(), 28));
-        RoundedGui.outlineOnly(graphics, x + 5, iconY, 13, 13, 4, withAlpha(theme.accentBright(), 45));
-        UiIcons.category(graphics, category.name(), x + 7, y + (headerHeight() - 9) / 2, theme.accentBright());
-        FormattedCharSequence categoryLabel = ArcaneFont.trimmed(font(), title, width - 35);
-        UiDraw.textSized(graphics, font(), categoryLabel, x + 22, y + (headerHeight() - 9) / 2,
-            8.25f, theme.text(), false);
+        UiIcons.category(graphics, category.name(), x + 8, y + (headerHeight() - 9) / 2, theme.muted());
+        FormattedCharSequence categoryLabel = ArcaneFont.trimmed(font(), title,
+            Math.max(1, (int)((width - 37) * UiDraw.FONT_SIZE / 8.0f)));
+        UiDraw.textSized(graphics, font(), categoryLabel, x + 23, y + (headerHeight() - 9) / 2,
+            8.0f, theme.text(), false);
         if (category.open()) {
             if (VectorUi.recording()) VectorUi.line(x + 1, y + headerHeight() - 0.5f, x + width - 1,
-                y + headerHeight() - 0.5f, 0.75f, withAlpha(theme.text(), 24));
-            else UiDraw.fill(graphics, x + 1, y + headerHeight() - 1, x + width - 1, y + headerHeight(), withAlpha(theme.text(), 24));
+                y + headerHeight() - 0.5f, 0.65f, theme.outlineSoft());
+            else UiDraw.fill(graphics, x + 1, y + headerHeight() - 1, x + width - 1, y + headerHeight(), theme.outlineSoft());
         }
         if (category.open()) drawCaretDown(graphics, x + width - 11, y + (headerHeight() - 5) / 2, theme.muted());
         else drawCaretRight(graphics, x + width - 10, y + (headerHeight() - 5) / 2, theme.muted());
@@ -585,16 +598,14 @@ public final class ArcaneSettingsScreen extends Screen {
 
         float hoverAmount = animatedHover(module, hovered);
         float enabledAmount = animatedEnabled(module, enabled);
-        int baseBackground = mixColor(withAlpha(theme.text(), 5), withAlpha(theme.accent(), 28), enabledAmount);
+        int baseBackground = mixColor(withAlpha(theme.row(), 0), withAlpha(theme.accent(), 18), enabledAmount);
         int hoverBackground = enabled ? theme.activeHover() : theme.hover();
         int background = mixColor(baseBackground, hoverBackground, hoverAmount);
         RoundedGui.fill(graphics, x + 4, y + 1, row.width() - 8, row.height() - 2, Math.min(4, windowRadius()), background);
-        if (enabledAmount > 0.01f) {
-            RoundedGui.fill(graphics, x + 4, y + 4, 2, Math.max(2, row.height() - 8), 1,
-                withAlpha(theme.accentBright(), Math.round(225 * enabledAmount)));
+        if (module.expanded()) {
+            RoundedGui.outlineOnly(graphics, x + 4, y + 1, row.width() - 8, row.height() - 2,
+                Math.min(4, windowRadius()), withAlpha(theme.accent(), 65));
         }
-        UiDraw.fill(graphics, x + 10, y + row.height() - 1, x + row.width() - 10, y + row.height(),
-            withAlpha(theme.text(), enabled ? 10 : 7));
 
         int textY = y + (row.height() - lineHeight()) / 2;
         int right = x + row.width() - 10;
@@ -602,7 +613,7 @@ public final class ArcaneSettingsScreen extends Screen {
             int toggleX = x + row.width() - 24;
             int toggleY = y + (row.height() - 8) / 2;
             RoundedGui.fill(graphics, toggleX, toggleY, 16, 8, 4,
-                mixColor(withAlpha(theme.text(), 27), withAlpha(theme.accent(), 180), enabledAmount));
+                mixColor(withAlpha(theme.text(), 32), withAlpha(theme.accent(), 205), enabledAmount));
             RoundedGui.outlineOnly(graphics, toggleX, toggleY, 16, 8, 4,
                 withAlpha(enabled ? theme.accentBright() : theme.text(), enabled ? 75 : 24));
             RoundedGui.fill(graphics, toggleX + 1 + Math.round(8 * enabledAmount), toggleY + 1, 6, 6, 3,
@@ -658,11 +669,9 @@ public final class ArcaneSettingsScreen extends Screen {
         boolean groupHeader = setting instanceof GuiSetting.Toggle toggle && toggle.groupHeader();
         boolean hovered = row.contains(mouseX, mouseY) && !section;
 
-        if (!section) {
-            int background = groupHeader ? mixColor(theme.nest(), withAlpha(theme.accent(), 28), 0.45f) : theme.nest();
-            RoundedGui.fill(graphics, x + 7, y + 1, row.width() - 14, height - 2, 4, background);
-            RoundedGui.fill(graphics, x + 7, y + 3, groupHeader ? 2 : 1, Math.max(1, height - 6), 1,
-                withAlpha(theme.accent(), groupHeader ? 155 : 70));
+        if (groupHeader) {
+            RoundedGui.fill(graphics, x + 8, y + 1, row.width() - 16, height - 2, 3,
+                withAlpha(theme.text(), 8));
         }
         if (hovered && !(setting instanceof GuiSetting.Info)) {
             RoundedGui.fill(graphics, x + 8, y + 1, row.width() - 15, height - 2, 4, theme.hover());
@@ -676,7 +685,7 @@ public final class ArcaneSettingsScreen extends Screen {
             font(), setting.label(), UiGeometry.labelWidth(labelX, labelRight)
         );
         UiDraw.textSized(graphics, font(), settingLabel, labelX, textY, section ? 5.75f : 6.25f,
-            section || groupHeader ? theme.accentBright() : theme.muted(), false);
+            groupHeader ? theme.text() : theme.muted(), false);
 
         switch (setting) {
             case GuiSetting.Section ignored -> UiDraw.fill(graphics,
@@ -698,7 +707,7 @@ public final class ArcaneSettingsScreen extends Screen {
                 if (filled > 0) {
                     fillRounded(graphics, trackX, trackY, filled, 3, theme.accent());
                 }
-                RoundedGui.fill(graphics, trackX + Math.clamp(filled - 3, 0, trackWidth - 7), trackY - 2, 7, 7, 3, theme.accentBright());
+                RoundedGui.fill(graphics, trackX + Math.clamp(filled - 3, 0, trackWidth - 7), trackY - 2, 7, 7, 3, theme.text());
             }
             case GuiSetting.Swatch swatch -> drawSwatch(graphics, right - 22, y + (height - 9) / 2, 22, swatch.color(), theme);
             case GuiSetting.Cycle cycle -> {
@@ -781,22 +790,20 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private void drawTopBar(GuiGraphicsExtractor graphics, ClickGuiColors theme) {
-        RoundedGui.fill(graphics, 8, 10, 18, 18, 6, withAlpha(theme.accent(), 215));
-        RoundedGui.outlineOnly(graphics, 8, 10, 18, 18, 6, withAlpha(theme.accentBright(), 110));
-        UiDraw.textSized(graphics, font(), ArcaneFont.text("A"), 14, 15, 8.0f, theme.text(), false);
-        UiDraw.textSized(graphics, font(), ArcaneFont.text("Arcane"), 31, 15, 9.0f, theme.text(), false);
+        RoundedGui.fill(graphics, 7, 10, DEV_BUILD ? 90 : 67, 22, 7, theme.bar());
+        RoundedGui.outlineOnly(graphics, 7, 10, DEV_BUILD ? 90 : 67, 22, 7, theme.outlineSoft());
+        UiDraw.textSized(graphics, font(), ArcaneFont.text("A"), 14, 17, 8.0f, theme.accentBright(), false);
+        UiDraw.textSized(graphics, font(), ArcaneFont.text("Arcane"), 28, 17, 9.0f, theme.text(), false);
         if (DEV_BUILD) {
-            RoundedGui.fill(graphics, 68, 13, 22, 12, 5, withAlpha(theme.accent(), 28));
-            RoundedGui.outlineOnly(graphics, 68, 13, 22, 12, 5, withAlpha(theme.accentBright(), 42));
-            UiDraw.textSized(graphics, font(), ArcaneFont.text("DEV"), 73, 16, 5.5f, theme.accentBright(), false);
+            UiDraw.textSized(graphics, font(), ArcaneFont.text("DEV"), 74, 18, 5.5f, theme.muted(), false);
         }
         if (this.searchInput != null && this.searchInput.visible) {
             int x = searchX(searchWidth());
-            RoundedGui.fill(graphics, x - 13, 10, searchWidth() + 20, 18, 7, theme.window());
-            RoundedGui.outlineOnly(graphics, x - 13, 10, searchWidth() + 20, 18, 7,
-                withAlpha(this.searchInput.isFocused() ? theme.accent() : theme.text(), this.searchInput.isFocused() ? 170 : 22));
-            RoundedGui.outlineOnly(graphics, x - 9, 15, 4, 4, 2, theme.muted());
-            smoothStroke(graphics, x - 5, 19, 2, (float)Math.PI / 4, theme.muted());
+            RoundedGui.fill(graphics, x - 16, 10, searchWidth() + 24, 22, 7, theme.bar());
+            RoundedGui.outlineOnly(graphics, x - 16, 10, searchWidth() + 24, 22, 7,
+                this.searchInput.isFocused() ? withAlpha(theme.accent(), 145) : theme.outlineSoft());
+            RoundedGui.outlineOnly(graphics, x - 10, 18, 4, 4, 2, theme.muted());
+            smoothStroke(graphics, x - 6, 22, 2, (float)Math.PI / 4, theme.muted());
         }
         if (this.width >= 520) {
             drawFilterChip(graphics, this.width - 116, 50, "Enabled", this.config.uiShowEnabledOnly, theme);
@@ -814,7 +821,8 @@ public final class ArcaneSettingsScreen extends Screen {
     private void drawBottomBar(GuiGraphicsExtractor graphics, ClickGuiColors theme) {
         int y = this.height - BOTTOM_BAR_HEIGHT;
         String hint = this.listeningFor != null ? "Press a key · Esc to unbind"
-            : this.hoveredModule != null ? "Right click settings · Shift-click favorite" : "";
+            : this.hoveredModule != null ? "Right click settings · Shift-click favorite"
+            : "Drag headers · Right click settings · Ctrl+F search";
         if (!hint.isEmpty()) {
             int reserved = this.width < 520 ? 190 : 110;
             FormattedCharSequence hintText = ArcaneFont.trimmed(font(), hint, Math.max(0, this.width - reserved));
@@ -829,8 +837,9 @@ public final class ArcaneSettingsScreen extends Screen {
         RoundedGui.outlineOnly(graphics, this.width - 98, y, 45, 16, 6, withAlpha(theme.text(), 18));
         UiDraw.text(graphics, font(), ArcaneFont.text("Configs"), this.width - 91, y + 4, theme.muted(), false);
         RoundedGui.fill(graphics, this.width - 48, y, 42, 16, 6, theme.bar());
-        RoundedGui.outlineOnly(graphics, this.width - 48, y, 42, 16, 6, withAlpha(theme.accent(), 34));
-        UiDraw.text(graphics, font(), ArcaneFont.text("Themes"), this.width - 40, y + 4, theme.accentBright(), false);
+        RoundedGui.outlineOnly(graphics, this.width - 48, y, 42, 16, 6, theme.outlineSoft());
+        UiDraw.text(graphics, font(), ArcaneFont.text("Themes"), this.width - 40, y + 4,
+            this.themePanel.isOpen() ? theme.accentBright() : theme.muted(), false);
         if (this.filteringActive && this.width >= 520) {
             String results = visibleModuleCount() + " results";
             UiDraw.textSized(graphics, font(), ArcaneFont.text(results), this.width - 159, y + 5, 6.25f, theme.muted(), false);
@@ -870,11 +879,10 @@ public final class ArcaneSettingsScreen extends Screen {
         RoundedGui.fill(graphics, x + 2, y + 2, width, height, Math.min(7, windowRadius()), 0x60000000);
         RoundedGui.fill(graphics, x, y, width, height, Math.min(7, windowRadius()), theme.bar());
         RoundedGui.outlineOnly(graphics, x, y, width, height, Math.min(7, windowRadius()), theme.outline());
-        UiDraw.fill(graphics, x + 1, y + 1, x + 3, y + height - 1, theme.accent());
         UiDraw.text(graphics, font(), ArcaneFont.text(module.name()), x + 8, y + 6, theme.text(), false);
         int lineY = y + 9 + lineHeight();
         for (String line : lines) {
-            UiDraw.text(graphics, font(), ArcaneFont.text(line), x + 8, lineY, theme.faint(), false);
+            UiDraw.text(graphics, font(), ArcaneFont.text(line), x + 8, lineY, theme.muted(), false);
             lineY += proseHeight();
         }
     }
@@ -915,7 +923,7 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private static void drawCheckbox(GuiGraphicsExtractor graphics, int x, int y, boolean checked, ClickGuiColors theme) {
-        RoundedGui.fill(graphics, x + 2, y + 1, 7, 7, 2, checked ? theme.accent() : 0xFF24202D);
+        RoundedGui.fill(graphics, x + 2, y + 1, 7, 7, 2, checked ? theme.accent() : withAlpha(theme.text(), 22));
         if (checked) {
             smoothStroke(graphics, x + 3, y + 4, 2, (float)Math.PI / 4, theme.text());
             smoothStroke(graphics, x + 4, y + 6, 4, -(float)Math.PI / 4, theme.text());
@@ -1416,7 +1424,7 @@ public final class ArcaneSettingsScreen extends Screen {
             return;
         }
         float seconds = Math.min(0.1f, elapsed / 1_000_000_000.0f);
-        this.animationStep = Math.clamp(seconds * 14.0f * this.config.uiAnimationPercent / 100.0f, 0.0f, 1.0f);
+        this.animationStep = 1.0f - (float)Math.exp(-seconds * 14.0f * this.config.uiAnimationPercent / 100.0f);
     }
 
     private float animatedHover(GuiModule module, boolean hovered) {
@@ -1585,7 +1593,7 @@ public final class ArcaneSettingsScreen extends Screen {
     }
 
     private int searchWidth() {
-        return Math.min(120, Math.max(76, this.width - 160));
+        return Math.min(164, Math.max(76, this.width - 240));
     }
 
     private int searchX(int searchWidth) {
@@ -1596,7 +1604,7 @@ public final class ArcaneSettingsScreen extends Screen {
         if (this.searchInput == null) return;
         int width = searchWidth();
         this.searchInput.setX(searchX(width));
-        this.searchInput.setY(14);
+        this.searchInput.setY(17);
         this.searchInput.setWidth(width);
         // Never strand an active filter during a resize: a populated search remains reachable.
         boolean visible = this.width >= SEARCH_MIN_SCREEN_WIDTH || !this.query.isEmpty() || this.searchShortcutFocused;

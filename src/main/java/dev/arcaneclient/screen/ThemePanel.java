@@ -68,21 +68,25 @@ public final class ThemePanel {
         if (!this.open) return;
         if (this.knownAccent != this.config.uiAccentColor) syncAccent();
         ClickGuiColors colors = ClickGuiColors.display(this.config);
-        RoundedGui.fill(graphics, this.x + 2, this.y + 3, WIDTH, HEIGHT, 6, 0x42000000);
-        RoundedGui.fill(graphics, this.x, this.y, WIDTH, HEIGHT, 6, colors.window());
-        RoundedGui.outlineOnly(graphics, this.x, this.y, WIDTH, HEIGHT, 6, colors.outlineSoft());
+        int radius = Math.clamp(this.config.uiCornerRadius, 0, 12);
+        if (VectorUi.recording()) VectorUi.shadow(this.x, this.y + 2, WIDTH, HEIGHT, radius, 7, 0x48000000);
+        else RoundedGui.fill(graphics, this.x + 2, this.y + 3, WIDTH, HEIGHT, radius, 0x42000000);
+        RoundedGui.fill(graphics, this.x, this.y, WIDTH, HEIGHT, radius, colors.window());
+        RoundedGui.outlineOnly(graphics, this.x, this.y, WIDTH, HEIGHT, radius, colors.outline());
         text(graphics, "Themes", 9, 6, colors.text());
         text(graphics, "×", WIDTH - 13, 5, colors.muted());
-        UiDraw.fill(graphics, this.x + 8, this.y + HEADER - 1, this.x + WIDTH - 8, this.y + HEADER, colors.accentDim());
+        UiDraw.fill(graphics, this.x + 8, this.y + HEADER - 1, this.x + WIDTH - 8, this.y + HEADER, colors.outlineSoft());
 
         for (int i = 0; i < 6; i++) {
             ClickGuiTheme preset = ClickGuiTheme.fromConfig(i);
             int rowY = HEADER + i * ROW;
-            if (hit(mouseX, mouseY, 4, rowY, WIDTH - 8, ROW))
-                RoundedGui.fill(graphics, this.x + 4, this.y + rowY, WIDTH - 8, ROW, 3, colors.hover());
-            radio(graphics, 10, rowY + 4, !this.config.customUiColors && this.config.uiTheme == i, preset.accent());
+            boolean selected = !this.config.customUiColors && this.config.uiTheme == i;
+            if (selected || hit(mouseX, mouseY, 4, rowY, WIDTH - 8, ROW))
+                RoundedGui.fill(graphics, this.x + 4, this.y + rowY, WIDTH - 8, ROW, 3,
+                    selected ? colors.active() : colors.hover());
+            radio(graphics, 10, rowY + 4, selected, preset.accent());
             String name = preset.label().substring(0, 1) + preset.label().substring(1).toLowerCase(Locale.ROOT);
-            text(graphics, name, 22, rowY + 3, colors.muted());
+            text(graphics, name, 22, rowY + 3, selected ? colors.text() : colors.muted());
             RoundedGui.fill(graphics, this.x + WIDTH - 17, this.y + rowY + 4, 6, 6, 3, preset.accent());
         }
         radio(graphics, 10, CUSTOM_Y + 4, this.config.customUiColors, this.config.uiAccentColor);
