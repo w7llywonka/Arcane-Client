@@ -78,15 +78,17 @@ public final class TextSettingsScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor draw, int mouseX, int mouseY, float delta) {
         ClickGuiColors c = colors();
         draw.fill(0, 0, width, height, c.backdrop());
-        RoundedGui.fill(draw, x, y, w, h, 7, c.window());
-        RoundedGui.outlineOnly(draw, x, y, w, h, 7, c.outline());
+        RoundedGui.fill(draw, x, y, w, h, 10, c.window());
+        RoundedGui.outlineOnly(draw, x, y, w, h, 10, c.outline());
         label(draw, title.getString(), x + 12, y + 13, c.text());
         label(draw, note, x + 12, y + 29, c.muted());
         for (int i = 0; i < inputs.size(); i++) {
             Field field = fields.get(page * pageSize + i);
             int row = y + 47 + i * 53;
-            label(draw, field.label(), x + 12, row, c.accentBright());
-            RoundedGui.fill(draw, x + 12, row + 12, w - 24, 22, 4, c.nest());
+            label(draw, field.label(), x + 12, row, c.text());
+            RoundedGui.fill(draw, x + 12, row + 12, w - 24, 22, 6, c.nest());
+            RoundedGui.outlineOnly(draw, x + 12, row + 12, w - 24, 22, 6,
+                inputs.get(i).isFocused() ? c.accentDim() : c.outlineSoft());
             label(draw, field.hint(), x + 12, row + 37, c.faint());
         }
         super.extractRenderState(draw, mouseX, mouseY, delta);
@@ -107,9 +109,15 @@ public final class TextSettingsScreen extends Screen {
         }
         @Override protected void extractWidgetRenderState(GuiGraphicsExtractor draw, int mouseX, int mouseY, float delta) {
             var c = colors();
-            RoundedGui.fill(draw, getX(), getY(), getWidth(), getHeight(), 4,
-                isHovered() || isFocused() ? c.activeHover() : c.nest());
-            draw.text(font, getMessage(), getX() + 9, getY() + 6, active ? c.text() : c.faint(), false);
+            boolean primary = getMessage().getString().equals("Save");
+            boolean highlighted = active && (isHovered() || isFocused());
+            RoundedGui.fill(draw, getX(), getY(), getWidth(), getHeight(), 6,
+                primary ? (highlighted ? c.activeHover() : c.active()) : highlighted ? c.hover() : c.nest());
+            RoundedGui.outlineOnly(draw, getX(), getY(), getWidth(), getHeight(), 6,
+                isFocused() ? c.accentBright() : c.outlineSoft());
+            var label = ArcaneFont.trimmed(font, getMessage().getString(), getWidth() - 12);
+            draw.text(font, label, getX() + (getWidth() - ArcaneFont.width(font, label)) / 2,
+                getY() + 6, active ? c.text() : c.faint(), false);
         }
         @Override public void onClick(MouseButtonEvent click, boolean doubled) { action.run(); }
         @Override public boolean keyPressed(KeyEvent input) {

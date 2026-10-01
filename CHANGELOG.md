@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Polish the in-game interface with calmer charcoal surfaces, softer accents, consistent rounded controls, aligned search tools, and clearer nested settings. Match the welcome, config library, text editor, and ESP pickers to the same style.
+- Smooth hover and toggle transitions across frame rates and reuse category rows when panel positions do not change, reducing menu layout allocations.
+- Add real-client regressions for slider bounds, nested toggles, theme controls, reduced motion, and the native rendering fallback while retaining saved-layout and search coverage.
+
 ## 2.9.4+mc26.3
 
 - Update the public client, tests, assets, and build configuration for Minecraft 26.3, Java 25, Fabric Loader 0.19.5, and Fabric API 0.160.6+26.3.

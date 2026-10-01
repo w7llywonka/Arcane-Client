@@ -168,14 +168,14 @@ public final class ConfigLibraryScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor draw, int mouseX, int mouseY, float delta) {
         var c = colors();
         draw.fill(0, 0, width, height, c.backdrop());
-        RoundedGui.fill(draw, x, y, w, h, 7, c.window());
-        RoundedGui.outlineOnly(draw, x, y, w, h, 7, c.outline());
+        RoundedGui.fill(draw, x, y, w, h, 10, c.window());
+        RoundedGui.outlineOnly(draw, x, y, w, h, 10, c.outline());
         String heading = switch (mode) {
             case LIBRARY -> "Config library"; case IMPORT -> "Import a profile"; case REVIEW -> "Review changes";
             case RENAME -> "Rename preset"; case DELETE -> "Delete preset?";
         };
         label(draw, heading, x + 12, y + 13, w - 110, c.text());
-        label(draw, "LOCAL JSON", x + w - 79, y + 13, 68, c.accentBright());
+        label(draw, "Local presets", x + w - 92, y + 13, 80, c.muted());
         if (mode == Mode.REVIEW) {
             label(draw, review.name() + " · " + review.changes().size() + " changes", x + 12, y + 31, w - 24, c.muted());
             label(draw, "Automation stays OFF. Personal data and keybinds stay local.", x + 12, y + 45, w - 24, c.accentBright());
@@ -183,7 +183,7 @@ public final class ConfigLibraryScreen extends Screen {
             for (int row = 0; row < rows && start + row < review.changes().size(); row++) {
                 var change = review.changes().get(start + row);
                 int top = y + 67 + row * 32;
-                RoundedGui.fill(draw, x + 12, top, w - 24, 29, 3, c.nest());
+                RoundedGui.fill(draw, x + 12, top, w - 24, 29, 6, c.nest());
                 label(draw, change.field(), x + 19, top + 5, w - 38, c.text());
                 label(draw, change.before() + "  >  " + change.after(), x + 19, top + 17, w - 38, c.muted());
             }
@@ -198,7 +198,7 @@ public final class ConfigLibraryScreen extends Screen {
             label(draw, "New name", x + 12, y + 68, w - 24, c.accentBright());
         } else {
             label(draw, status, x + 12, y + 31, w - 24, c.muted());
-            RoundedGui.fill(draw, x + 12, y + 102, w - 24, rows * 28 + 2, 4, c.nest());
+            RoundedGui.fill(draw, x + 12, y + 102, w - 24, rows * 28 + 2, 6, c.nest());
             if (profiles.isEmpty()) label(draw, mode == Mode.IMPORT ? "No incoming JSON files. Open inbox to add one." : "No saved presets. Name one above and Save current.", x + 20, y + 114, w - 40, c.muted());
             pageLabel(draw, profiles.size(), y + 115 + rows * 28);
         }
@@ -207,8 +207,8 @@ public final class ConfigLibraryScreen extends Screen {
             if (status.startsWith("Error: ")) label(draw, status, x + 12, y + h - 77, w - 24, c.accentBright());
         }
         if (input != null) {
-            RoundedGui.fill(draw, input.getX() - 6, input.getY() - 6, input.getWidth() + 12, 22, 4, c.nest());
-            RoundedGui.outlineOnly(draw, input.getX() - 6, input.getY() - 6, input.getWidth() + 12, 22, 4,
+            RoundedGui.fill(draw, input.getX() - 6, input.getY() - 6, input.getWidth() + 12, 22, 6, c.nest());
+            RoundedGui.outlineOnly(draw, input.getX() - 6, input.getY() - 6, input.getWidth() + 12, 22, 6,
                 input.isFocused() ? c.accentDim() : c.outlineSoft());
         }
         super.extractRenderState(draw, mouseX, mouseY, delta);
@@ -263,9 +263,12 @@ public final class ConfigLibraryScreen extends Screen {
         }
         @Override protected void extractWidgetRenderState(GuiGraphicsExtractor draw, int mouseX, int mouseY, float delta) {
             var c = colors();
-            RoundedGui.fill(draw, getX(), getY(), getWidth(), getHeight(), 4, isHovered() || isFocused() ? c.activeHover() : c.nest());
-            RoundedGui.outlineOnly(draw, getX(), getY(), getWidth(), getHeight(), 4, isFocused() ? c.accentBright() : c.outlineSoft());
-            label(draw, getMessage().getString(), getX() + 6, getY() + 6, getWidth() - 12, active ? c.text() : c.faint());
+            boolean highlighted = active && (isHovered() || isFocused());
+            RoundedGui.fill(draw, getX(), getY(), getWidth(), getHeight(), 6, highlighted ? c.hover() : c.nest());
+            RoundedGui.outlineOnly(draw, getX(), getY(), getWidth(), getHeight(), 6, isFocused() ? c.accentBright() : c.outlineSoft());
+            var text = ArcaneFont.trimmed(font, getMessage().getString(), getWidth() - 12);
+            draw.text(font, text, getX() + (getWidth() - ArcaneFont.width(font, text)) / 2, getY() + 6,
+                active ? c.text() : c.faint(), false);
         }
         @Override public void onClick(MouseButtonEvent click, boolean doubled) { action.run(); }
         @Override public boolean keyPressed(KeyEvent input) {
@@ -282,10 +285,10 @@ public final class ConfigLibraryScreen extends Screen {
         ProfileRow(int x, int y, int width, String name) { super(x, y, width, 26, Component.literal(name)); this.name = name; }
         @Override protected void extractWidgetRenderState(GuiGraphicsExtractor draw, int mouseX, int mouseY, float delta) {
             var c = colors(); boolean chosen = name.equals(selected);
-            RoundedGui.fill(draw, getX() + 2, getY(), getWidth() - 4, 26, 3, chosen ? c.active() : isHovered() || isFocused() ? c.hover() : c.nest());
+            RoundedGui.fill(draw, getX() + 2, getY(), getWidth() - 4, 26, 5, chosen ? c.active() : isHovered() || isFocused() ? c.hover() : c.row());
             label(draw, name, getX() + 8, getY() + 4, getWidth() - 18, c.text());
             label(draw, name + ".json", getX() + 8, getY() + 15, getWidth() - 18, c.muted());
-            if (isFocused()) RoundedGui.outlineOnly(draw, getX() + 2, getY(), getWidth() - 4, 26, 3, c.accentBright());
+            if (isFocused()) RoundedGui.outlineOnly(draw, getX() + 2, getY(), getWidth() - 4, 26, 5, c.accentBright());
         }
         private void select() {
             selected = name;
