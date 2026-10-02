@@ -35,6 +35,12 @@ The loader bundles the client you just compiled. No prebuilt client binary or pr
 
 Runtime requirements: Minecraft 26.3, Java 25, Fabric Loader 0.19.5, and Fabric API 0.160.6+26.3. Right Shift opens the module interface.
 
+## Automatic chat macros
+
+Open the interface with Right Shift, expand **Social** in **UTILITY**, and fill one of the four Chat Macros message slots. Enable **Chat Macros**, select the slot with **Auto macro**, click **Interval** to type an exact interval of **1–3600 seconds**, and save. Turn on **Automatic** to repeat that selected message. Messages beginning with `/` send as commands, just like manual macros.
+
+The first send occurs after a full interval. Turning off Automatic or Chat Macros stops repetition. Empty slots send nothing. Changing the selected slot, its message, or the interval, reconnecting, or pausing a single-player game restarts the countdown. Delayed ticks send once without replaying missed intervals. These settings are saved with your client configuration; loading a Config Library profile switches automation off.
+
 ## Inspect and verify
 
 Read [the security and release-verification notes](docs/SECURITY-AND-VERIFICATION.md). They explain the loader's network requests, file writes, helper process, trust model and release hashes.

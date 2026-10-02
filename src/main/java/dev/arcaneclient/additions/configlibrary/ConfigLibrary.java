@@ -31,7 +31,7 @@ public final class ConfigLibrary {
     private static final Set<String> AUTOMATION = Set.of("autoTotem", "autoSprint", "autoEat", "autoArmor",
         "smartWeapon", "triggerBot", "hotbarRefill", "spearSwitch", "maceSwitch", "safetyDisconnect", "autoTool",
         "elytraAssist", "autoRespawn", "antiAfk", "autoWalk", "autoJump", "autoSneak", "inventoryMove",
-        "safeWalk", "parkourAssist", "swimAssist", "vehicleCruise", "autoFish", "chatMacros", "coordinateClipboard",
+        "safeWalk", "parkourAssist", "swimAssist", "vehicleCruise", "autoFish", "chatMacros", "automaticChatMacros", "coordinateClipboard",
         "freecamMining", "combatAdditions.aimAssist", "combatAdditions.autoClicker", "combatAdditions.autoCrystal",
         "combatAdditions.shieldBreaker", "combatAdditions.maceBomber", "combatAdditions.anchorMacro",
         "combatAdditions.doubleAnchor", "combatAdditions.clickerIgnoreCooldown", "utilityAdditions.hoverTotem",

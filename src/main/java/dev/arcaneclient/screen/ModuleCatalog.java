@@ -493,9 +493,20 @@ public final class ModuleCatalog {
     private static List<GuiModule> utility(ArcaneConfig config, ArcaneKeybinds keybinds) {
         GuiModule autoTool = GuiModule.toggle("Auto Tool", "Selects the best hotbar tool before mining, then restores your slot.", () -> config.autoTool, value -> config.autoTool = value)
             .with(new GuiSetting.Toggle("Protect 1 durability", () -> config.autoToolPreserveDurability, value -> config.autoToolPreserveDurability = value)).build();
-        GuiModule.Builder macros = GuiModule.toggle("Chat Macros", "Sends four saved messages, each on its own key.", () -> config.chatMacros, value -> config.chatMacros = value);
+        GuiModule.Builder macros = GuiModule.toggle("Chat Macros", "Send four saved messages or commands by key, or automatically repeat one at a chosen interval.", () -> config.chatMacros, value -> config.chatMacros = value);
         List<KeyMapping> macroKeys = keybinds.chatMacros();
         for (int slot = 0; slot < macroKeys.size(); slot++) macros.with(new GuiSetting.Message(Integer.toString(slot + 1), slot, macroKeys.get(slot)));
+        macros.with(new GuiSetting.Toggle("Automatic", () -> config.automaticChatMacros, value -> config.automaticChatMacros = value))
+            .with(new GuiSetting.Cycle("Auto macro", () -> "Macro " + (config.automaticChatMacroSlot + 1),
+                () -> config.automaticChatMacroSlot = (config.automaticChatMacroSlot + 1) % 4))
+            .with(new GuiSetting.Cycle("Interval", () -> config.automaticChatMacroIntervalSeconds + "s / Edit", () -> {
+                Minecraft client = Minecraft.getInstance();
+                client.gui.setScreen(new TextSettingsScreen(client.gui.screen(), config, "Automatic chat interval",
+                    "Repeat the selected macro after each full interval.", List.of(new TextSettingsScreen.Field(
+                        "Interval in seconds", "1-3600 seconds; invalid text keeps the previous value.",
+                        () -> Integer.toString(config.automaticChatMacroIntervalSeconds),
+                        value -> config.setAutomaticChatMacroInterval(value), 10))));
+            }));
         GuiModule autoRespawn = GuiModule.toggle("Auto Respawn", "Returns to play immediately after death without clicking the death screen.", () -> config.autoRespawn, value -> config.autoRespawn = value).build();
         GuiModule antiAfk = GuiModule.toggle("Anti AFK", "Performs one harmless hand swing after the configured idle interval.", () -> config.antiAfk, value -> config.antiAfk = value)
             .with(new GuiSetting.Slider("Idle interval", () -> config.antiAfkSeconds, value -> config.antiAfkSeconds = value, 30, 600, "s")).build();
