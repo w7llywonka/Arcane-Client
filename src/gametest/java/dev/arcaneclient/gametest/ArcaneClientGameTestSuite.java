@@ -19,6 +19,7 @@ public final class ArcaneClientGameTestSuite implements FabricClientGameTest {
         tests.put("scanner", new ChunkScannerClientGameTest());
         tests.put("growth", new GrowthFinderClientGameTest());
         tests.put("relog", new RelogClientGameTest());
+        tests.put("chat-macros", new ChatMacrosClientGameTest());
         String filter = System.getProperty("arcane.gametest.tests", "all");
         for (String name : filter.equals("all") ? tests.keySet() : java.util.Arrays.asList(filter.split(","))) {
             FabricClientGameTest test = tests.get(name.trim());

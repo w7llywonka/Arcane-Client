@@ -55,7 +55,7 @@ jobs:
           - name: camera
             tests: camera
           - name: scanners-session
-            tests: scanner,growth,relog
+            tests: scanner,growth,relog,chat-macros
     steps:
       - name: Check out source
         uses: actions/checkout@v7

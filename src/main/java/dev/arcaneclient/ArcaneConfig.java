@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dev.arcaneclient.ArcaneClient;
 import dev.arcaneclient.chat.ChatMacroMessage;
+import dev.arcaneclient.chat.AutomaticChatMacroSchedule;
 import dev.arcaneclient.combat.SwingDuration;
 import dev.arcaneclient.esp.ItemEspCategory;
 import dev.arcaneclient.freecam.FreecamSpeed;
@@ -62,6 +63,9 @@ public final class ArcaneConfig {
     public boolean chunkAnalysis = false;
     public boolean autoTotem = false;
     public boolean chatMacros = true;
+    public boolean automaticChatMacros = false;
+    public int automaticChatMacroSlot = 0;
+    public int automaticChatMacroIntervalSeconds = 30;
 
     // Combat and survival modules.
     public boolean autoSprint = false;
@@ -595,6 +599,16 @@ public final class ArcaneConfig {
         };
     }
 
+    public boolean setAutomaticChatMacroInterval(String value) {
+        try {
+            this.automaticChatMacroIntervalSeconds = Math.clamp(Integer.parseInt(value.strip()),
+                AutomaticChatMacroSchedule.MIN_INTERVAL_SECONDS, AutomaticChatMacroSchedule.MAX_INTERVAL_SECONDS);
+            return true;
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
+    }
+
     public void setChatMacro(int index, String value) {
         String normalized = ChatMacroMessage.normalize(value);
         switch (index) {
@@ -760,5 +774,8 @@ public final class ArcaneConfig {
         this.chatMacro2 = ChatMacroMessage.normalize(this.chatMacro2);
         this.chatMacro3 = ChatMacroMessage.normalize(this.chatMacro3);
         this.chatMacro4 = ChatMacroMessage.normalize(this.chatMacro4);
+        this.automaticChatMacroSlot = Math.clamp(this.automaticChatMacroSlot, 0, AutomaticChatMacroSchedule.MACRO_COUNT - 1);
+        this.automaticChatMacroIntervalSeconds = Math.clamp(this.automaticChatMacroIntervalSeconds,
+            AutomaticChatMacroSchedule.MIN_INTERVAL_SECONDS, AutomaticChatMacroSchedule.MAX_INTERVAL_SECONDS);
     }
 }
